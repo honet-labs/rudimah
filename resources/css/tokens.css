@@ -1,0 +1,85 @@
+:root {
+  --rd-bg: #f8fafc;
+  --rd-surface: #ffffff;
+  --rd-surface-muted: #f1f5f9;
+  --rd-text: #0f172a;
+  --rd-text-muted: #475569;
+  --rd-text-subtle: #64748b;
+  --rd-border: #cbd5e1;
+  --rd-border-subtle: #e2e8f0;
+  
+  --rd-primary: #0f766e;
+  --rd-primary-hover: #0d655e;
+  --rd-primary-text: #ffffff;
+  --rd-primary-muted: #f0fdfa;
+  
+  --rd-neutral-badge-bg: #f1f5f9;
+  --rd-neutral-badge-text: #334155;
+  --rd-neutral-badge-border: #cbd5e1;
+  
+  --rd-success: #15803d;
+  --rd-success-bg: #f0fdf4;
+  --rd-warning: #b45309;
+  --rd-warning-bg: #fffbeb;
+  --rd-danger: #b91c1c;
+  --rd-danger-bg: #fef2f2;
+  
+  --rd-focus: #0f766e;
+  --rd-ring: rgba(15, 118, 110, 0.2);
+
+  --rd-space-1: 4px;
+  --rd-space-2: 8px;
+  --rd-space-3: 12px;
+  --rd-space-4: 16px;
+  --rd-space-5: 20px;
+  --rd-space-6: 24px;
+  --rd-space-8: 32px;
+  --rd-space-12: 48px;
+
+  --rd-radius-sm: 6px;
+  --rd-radius-md: 10px;
+  --rd-radius-lg: 14px;
+  --rd-radius-xl: 18px;
+
+  --rd-shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --rd-shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --rd-shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+
+  --rd-font-sans: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --rd-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --rd-z-drawer: 40;
+  --rd-z-modal: 50;
+  --rd-z-toast: 60;
+  --rd-z-dropdown: 30;
+}
+
+[data-theme="dark"] {
+  --rd-bg: #090d16;
+  --rd-surface: #111827;
+  --rd-surface-muted: #1f2937;
+  --rd-text: #f9fafb;
+  --rd-text-muted: #9ca3af;
+  --rd-text-subtle: #6b7280;
+  --rd-border: #374151;
+  --rd-border-subtle: #1f2937;
+
+  --rd-primary: #14b8a6;
+  --rd-primary-hover: #0d9488;
+  --rd-primary-text: #042f2e;
+  --rd-primary-muted: #134e4a;
+
+  --rd-neutral-badge-bg: #1f2937;
+  --rd-neutral-badge-text: #e5e7eb;
+  --rd-neutral-badge-border: #374151;
+
+  --rd-success: #22c55e;
+  --rd-success-bg: #052e16;
+  --rd-warning: #f59e0b;
+  --rd-warning-bg: #451a03;
+  --rd-danger: #ef4444;
+  --rd-danger-bg: #450a0a;
+
+  --rd-focus: #14b8a6;
+  --rd-ring: rgba(20, 184, 166, 0.3);
+}

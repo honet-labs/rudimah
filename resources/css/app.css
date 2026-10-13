@@ -1,0 +1,35 @@
+@import "./tokens.css";
+@import "tailwindcss";
+
+@layer base {
+  *, ::before, ::after {
+    border-color: var(--rd-border);
+  }
+
+  body {
+    background-color: var(--rd-bg);
+    color: var(--rd-text);
+    font-family: var(--rd-font-sans);
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+.rd-card {
+  background-color: var(--rd-surface);
+  border: 1px solid var(--rd-border);
+  border-radius: var(--rd-radius-md);
+  box-shadow: var(--rd-shadow-sm);
+}
+
+.rd-badge-neutral {
+  background-color: var(--rd-neutral-badge-bg);
+  color: var(--rd-neutral-badge-text);
+  border: 1px solid var(--rd-neutral-badge-border);
+  border-radius: var(--rd-radius-sm);
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+}

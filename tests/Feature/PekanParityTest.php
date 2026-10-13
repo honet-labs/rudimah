@@ -1,0 +1,29 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Core\Applications\AppRegistry;
+use Tests\TestCase;
+
+class PekanParityTest extends TestCase
+{
+    public function test_pekan_app_manifest_is_registered_and_enabled(): void
+    {
+        $manifest = AppRegistry::find('pekan');
+
+        $this->assertNotNull($manifest, 'Modul PEKAN harus terdaftar dalam AppRegistry RUDIMAH.');
+        $this->assertEquals('PEKAN', $manifest->name);
+        $this->assertTrue($manifest->enabled, 'Modul PEKAN harus berstatus enabled.');
+    }
+
+    public function test_skeleton_apps_are_registered(): void
+    {
+        $app1 = AppRegistry::find('app1');
+        $this->assertNotNull($app1, 'Modul App1 harus terdaftar sebagai skeleton.');
+        $this->assertFalse($app1->enabled, 'Modul App1 belum boleh diaktifkan sebelum spesifikasi fungsional tersedia.');
+
+        $app2 = AppRegistry::find('app2');
+        $this->assertNotNull($app2, 'Modul App2 harus terdaftar sebagai skeleton.');
+        $this->assertFalse($app2->enabled, 'Modul App2 belum boleh diaktifkan sebelum spesifikasi fungsional tersedia.');
+    }
+}
