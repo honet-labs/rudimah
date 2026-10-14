@@ -16,6 +16,7 @@ RUN apk add --no-cache \
     mariadb-client \
     curl \
     git \
+    unzip \
     libzip-dev \
     libpng-dev \
     icu-dev \
@@ -41,6 +42,9 @@ RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
+
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_MEMORY_LIMIT=-1
 
 # Copy Application Code
 COPY . .

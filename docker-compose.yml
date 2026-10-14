@@ -40,7 +40,7 @@ services:
       dockerfile: Dockerfile
     container_name: rudimah_horizon
     restart: unless-stopped
-    command: ["php", "artisan", "horizon"]
+    command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=90"]
     env_file: .env
     volumes:
       - storage_data:/var/www/html/storage

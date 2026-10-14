@@ -208,7 +208,7 @@ fi
 echo ""
 echo "=================================================================="
 echo "          MEMULAI DEPLOYMENT OTOMATIS KONTAINER DOCKER           "
-echo "=================================================================="
+chmod +x artisan *.sh docker/mariadb/*.sh 2>/dev/null || true
 
 echo "[1/6] Membangun dan menjalankan kontainer Docker..."
 docker compose up -d --build
