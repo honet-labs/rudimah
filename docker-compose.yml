@@ -45,7 +45,10 @@ services:
     volumes:
       - storage_data:/var/www/html/storage
     depends_on:
-      - app
+      app:
+        condition: service_started
+      redis:
+        condition: service_healthy
     networks:
       - rudimah_network
 

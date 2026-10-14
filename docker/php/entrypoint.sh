@@ -73,4 +73,10 @@ if [ "$1" = "php-fpm" ]; then
     php artisan optimize:clear 2>/dev/null || true
 fi
 
+# 3. Jeda inisialisasi jika proses adalah worker antrean
+if [ "$1" = "php" ] && [ "${2:-}" = "artisan" ]; then
+    echo "[*] Mempersiapkan worker antrean RUDIMAH..."
+    sleep 3
+fi
+
 exec "$@"
