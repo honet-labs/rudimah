@@ -3,7 +3,7 @@
 FROM node:22-alpine AS frontend-builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --no-audit
+RUN npm install --no-audit
 COPY . .
 RUN npm run build
 
@@ -46,12 +46,20 @@ WORKDIR /var/www/html
 COPY . .
 COPY --from=frontend-builder /app/public/build ./public/build
 
-# Setup Permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Install Composer Dependencies
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
 
-# Copy Nginx & Supervisor Configs
-COPY docker/nginx/http.conf /etc/nginx/http.d/default.conf
+# Setup Storage & Cache Directories
+RUN mkdir -p \
+    storage/framework/cache/data \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/logs \
+    bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache public \
+    && chmod -R 775 storage bootstrap/cache public
+
+# Copy PHP Config
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
 
 EXPOSE 80 443

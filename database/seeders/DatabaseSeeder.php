@@ -16,17 +16,19 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // 1. Buat User Administrator
+        $adminEmail = env('INITIAL_ADMIN_EMAIL', 'admin@rudimah.id');
+        $adminPassword = env('INITIAL_ADMIN_PASSWORD', 'AdminRUDIMAH2026!');
         $adminId = (string) Str::uuid();
-        $admin = User::firstOrCreate(
-            ['email' => 'admin@rudimah.id'],
-            [
-                'id' => $adminId,
-                'full_name' => 'Administrator RUDIMAH',
-                'password' => Hash::make('AdminRUDIMAH2026!'),
-                'is_active' => true,
-                'is_super_admin' => true,
-            ]
-        );
+
+        $admin = User::firstOrNew(['email' => $adminEmail]);
+        if (!$admin->exists) {
+            $admin->id = $adminId;
+            $admin->full_name = 'Administrator RUDIMAH';
+            $admin->is_active = true;
+            $admin->is_super_admin = true;
+        }
+        $admin->password = Hash::make($adminPassword);
+        $admin->save();
 
         // 2. Buat Tenant Default
         $tenantId = (string) Str::uuid();
