@@ -1,3 +1,4 @@
+<script setup lang="ts">
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import RdButton from '../design-system/RdButton.vue';
