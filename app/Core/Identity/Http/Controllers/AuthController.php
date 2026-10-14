@@ -106,16 +106,35 @@ class AuthController
         return redirect('/login');
     }
 
+    public static function hasConfiguredNotificationChannel(): bool
+    {
+        $mailConfigured = !empty(config('rudimah.notifications.mail.host', env('MAIL_HOST'))) && env('MAIL_MAILER', 'smtp') !== 'log';
+        $telegramConfigured = !empty(config('rudimah.notifications.telegram.bot_token', env('TELEGRAM_BOT_TOKEN')));
+        $whatsappConfigured = !empty(config('rudimah.notifications.whatsapp.waha_api_url', env('WAHA_API_URL', env('WHATSAPP_API_URL'))));
+
+        return $mailConfigured || $telegramConfigured || $whatsappConfigured;
+    }
+
     public function showForgotPassword(): Response
     {
+        $channelsConfigured = self::hasConfiguredNotificationChannel();
+
         return Inertia::render('Auth/ForgotPassword', [
             'status' => session('status'),
             'error' => session('error'),
+            'channelsConfigured' => $channelsConfigured,
+            'unconfiguredNotice' => !$channelsConfigured
+                ? 'Kanal pengiriman notifikasi (Email SMTP, Telegram Bot, atau WhatsApp WAHA) belum dikonfigurasi di Admin Control Panel. Silakan lakukan setup konfigurasi kanal terlebih dahulu di Admin Control Panel atau berkas .env.'
+                : null,
         ]);
     }
 
     public function sendResetLinkEmail(Request $request): RedirectResponse
     {
+        if (!self::hasConfiguredNotificationChannel()) {
+            return back()->with('error', 'Kanal pengiriman notifikasi (Email SMTP, Telegram Bot, atau WhatsApp WAHA) belum dikonfigurasi di Admin Control Panel. Anda harus melakukan setup konfigurasi kanal pengiriman terlebih dahulu sebelum dapat mengirim tautan pemulihan kata sandi.');
+        }
+
         $validated = $request->validate([
             'email' => 'required|email',
         ]);

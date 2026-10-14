@@ -57,4 +57,24 @@ return [
         'allowed_mimes' => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
         'auto_commit' => false,
     ],
+
+    'notifications' => [
+        'mail' => [
+            'enabled' => !empty(env('MAIL_HOST')) && env('MAIL_MAILER', 'smtp') !== 'log',
+            'host' => env('MAIL_HOST', ''),
+            'port' => (int) env('MAIL_PORT', 587),
+            'from_address' => env('MAIL_FROM_ADDRESS', 'noreply@rudimah.id'),
+        ],
+        'telegram' => [
+            'enabled' => !empty(env('TELEGRAM_BOT_TOKEN')),
+            'bot_token' => env('TELEGRAM_BOT_TOKEN', ''),
+            'bot_username' => env('TELEGRAM_BOT_USERNAME', ''),
+        ],
+        'whatsapp' => [
+            'enabled' => !empty(env('WAHA_API_URL')) || !empty(env('WHATSAPP_API_URL')),
+            'waha_api_url' => env('WAHA_API_URL', env('WHATSAPP_API_URL', '')),
+            'waha_api_key' => env('WAHA_API_KEY', env('WHATSAPP_API_KEY', '')),
+            'waha_session' => env('WAHA_SESSION', 'default'),
+        ],
+    ],
 ];

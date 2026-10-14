@@ -5,9 +5,11 @@ import RdButton from '../../design-system/RdButton.vue';
 import RdInput from '../../design-system/RdInput.vue';
 import RdThemeToggle from '../../design-system/RdThemeToggle.vue';
 
-defineProps<{
+const props = defineProps<{
   status?: string;
   error?: string;
+  channelsConfigured?: boolean;
+  unconfiguredNotice?: string;
 }>();
 
 const csrfToken = ref('');
@@ -53,6 +55,9 @@ function submit() {
       <RdThemeToggle />
     </div>
     <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
+      <div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-teal-800 text-white font-black text-lg mb-2">
+        R
+      </div>
       <h2 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
         Pemulihan Kata Sandi
       </h2>
@@ -63,10 +68,27 @@ function submit() {
 
     <div class="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
       <div class="bg-white dark:bg-slate-900 py-8 px-6 shadow-sm border border-slate-200 dark:border-slate-800 rounded-lg sm:px-10">
+        <!-- Peringatan Kanal Notifikasi Belum Disetup -->
+        <div
+          v-if="channelsConfigured === false || unconfiguredNotice"
+          class="mb-5 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 rounded-lg text-xs space-y-2"
+        >
+          <div class="font-bold uppercase tracking-wider text-[11px] text-amber-800 dark:text-amber-300">
+            Perhatian: Kanal Notifikasi Belum Dikonfigurasi
+          </div>
+          <p class="leading-relaxed">
+            Kanal pengiriman notifikasi (Email SMTP, Telegram Bot, atau WhatsApp WAHA) belum disiapkan pada Admin Control Panel atau berkas .env. Tautan pemulihan otomatis belum dapat dikirim ke perangkat Anda.
+          </p>
+          <div class="pt-2 border-t border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300">
+            <strong>Bagi Administrator Sistem:</strong> Anda dapat mereset kata sandi administrator secara langsung via terminal server:
+            <code class="block mt-1 p-1.5 bg-amber-100 dark:bg-amber-900/60 rounded font-mono text-[11px] select-all text-slate-800 dark:text-slate-200">bash reset-admin-password.sh</code>
+          </div>
+        </div>
+
         <form @submit.prevent="submit" class="space-y-4">
           <input type="hidden" name="_token" :value="csrfToken" />
 
-          <div v-if="status" class="p-3 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs rounded-md border border-slate-300 dark:border-slate-700">
+          <div v-if="status" class="p-3 bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-200 text-xs rounded-md border border-teal-300 dark:border-teal-800">
             {{ status }}
           </div>
           <div v-if="error || form.errors.email" class="p-3 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200 text-xs rounded-md border border-red-300 dark:border-red-800">
@@ -82,6 +104,7 @@ function submit() {
             placeholder="nama@domain.com"
             :error="form.errors.email"
             required
+            :disabled="channelsConfigured === false"
           />
 
           <div class="pt-2">
@@ -90,8 +113,9 @@ function submit() {
               variant="primary"
               class="w-full"
               :loading="form.processing"
+              :disabled="channelsConfigured === false"
             >
-              Kirim Tautan Pemulihan
+              {{ channelsConfigured === false ? 'Kanal Pengiriman Belum Dikonfigurasi' : 'Kirim Tautan Pemulihan' }}
             </RdButton>
           </div>
         </form>
