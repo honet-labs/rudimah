@@ -71,7 +71,7 @@ const newWorkspaceName = ref('');
         title="Buat Ruang Kerja Baru"
         description="Ruang kerja memisahkan data transaksi dan anggota secara aman"
       >
-        <form method="POST" action="/workspaces" class="space-y-4">
+        <form id="create-workspace-form" method="POST" action="/workspaces" class="space-y-4">
           <RdInput
             id="workspace_name"
             v-model="newWorkspaceName"
@@ -79,16 +79,16 @@ const newWorkspaceName = ref('');
             placeholder="Contoh: Keluarga Pratama, Toko Berkah"
             required
           />
-
-          <template #footer>
-            <RdButton variant="outline" size="sm" @click="isCreateModalOpen = false">
-              Batal
-            </RdButton>
-            <RdButton type="submit" variant="primary" size="sm">
-              Simpan Ruang Kerja
-            </RdButton>
-          </template>
         </form>
+
+        <template #footer>
+          <RdButton variant="outline" size="sm" @click="isCreateModalOpen = false">
+            Batal
+          </RdButton>
+          <RdButton form="create-workspace-form" type="submit" variant="primary" size="sm">
+            Simpan Ruang Kerja
+          </RdButton>
+        </template>
       </RdModal>
     </div>
   </div>

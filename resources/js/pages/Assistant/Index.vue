@@ -460,7 +460,7 @@ onMounted(() => {
 
       <!-- Modal Pengaturan AI Ruang Kerja -->
       <RdModal
-        :is-open="isSettingsModalOpen"
+        v-model="isSettingsModalOpen"
         title="Pengaturan Integrasi Asisten AI"
         @close="isSettingsModalOpen = false"
       >

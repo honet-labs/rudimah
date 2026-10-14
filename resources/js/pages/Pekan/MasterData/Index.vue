@@ -147,11 +147,12 @@ const categoryColumns = [
           label="Saldo Awal (Rp)"
           required
         />
-        <template #footer>
-          <RdButton variant="outline" size="sm" @click="isAddAccountOpen = false">Batal</RdButton>
-          <RdButton variant="primary" size="sm">Simpan Rekening</RdButton>
-        </template>
       </form>
+
+      <template #footer>
+        <RdButton variant="outline" size="sm" @click="isAddAccountOpen = false">Batal</RdButton>
+        <RdButton variant="primary" size="sm">Simpan Rekening</RdButton>
+      </template>
     </RdModal>
 
     <!-- Modal Tambah Kategori -->
@@ -177,11 +178,12 @@ const categoryColumns = [
           ]"
           required
         />
-        <template #footer>
-          <RdButton variant="outline" size="sm" @click="isAddCategoryOpen = false">Batal</RdButton>
-          <RdButton variant="primary" size="sm">Simpan Kategori</RdButton>
-        </template>
       </form>
+
+      <template #footer>
+        <RdButton variant="outline" size="sm" @click="isAddCategoryOpen = false">Batal</RdButton>
+        <RdButton variant="primary" size="sm">Simpan Kategori</RdButton>
+      </template>
     </RdModal>
   </RudimahAppShell>
 </template>
