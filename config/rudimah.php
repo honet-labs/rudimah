@@ -39,8 +39,20 @@ return [
         'max_attempts' => 5,
     ],
 
+    'ai' => [
+        'default_provider' => env('AI_DEFAULT_PROVIDER', 'gemini'),
+        'gemini_key' => env('GEMINI_API_KEY', ''),
+        'openai_key' => env('OPENAI_API_KEY', ''),
+        'hermes_key' => env('HERMES_API_KEY', ''),
+        'hermes_endpoint' => env('HERMES_API_ENDPOINT', 'http://localhost:11434/v1'),
+        'openclaw_key' => env('OPENCLAW_API_KEY', ''),
+        'openclaw_endpoint' => env('OPENCLAW_API_ENDPOINT', 'http://localhost:8080/v1'),
+        'enforce_strict_tenant_isolation' => true,
+    ],
+
     'ocr' => [
-        'provider' => env('OCR_PROVIDER', 'local_vision'),
+        'provider' => env('OCR_PROVIDER', 'gemini'),
+        'model' => env('OCR_MODEL', 'gemini-1.5-flash'),
         'max_file_size_bytes' => 10 * 1024 * 1024,
         'allowed_mimes' => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
         'auto_commit' => false,

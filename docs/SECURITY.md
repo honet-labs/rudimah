@@ -27,9 +27,15 @@ Aset: kredensial, sessions, MFA seeds, tenant membership, receipt images, transa
 - Validasi Input FormRequest, query parameterization, tidak ada command interpolation; SSRF block private/metadata IP jika user dapat memilih URL dan allowlist provider.
 - Error API tidak membocorkan stack trace, SQL, secrets atau lokasi filesystem.
 
-## 5. File/OCR/AI
+## 5. File, OCR, dan AI
 - Validate MIME by content, extension allowlist, max size/pages, image parsing limits; scanning malware bila feasible; file storage private, signed temporary authorization, per-tenant prefix + ownership enforced in app.
 - OCR output untrusted: schema parse, bounds check, duplicate checking, human approval, audit trail. LLM output tidak pernah menjalankan instruksi/system commands atau menulis transaksi tanpa validasi.
+- Tenant AI Assistant Isolation:
+  - Asisten AI di setiap ruang kerja terikat mutlak pada `TenantContext::id()`.
+  - Context builder data finansial hanya melakukan query dengan filter tenant aktif via `TenantScope`.
+  - Jika pengguna meminta informasi mengenai ruang kerja/tenant lain atau memanipulasi prompt (*prompt injection*), asisten wajib menolak secara tegas demi keamanan data.
+  - Percakapan dan pesan (`ai_conversations`, `ai_messages`) terisolasi per tenant dan per pengguna; akses silang menghasilkan HTTP 403/404.
+  - Kunci API kustom yang dikonfigurasi per tenant wajib disimpan terenkripsi (`Crypt::encryptString`).
 - Protect provider prompts: minimalkan PII, prinsip least data, consent and retention policy, no unrestricted production receipt upload to unapproved providers.
 - Protect cache and logs: redact images, raw OCR content and credentials. Encrypt sensitive backups, key rotation, restore drills.
 

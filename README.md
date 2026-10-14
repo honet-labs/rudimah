@@ -23,6 +23,11 @@ RUDIMAH menyediakan satu portal terpadu untuk mengelola berbagai aplikasi web ha
    - Ekstraksi struk belanja via AI OCR dengan alur verifikasi manusia (Human-in-the-Loop)
    - Laporan visual dan analitik keuangan
 
+3. **Kecerdasan Buatan (AI) dan Asisten Cerdas Terisolasi**:
+   - **Fungsi 1 (AI OCR Struk Belanja)**: Ekstraksi draf transaksi kuitansi berbasis model visi (Google Gemini, OpenAI, atau Local Vision). Mengikuti prinsip Human in the Loop (ADR-005) di mana draf wajib diverifikasi oleh pengguna sebelum disimpan final.
+   - **Fungsi 2 (Asisten AI per Ruang Kerja)**: Layanan percakapan cerdas yang terintegrasi ke penyedia Google Gemini, OpenAI, Hermes Agent (Nous Hermes 3), OpenClaw Agent, dan Local Mock.
+   - **Isolasi Keamanan Data Mutlak**: Asisten di Ruang Kerja A terisolasi secara mutlak pada konteks data miliknya (`TenantScope`). Jika pengguna menanyakan data mengenai ruang kerja/tenant lain, asisten secara teknis tidak memiliki akses ke data tersebut dan menolak permintaan secara tegas demi menjaga kerahasiaan data.
+
 ## Tumpukan Teknologi (Tech Stack)
 
 - **Backend**: Laravel 13, PHP 8.3+, Eloquent ORM

@@ -53,6 +53,7 @@ const pekanNavItems = [
   { name: 'Pengingat Tagihan', path: `/t/${props.tenant.slug}/apps/pekan/reminders`, icon: 'bell' },
   { name: 'Master Data', path: `/t/${props.tenant.slug}/apps/pekan/master-data`, icon: 'folder' },
   { name: 'Pindai Struk OCR', path: `/t/${props.tenant.slug}/apps/pekan/receipt-scan`, icon: 'camera' },
+  { name: 'Asisten AI', path: `/t/${props.tenant.slug}/assistant`, icon: 'chat' },
   { name: 'Laporan', path: `/t/${props.tenant.slug}/apps/pekan/reports`, icon: 'chart' },
   { name: 'Pengaturan', path: `/t/${props.tenant.slug}/apps/pekan/settings`, icon: 'cog' },
 ];

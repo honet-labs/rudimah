@@ -1,5 +1,6 @@
 <?php
 
+use App\Core\AI\Http\Controllers\AiAssistantController;
 use App\Core\Identity\Http\Controllers\AdminController;
 use App\Core\Identity\Http\Controllers\AuthController;
 use App\Core\Identity\Http\Controllers\ProfileController;
@@ -49,44 +50,57 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin', [AdminController::class, 'dashboard'])->name('admin.dashboard');
 });
 
-// Rute Modul Terikat Ruang Kerja (Tenant & App Scoped)
-Route::prefix('t/{tenantSlug}/apps')->middleware(['auth', ResolveTenantMiddleware::class])->group(function () {
-    // Modul PEKAN
-    Route::prefix('pekan')->name('pekan.')->group(function () {
-        Route::get('/', [DashboardController::class, 'index']);
-        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-        // Transaksi
-        Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
-        Route::get('/transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
-        Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
-        Route::get('/transactions/{id}', [TransactionController::class, 'show'])->name('transactions.show');
-        Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
-
-        // Anggaran, Tabungan, Pengingat
-        Route::get('/budgets', [BudgetController::class, 'index'])->name('budgets.index');
-        Route::get('/savings', [SavingsController::class, 'index'])->name('savings.index');
-        Route::get('/reminders', [ReminderController::class, 'index'])->name('reminders.index');
-
-        // Master Data
-        Route::get('/master-data', [MasterDataController::class, 'index'])->name('masterdata.index');
-
-        // Pindai Struk OCR
-        Route::get('/receipt-scan', [ReceiptScanController::class, 'index'])->name('receiptscan.index');
-        Route::post('/receipt-scan/upload', [ReceiptScanController::class, 'upload'])->name('receiptscan.upload');
-
-        // Laporan & Pengaturan
-        Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+// Rute Terikat Ruang Kerja (Tenant Scoped: Asisten AI & Modul Aplikasi)
+Route::prefix('t/{tenantSlug}')->middleware(['auth', ResolveTenantMiddleware::class])->group(function () {
+    // Asisten Cerdas AI (Terisolasi per Tenant)
+    Route::prefix('assistant')->name('assistant.')->group(function () {
+        Route::get('/', [AiAssistantController::class, 'index'])->name('index');
+        Route::post('/conversations', [AiAssistantController::class, 'store'])->name('conversations.store');
+        Route::get('/conversations/{id}', [AiAssistantController::class, 'show'])->name('conversations.show');
+        Route::post('/conversations/{id}/messages', [AiAssistantController::class, 'sendMessage'])->name('messages.send');
+        Route::delete('/conversations/{id}', [AiAssistantController::class, 'destroy'])->name('conversations.destroy');
+        Route::put('/settings', [AiAssistantController::class, 'updateSettings'])->name('settings.update');
     });
 
-    // Modul Skeleton App1
-    Route::prefix('app1')->name('app1.')->group(function () {
-        Route::get('/', [App1Controller::class, 'index'])->name('index');
-    });
+    // Rute Modul Aplikasi
+    Route::prefix('apps')->group(function () {
+        // Modul PEKAN
+        Route::prefix('pekan')->name('pekan.')->group(function () {
+            Route::get('/', [DashboardController::class, 'index']);
+            Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Modul Skeleton App2
-    Route::prefix('app2')->name('app2.')->group(function () {
-        Route::get('/', [App2Controller::class, 'index'])->name('index');
+            // Transaksi
+            Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+            Route::get('/transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
+            Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
+            Route::get('/transactions/{id}', [TransactionController::class, 'show'])->name('transactions.show');
+            Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
+
+            // Anggaran, Tabungan, Pengingat
+            Route::get('/budgets', [BudgetController::class, 'index'])->name('budgets.index');
+            Route::get('/savings', [SavingsController::class, 'index'])->name('savings.index');
+            Route::get('/reminders', [ReminderController::class, 'index'])->name('reminders.index');
+
+            // Master Data
+            Route::get('/master-data', [MasterDataController::class, 'index'])->name('masterdata.index');
+
+            // Pindai Struk OCR
+            Route::get('/receipt-scan', [ReceiptScanController::class, 'index'])->name('receiptscan.index');
+            Route::post('/receipt-scan/upload', [ReceiptScanController::class, 'upload'])->name('receiptscan.upload');
+
+            // Laporan & Pengaturan
+            Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+            Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+        });
+
+        // Modul Skeleton App1
+        Route::prefix('app1')->name('app1.')->group(function () {
+            Route::get('/', [App1Controller::class, 'index'])->name('index');
+        });
+
+        // Modul Skeleton App2
+        Route::prefix('app2')->name('app2.')->group(function () {
+            Route::get('/', [App2Controller::class, 'index'])->name('index');
+        });
     });
 });
