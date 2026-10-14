@@ -43,8 +43,8 @@ fi
 echo "[*] Tahap 4: Memuat ulang layanan..."
 if command -v docker >/dev/null 2>&1; then
     docker compose up -d --remove-orphans
-    docker compose exec app php artisan optimize:clear
-    docker compose exec app php artisan optimize
+    docker compose exec -T app php artisan optimize:clear || true
+    docker compose exec -T app php artisan optimize || true
 fi
 
 # 5. Uji Kesehatan Sistem (Healthcheck)

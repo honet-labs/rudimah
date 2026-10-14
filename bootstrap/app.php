@@ -12,7 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/healthz',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->trustProxies(at: '*');
         $middleware->web(append: [
+            \App\Http\Middleware\HandleInertiaRequests::class,
             \App\Core\Tenancy\ResolveTenantMiddleware::class,
         ]);
     })

@@ -49,6 +49,7 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
 # Copy Application Code
 COPY . .
 COPY --from=frontend-builder /app/public/build ./public/build
+COPY --from=frontend-builder /app/public/build /var/www/html/build_dist
 
 # Install Composer Dependencies
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
@@ -63,9 +64,12 @@ RUN mkdir -p \
     && chown -R www-data:www-data storage bootstrap/cache public \
     && chmod -R 775 storage bootstrap/cache public
 
-# Copy PHP Config
+# Copy PHP Config & Entrypoint
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
+COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 80 443
 
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["php-fpm"]

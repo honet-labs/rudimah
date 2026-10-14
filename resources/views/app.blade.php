@@ -13,9 +13,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     @php
-        $manifestPath = public_path('build/manifest.json');
+        $manifestPath = public_path('build/.vite/manifest.json');
+        if (!file_exists($manifestPath)) {
+            $manifestPath = public_path('build/manifest.json');
+        }
         $manifest = file_exists($manifestPath) ? json_decode(file_get_contents($manifestPath), true) : [];
-        $appEntry = $manifest['resources/js/app.ts'] ?? null;
+        $appEntry = $manifest['resources/js/app.ts'] ?? $manifest['resources/js/app.js'] ?? null;
+        if (!$appEntry && !empty($manifest)) {
+            foreach ($manifest as $entry) {
+                if (!empty($entry['isEntry'])) {
+                    $appEntry = $entry;
+                    break;
+                }
+            }
+        }
     @endphp
 
     @if ($appEntry)
@@ -26,10 +37,9 @@
         @endif
         <script type="module" src="{{ asset('build/' . $appEntry['file']) }}"></script>
     @else
-        <!-- Fallback ke directive vite bila tersedia -->
-        @if (function_exists('vite'))
-            @vite(['resources/js/app.ts'])
-        @endif
+        <!-- Fallback aman tanpa throw exception bila manifest sedang dimuat -->
+        <link rel="stylesheet" href="{{ asset('resources/css/app.css') }}">
+        <script type="module" src="{{ asset('resources/js/app.ts') }}"></script>
     @endif
 
     @inertiaHead
