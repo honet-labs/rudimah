@@ -1,19 +1,39 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useForm } from '@inertiajs/vue3';
 import RdButton from '../../design-system/RdButton.vue';
 import RdInput from '../../design-system/RdInput.vue';
+import RdThemeToggle from '../../design-system/RdThemeToggle.vue';
 
 defineProps<{
   challengeType?: string;
   error?: string;
 }>();
 
-const code = ref('');
-const loading = ref(false);
+const csrfToken = ref('');
+
+onMounted(() => {
+  if (typeof document !== 'undefined') {
+    csrfToken.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  }
+});
+
+const form = useForm({
+  code: '',
+});
+
+function submit() {
+  form.post('/mfa/verify', {
+    preserveScroll: true,
+  });
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+  <div class="relative min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div class="absolute top-4 right-4">
+      <RdThemeToggle />
+    </div>
     <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
       <div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-teal-800 text-white font-black text-lg mb-2">
         R
@@ -28,16 +48,20 @@ const loading = ref(false);
 
     <div class="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
       <div class="bg-white dark:bg-slate-900 py-8 px-6 shadow-sm border border-slate-200 dark:border-slate-800 rounded-lg sm:px-10">
-        <form method="POST" action="/mfa/verify" class="space-y-4" @submit="loading = true">
-          <div v-if="error" class="p-3 bg-red-50 text-red-800 text-xs rounded-md border border-red-300">
-            {{ error }}
+        <form @submit.prevent="submit" class="space-y-4">
+          <input type="hidden" name="_token" :value="csrfToken" />
+
+          <div v-if="error || form.errors.code" class="p-3 bg-red-50 text-red-800 text-xs rounded-md border border-red-300">
+            {{ error || form.errors.code }}
           </div>
 
           <RdInput
             id="code"
-            v-model="code"
+            name="code"
+            v-model="form.code"
             label="Kode Autentikasi (6 Digit)"
             placeholder="Contoh: 123456"
+            :error="form.errors.code"
             required
             class="text-center font-mono tracking-widest text-lg"
           />
@@ -47,7 +71,7 @@ const loading = ref(false);
               type="submit"
               variant="primary"
               class="w-full"
-              :loading="loading"
+              :loading="form.processing"
             >
               Verifikasi dan Lanjutkan
             </RdButton>

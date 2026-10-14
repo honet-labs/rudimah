@@ -1,18 +1,38 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useForm } from '@inertiajs/vue3';
 import RdButton from '../../design-system/RdButton.vue';
 import RdInput from '../../design-system/RdInput.vue';
 import RdThemeToggle from '../../design-system/RdThemeToggle.vue';
 
 defineProps<{
   error?: string;
+  errors?: Record<string, string>;
 }>();
 
-const fullName = ref('');
-const email = ref('');
-const password = ref('');
-const passwordConfirmation = ref('');
-const loading = ref(false);
+const csrfToken = ref('');
+
+onMounted(() => {
+  if (typeof document !== 'undefined') {
+    csrfToken.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  }
+});
+
+const form = useForm({
+  name: '',
+  email: '',
+  password: '',
+  password_confirmation: '',
+});
+
+function submit() {
+  form.post('/register', {
+    preserveScroll: true,
+    onFinish: () => {
+      form.reset('password', 'password_confirmation');
+    },
+  });
+}
 </script>
 
 <template>
@@ -34,43 +54,53 @@ const loading = ref(false);
 
     <div class="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
       <div class="bg-white dark:bg-slate-900 py-8 px-6 shadow-sm border border-slate-200 dark:border-slate-800 rounded-lg sm:px-10">
-        <form method="POST" action="/register" class="space-y-4" @submit="loading = true">
-          <div v-if="error" class="p-3 bg-red-50 text-red-800 text-xs rounded-md border border-red-300">
-            {{ error }}
+        <form @submit.prevent="submit" class="space-y-4">
+          <input type="hidden" name="_token" :value="csrfToken" />
+
+          <div v-if="error || form.errors.name || form.errors.email || form.errors.password" class="p-3 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-red-800 dark:text-red-200 text-xs rounded-md">
+            {{ error || form.errors.name || form.errors.email || form.errors.password }}
           </div>
 
           <RdInput
             id="name"
-            v-model="fullName"
+            name="name"
+            v-model="form.name"
             label="Nama Lengkap"
             placeholder="Masukkan nama Anda"
+            :error="form.errors.name"
             required
           />
 
           <RdInput
             id="email"
-            v-model="email"
+            name="email"
+            v-model="form.email"
             type="email"
             label="Alamat Email"
             placeholder="nama@domain.com"
+            :error="form.errors.email"
             required
           />
 
           <RdInput
             id="password"
-            v-model="password"
+            name="password"
+            v-model="form.password"
             type="password"
             label="Kata Sandi"
             placeholder="Minimal 8 karakter"
+            :error="form.errors.password"
             required
           />
 
           <RdInput
             id="password_confirmation"
-            v-model="passwordConfirmation"
+            name="password_confirmation"
+            v-model="form.password_confirmation"
             type="password"
             label="Konfirmasi Kata Sandi"
             placeholder="Ketik ulang kata sandi"
+            :error="form.errors.password_confirmation"
             required
           />
 
@@ -79,7 +109,7 @@ const loading = ref(false);
               type="submit"
               variant="primary"
               class="w-full"
-              :loading="loading"
+              :loading="form.processing"
             >
               Daftar Sekarang
             </RdButton>

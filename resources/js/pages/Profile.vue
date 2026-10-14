@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useForm } from '@inertiajs/vue3';
 import RudimahAppShell from '../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../design-system/RdPageHeader.vue';
 import RdCard from '../design-system/RdCard.vue';
@@ -14,8 +15,13 @@ const props = defineProps<{
   tenant: Tenant;
 }>();
 
-const name = ref(props.user.name);
-const email = ref(props.user.email);
+const form = useForm({
+  name: props.user.name,
+});
+
+function submitProfile() {
+  form.post('/profile');
+}
 </script>
 
 <template>
@@ -29,17 +35,20 @@ const email = ref(props.user.email);
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- Informasi Akun -->
       <RdCard title="Informasi Pribadi" description="Data akun yang digunakan untuk masuk ke platform">
-        <form method="POST" action="/profile" class="space-y-4">
+        <form @submit.prevent="submitProfile" class="space-y-4">
           <RdInput
             id="name"
-            v-model="name"
+            name="name"
+            v-model="form.name"
             label="Nama Lengkap"
+            :error="form.errors.name"
             required
           />
 
           <RdInput
             id="email"
-            v-model="email"
+            name="email"
+            :model-value="user.email"
             type="email"
             label="Alamat Email"
             disabled
@@ -47,7 +56,7 @@ const email = ref(props.user.email);
           />
 
           <div class="pt-2">
-            <RdButton type="submit" variant="primary" size="sm">
+            <RdButton type="submit" variant="primary" size="sm" :loading="form.processing">
               Simpan Profil
             </RdButton>
           </div>

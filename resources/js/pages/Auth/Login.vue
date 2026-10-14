@@ -1,22 +1,38 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useForm } from '@inertiajs/vue3';
 import RdButton from '../../design-system/RdButton.vue';
 import RdInput from '../../design-system/RdInput.vue';
 import RdCheckbox from '../../design-system/RdCheckbox.vue';
 import RdThemeToggle from '../../design-system/RdThemeToggle.vue';
 
-defineProps<{
+const props = defineProps<{
   error?: string;
   status?: string;
+  errors?: Record<string, string>;
 }>();
 
-const email = ref('');
-const password = ref('');
-const remember = ref(false);
-const loading = ref(false);
+const csrfToken = ref('');
+
+onMounted(() => {
+  if (typeof document !== 'undefined') {
+    csrfToken.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  }
+});
+
+const form = useForm({
+  email: '',
+  password: '',
+  remember: false,
+});
 
 function submit() {
-  loading.value = true;
+  form.post('/login', {
+    preserveScroll: true,
+    onFinish: () => {
+      form.reset('password');
+    },
+  });
 }
 </script>
 
@@ -39,9 +55,11 @@ function submit() {
 
     <div class="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
       <div class="bg-white dark:bg-slate-900 py-8 px-6 shadow-sm border border-slate-200 dark:border-slate-800 rounded-lg sm:px-10">
-        <form method="POST" action="/login" class="space-y-4" @submit="submit">
-          <div v-if="error" class="p-3 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-red-800 dark:text-red-200 text-xs rounded-md">
-            {{ error }}
+        <form @submit.prevent="submit" class="space-y-4">
+          <input type="hidden" name="_token" :value="csrfToken" />
+
+          <div v-if="error || form.errors.email || form.errors.password" class="p-3 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-red-800 dark:text-red-200 text-xs rounded-md">
+            {{ error || form.errors.email || form.errors.password }}
           </div>
 
           <div v-if="status" class="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs rounded-md">
@@ -50,25 +68,29 @@ function submit() {
 
           <RdInput
             id="email"
-            v-model="email"
+            name="email"
+            v-model="form.email"
             type="email"
             label="Alamat Email"
             placeholder="nama@domain.com"
+            :error="form.errors.email"
             required
           />
 
           <RdInput
             id="password"
-            v-model="password"
+            name="password"
+            v-model="form.password"
             type="password"
             label="Kata Sandi"
             placeholder="Masukkan kata sandi"
+            :error="form.errors.password"
             required
           />
 
           <div class="flex items-center justify-between text-xs">
             <RdCheckbox
-              v-model="remember"
+              v-model="form.remember"
               label="Ingat saya di perangkat ini"
             />
             <a
@@ -84,7 +106,7 @@ function submit() {
               type="submit"
               variant="primary"
               class="w-full"
-              :loading="loading"
+              :loading="form.processing"
             >
               Masuk ke RUDIMAH
             </RdButton>

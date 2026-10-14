@@ -3,6 +3,7 @@ withDefaults(
   defineProps<{
     modelValue?: string | number;
     id?: string;
+    name?: string;
     label?: string;
     type?: string;
     placeholder?: string;
@@ -37,6 +38,7 @@ defineEmits<{
     </label>
     <input
       :id="id"
+      :name="name || id"
       :type="type"
       :value="modelValue"
       :placeholder="placeholder"

@@ -1,5 +1,5 @@
-<script setup lang="ts">
 import { ref } from 'vue';
+import { useForm } from '@inertiajs/vue3';
 import RdButton from '../design-system/RdButton.vue';
 import RdCard from '../design-system/RdCard.vue';
 import RdModal from '../design-system/RdModal.vue';
@@ -13,7 +13,18 @@ defineProps<{
 }>();
 
 const isCreateModalOpen = ref(false);
-const newWorkspaceName = ref('');
+const form = useForm({
+  name: '',
+});
+
+function submitWorkspace() {
+  form.post('/workspaces', {
+    onSuccess: () => {
+      isCreateModalOpen.value = false;
+      form.reset();
+    },
+  });
+}
 </script>
 
 <template>
@@ -75,12 +86,14 @@ const newWorkspaceName = ref('');
         title="Buat Ruang Kerja Baru"
         description="Ruang kerja memisahkan data transaksi dan anggota secara aman"
       >
-        <form id="create-workspace-form" method="POST" action="/workspaces" class="space-y-4">
+        <form id="create-workspace-form" @submit.prevent="submitWorkspace" class="space-y-4">
           <RdInput
             id="workspace_name"
-            v-model="newWorkspaceName"
+            name="name"
+            v-model="form.name"
             label="Nama Ruang Kerja"
             placeholder="Contoh: Keluarga Pratama, Toko Berkah"
+            :error="form.errors.name"
             required
           />
         </form>
@@ -89,7 +102,7 @@ const newWorkspaceName = ref('');
           <RdButton variant="outline" size="sm" @click="isCreateModalOpen = false">
             Batal
           </RdButton>
-          <RdButton form="create-workspace-form" type="submit" variant="primary" size="sm">
+          <RdButton form="create-workspace-form" type="submit" variant="primary" size="sm" :loading="form.processing">
             Simpan Ruang Kerja
           </RdButton>
         </template>

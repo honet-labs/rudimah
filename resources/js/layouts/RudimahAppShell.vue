@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 import RdTenantSwitcher from '../design-system/RdTenantSwitcher.vue';
 import RdAppLauncher from '../design-system/RdAppLauncher.vue';
 import RdThemeToggle from '../design-system/RdThemeToggle.vue';
@@ -155,14 +156,13 @@ function isCurrentRoute(path: string): boolean {
               <RdThemeToggle size="sm" />
             </div>
             <div class="border-t border-slate-100 dark:border-slate-800 my-1"></div>
-            <form method="POST" action="/logout">
-              <button
-                type="submit"
-                class="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer"
-              >
-                Keluar
-              </button>
-            </form>
+            <button
+              type="button"
+              class="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer"
+              @click="router.post('/logout')"
+            >
+              Keluar
+            </button>
           </div>
         </div>
       </div>
