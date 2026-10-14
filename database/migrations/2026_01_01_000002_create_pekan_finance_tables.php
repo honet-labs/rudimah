@@ -10,6 +10,17 @@ return new class extends Migration
     {
         $schema = Schema::connection('pekan');
 
+        // Bersihkan tabel yang mungkin terbuat sebagian jika migrasi sebelumnya gagal
+        $schema->dropIfExists('finance_receipt_scans');
+        $schema->dropIfExists('finance_reminders');
+        $schema->dropIfExists('finance_savings');
+        $schema->dropIfExists('finance_budgets');
+        $schema->dropIfExists('finance_transaction_attachments');
+        $schema->dropIfExists('finance_transaction_items');
+        $schema->dropIfExists('finance_transactions');
+        $schema->dropIfExists('finance_categories');
+        $schema->dropIfExists('finance_accounts');
+
         $schema->create('finance_accounts', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('tenant_id')->index();
@@ -87,7 +98,7 @@ return new class extends Migration
             $table->uuid('file_id');
             $table->uuid('created_by')->nullable();
             $table->timestamps();
-            $table->unique(['tenant_id', 'transaction_id', 'file_id']);
+            $table->unique(['tenant_id', 'transaction_id', 'file_id'], 'fta_tenant_trx_file_unique');
         });
 
         $schema->create('finance_budgets', function (Blueprint $table) {

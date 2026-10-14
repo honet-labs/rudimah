@@ -45,10 +45,11 @@ if command -v docker >/dev/null 2>&1; then
     docker compose build app horizon scheduler
 fi
 
-# 3. Eksekusi Migrasi Basis Data Aman (Forward-Compatible)
-echo "[*] Tahap 3: Menjalankan migrasi skema basis data..."
+# 3. Eksekusi Migrasi Basis Data Aman (Forward-Compatible) & Seeding Data Awal
+echo "[*] Tahap 3: Menjalankan migrasi skema basis data dan sinkronisasi data awal..."
 if command -v docker >/dev/null 2>&1; then
-    docker compose run --rm app php artisan migrate --force || true
+    docker compose run --rm app php artisan migrate --force
+    docker compose run --rm app php artisan db:seed --force || true
 fi
 
 # 4. Restart Kontainer & Pembersihan Cache
@@ -56,6 +57,7 @@ echo "[*] Tahap 4: Memuat ulang layanan..."
 if command -v docker >/dev/null 2>&1; then
     docker compose up -d --remove-orphans
     docker compose restart redis nginx || true
+    docker compose exec -T app php artisan storage:link || true
     docker compose exec -T app php artisan optimize:clear || true
     docker compose exec -T app php artisan optimize || true
 fi

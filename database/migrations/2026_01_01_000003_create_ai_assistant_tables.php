@@ -10,6 +10,10 @@ return new class extends Migration
     {
         $schema = Schema::connection('platform');
 
+        $schema->dropIfExists('ai_messages');
+        $schema->dropIfExists('ai_conversations');
+        $schema->dropIfExists('tenant_ai_settings');
+
         $schema->create('tenant_ai_settings', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('tenant_id')->constrained('tenants')->cascadeOnDelete();
@@ -34,7 +38,7 @@ return new class extends Migration
             $table->string('model', 100)->default('gemini-1.5-flash');
             $table->timestamps();
 
-            $table->index(['tenant_id', 'user_id', 'created_at']);
+            $table->index(['tenant_id', 'user_id', 'created_at'], 'aic_tenant_user_created_idx');
         });
 
         $schema->create('ai_messages', function (Blueprint $table) {
