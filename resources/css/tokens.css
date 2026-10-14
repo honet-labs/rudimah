@@ -54,7 +54,7 @@
   --rd-z-dropdown: 30;
 }
 
-[data-theme="dark"] {
+:root.dark, [data-theme="dark"], html.dark {
   --rd-bg: #090d16;
   --rd-surface: #111827;
   --rd-surface-muted: #1f2937;

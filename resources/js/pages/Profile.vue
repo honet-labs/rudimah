@@ -6,6 +6,7 @@ import RdCard from '../design-system/RdCard.vue';
 import RdButton from '../design-system/RdButton.vue';
 import RdInput from '../design-system/RdInput.vue';
 import RdBadge from '../design-system/RdBadge.vue';
+import RdThemeToggle from '../design-system/RdThemeToggle.vue';
 import type { User, Tenant } from '../types/core';
 
 const props = defineProps<{
@@ -92,6 +93,21 @@ const email = ref(props.user.email);
               Lihat Kode Pemulihan
             </RdButton>
           </div>
+        </div>
+      </RdCard>
+
+      <!-- Preferensi Tampilan Antarmuka -->
+      <RdCard title="Preferensi Tampilan" description="Pilih tema tampilan antarmuka yang nyaman untuk mata Anda" class="md:col-span-2">
+        <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800">
+          <div>
+            <h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              Tema Terang / Gelap
+            </h4>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Sesuaikan kontras tampilan secara instan atau ikuti preferensi sistem operasi perangkat Anda
+            </p>
+          </div>
+          <RdThemeToggle show-label size="md" />
         </div>
       </RdCard>
     </div>

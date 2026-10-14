@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import RdTenantSwitcher from '../design-system/RdTenantSwitcher.vue';
 import RdAppLauncher from '../design-system/RdAppLauncher.vue';
+import RdThemeToggle from '../design-system/RdThemeToggle.vue';
 import type { Tenant, AppManifest, User } from '../types/core';
 
 const props = withDefaults(
@@ -104,11 +105,14 @@ function isCurrentRoute(path: string): boolean {
       </div>
 
       <!-- Right Header Actions -->
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 sm:gap-3">
         <!-- App Indicator Badge -->
         <span class="hidden md:inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
           Modul: {{ appName }}
         </span>
+
+        <!-- Tombol Beralih Mode Terang / Gelap -->
+        <RdThemeToggle />
 
         <!-- User Profile Dropdown -->
         <div class="relative">
@@ -146,6 +150,10 @@ function isCurrentRoute(path: string): boolean {
             >
               Administrasi Sistem
             </a>
+            <div class="px-3 py-1.5 flex items-center justify-between text-xs text-slate-700 dark:text-slate-200 border-t border-slate-100 dark:border-slate-800">
+              <span class="text-[11px]">Mode Tampilan</span>
+              <RdThemeToggle size="sm" />
+            </div>
             <div class="border-t border-slate-100 dark:border-slate-800 my-1"></div>
             <form method="POST" action="/logout">
               <button
@@ -233,6 +241,12 @@ function isCurrentRoute(path: string): boolean {
             >
               <span>{{ item.name }}</span>
             </a>
+          </div>
+
+          <!-- Pengaturan Tema di Drawer Mobile -->
+          <div class="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between mt-auto">
+            <span class="text-xs text-slate-500 dark:text-slate-400">Mode Tampilan</span>
+            <RdThemeToggle show-label size="sm" />
           </div>
         </div>
       </div>

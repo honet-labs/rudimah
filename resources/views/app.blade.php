@@ -7,6 +7,25 @@
 
     <title inertia>{{ config('app.name', 'RUDIMAH') }}</title>
 
+    <!-- Inisialisasi Tema (Dark / Light Mode) Tanpa Flash -->
+    <script>
+        (function() {
+            try {
+                var theme = localStorage.getItem('rudimah_theme');
+                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (theme === 'dark' || (!theme && prefersDark)) {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    document.documentElement.style.colorScheme = 'dark';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    document.documentElement.style.colorScheme = 'light';
+                }
+            } catch (e) {}
+        })();
+    </script>
+
     <!-- Font Family Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

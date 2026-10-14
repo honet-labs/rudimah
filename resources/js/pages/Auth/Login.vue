@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import RdButton from '../../design-system/RdButton.vue';
 import RdInput from '../../design-system/RdInput.vue';
 import RdCheckbox from '../../design-system/RdCheckbox.vue';
+import RdThemeToggle from '../../design-system/RdThemeToggle.vue';
 
 defineProps<{
   error?: string;
@@ -20,7 +21,10 @@ function submit() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+  <div class="relative min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div class="absolute top-4 right-4">
+      <RdThemeToggle />
+    </div>
     <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
       <div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-teal-800 text-white font-black text-lg mb-2">
         R
