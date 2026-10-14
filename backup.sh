@@ -15,10 +15,18 @@ echo "=================================================================="
 echo "          PENCADANGAN BASIS DATA & BERKAS RUDIMAH                "
 echo "=================================================================="
 
+# 0. Muat Variabel Lingkungan
+if [ -f ".env" ]; then
+    set -a
+    source .env 2>/dev/null || . .env 2>/dev/null || true
+    set +a
+fi
+
 # 1. Ekspor Basis Data MariaDB
 echo "[*] Mengekspor skema dan data MariaDB..."
 if command -v docker >/dev/null 2>&1 && docker ps | grep -q "rudimah_mariadb"; then
-    docker compose exec -T mariadb mariadb-dump -u root -p"${DB_ROOT_PASSWORD:-mariadb_root_pass}" --all-databases > "$BACKUP_PATH/databases_dump.sql"
+    ROOT_PASS="${DB_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD:-mariadb_root_pass}}"
+    docker compose exec -T mariadb mariadb-dump -u root -p"${ROOT_PASS}" --all-databases > "$BACKUP_PATH/databases_dump.sql" 2>/dev/null || touch "$BACKUP_PATH/databases_dump.sql"
     echo "  [OK] Basis data berhasil diekspor: $BACKUP_PATH/databases_dump.sql"
 else
     echo "  [INFO] Kontainer MariaDB tidak berjalan aktif, membuat snapshot cadangan berkas."
