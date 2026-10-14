@@ -248,6 +248,8 @@ docker compose exec -T app php artisan db:seed --force
 echo "[6/6] Menyiapkan tautan penyimpanan dan membersihkan cache..."
 docker compose exec -T app php artisan storage:link || true
 docker compose exec -T app php artisan optimize:clear || true
+docker compose exec -T app chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
+docker compose exec -T app chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
 
 echo ""
 echo "=================================================================="

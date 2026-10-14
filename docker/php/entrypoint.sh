@@ -10,7 +10,7 @@ mkdir -p \
     /var/www/html/bootstrap/cache
 
 chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
-chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
+chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
 
 # 2. Inisialisasi otomatis jika perintah adalah php-fpm (container app)
 if [ "$1" = "php-fpm" ]; then
@@ -76,6 +76,10 @@ if [ "$1" = "php-fpm" ]; then
 
     # Bersihkan cache optimasi
     php artisan optimize:clear 2>/dev/null || true
+
+    # Pastikan izin storage, session, dan cache selalu dapat ditulis penuh oleh www-data
+    chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
+    chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
 fi
 
 # 3. Jeda inisialisasi jika proses adalah worker antrean
@@ -83,5 +87,9 @@ if [ "$1" = "php" ] && [ "${2:-}" = "artisan" ]; then
     echo "[*] Mempersiapkan worker antrean RUDIMAH..."
     sleep 3
 fi
+
+# Pastikan izin storage selalu aman sebelum proses dieksekusi
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
+chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
 
 exec "$@"

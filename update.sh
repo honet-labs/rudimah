@@ -60,6 +60,8 @@ if command -v docker >/dev/null 2>&1; then
     docker compose restart app redis nginx || true
     docker compose exec -T app php artisan storage:link || true
     docker compose exec -T app php artisan optimize:clear || true
+    docker compose exec -T app chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
+    docker compose exec -T app chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
 fi
 
 # 5. Uji Kesehatan Sistem (Healthcheck)
