@@ -50,6 +50,7 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
 COPY . .
 COPY --from=frontend-builder /app/public/build ./public/build
 COPY --from=frontend-builder /app/public/build /var/www/html/build_dist
+RUN cp -rf /var/www/html/public /var/www/html/public_dist
 
 # Install Composer Dependencies
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts

@@ -21,6 +21,7 @@ echo "=================================================================="
 
 # 0. Muat Konfigurasi Lingkungan & Tarik Perubahan Kode Terbaru jika Git Ada
 if [ -f ".env" ]; then
+    sed -i 's/SESSION_DRIVER=redis/SESSION_DRIVER=file/' .env 2>/dev/null || true
     set -a
     source .env 2>/dev/null || . .env 2>/dev/null || true
     set +a
@@ -56,10 +57,9 @@ fi
 echo "[*] Tahap 4: Memuat ulang layanan..."
 if command -v docker >/dev/null 2>&1; then
     docker compose up -d --remove-orphans
-    docker compose restart redis nginx || true
+    docker compose restart app redis nginx || true
     docker compose exec -T app php artisan storage:link || true
     docker compose exec -T app php artisan optimize:clear || true
-    docker compose exec -T app php artisan optimize || true
 fi
 
 # 5. Uji Kesehatan Sistem (Healthcheck)

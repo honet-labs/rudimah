@@ -13,9 +13,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->trustProxies(at: '*');
+        $middleware->validateCsrfTokens(except: [
+            'login',
+            'forgot-password',
+            'reset-password',
+        ]);
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
-            \App\Core\Tenancy\ResolveTenantMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

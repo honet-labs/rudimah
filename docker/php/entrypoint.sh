@@ -27,8 +27,13 @@ if [ "$1" = "php-fpm" ]; then
         php artisan key:generate --force || true
     fi
 
-    # Sinkronisasi aset statis frontend ke direktori publik
-    if [ -d /var/www/html/build_dist ]; then
+    # Sinkronisasi aset statis frontend dan publik ke volume
+    if [ -d /var/www/html/public_dist ]; then
+        echo "[*] Sinkronisasi aset statis frontend dan direktori publik..."
+        cp -rf /var/www/html/public_dist/* /var/www/html/public/ 2>/dev/null || true
+        chown -R www-data:www-data /var/www/html/public 2>/dev/null || true
+        chmod -R 775 /var/www/html/public 2>/dev/null || true
+    elif [ -d /var/www/html/build_dist ]; then
         echo "[*] Sinkronisasi aset statis frontend..."
         mkdir -p /var/www/html/public/build
         cp -rf /var/www/html/build_dist/* /var/www/html/public/build/ 2>/dev/null || true
