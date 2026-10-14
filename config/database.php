@@ -45,7 +45,7 @@ return [
     'redis' => [
         'client' => env('REDIS_CLIENT', 'phpredis'),
         'options' => [
-            'cluster' => env('REDIS_CLUSTER', 'redis'),
+            'cluster' => env('REDIS_CLUSTER', false),
             'prefix' => env('REDIS_PREFIX', 'rudimah_database_'),
         ],
         'default' => [
@@ -63,6 +63,14 @@ return [
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_CACHE_DB', '1'),
+        ],
+        'session' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', 'redis'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_SESSION_DB', '2'),
         ],
     ],
 ];

@@ -12,19 +12,37 @@ defineProps<{
 
 const csrfToken = ref('');
 
-onMounted(() => {
+function getCsrfToken(): string {
   if (typeof document !== 'undefined') {
-    csrfToken.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
   }
+  return '';
+}
+
+onMounted(() => {
+  csrfToken.value = getCsrfToken();
 });
 
 const form = useForm({
+  _token: '',
   email: '',
 });
 
 function submit() {
-  form.post('/forgot-password', {
+  const token = getCsrfToken() || csrfToken.value;
+  form.transform((data) => ({
+    ...data,
+    _token: token,
+  })).post('/forgot-password', {
+    headers: {
+      'X-CSRF-TOKEN': token,
+    },
     preserveScroll: true,
+    onError: (errs: any) => {
+      if (errs && (errs.message === 'CSRF token mismatch.' || errs.csrf)) {
+        window.location.reload();
+      }
+    },
   });
 }
 </script>

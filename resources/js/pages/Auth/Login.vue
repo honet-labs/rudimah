@@ -14,21 +14,40 @@ const props = defineProps<{
 
 const csrfToken = ref('');
 
-onMounted(() => {
+function getCsrfToken(): string {
   if (typeof document !== 'undefined') {
-    csrfToken.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
   }
+  return '';
+}
+
+onMounted(() => {
+  csrfToken.value = getCsrfToken();
 });
 
 const form = useForm({
+  _token: '',
   email: '',
   password: '',
   remember: false,
 });
 
 function submit() {
-  form.post('/login', {
+  const token = getCsrfToken() || csrfToken.value;
+  form.transform((data) => ({
+    ...data,
+    _token: token,
+  })).post('/login', {
+    headers: {
+      'X-CSRF-TOKEN': token,
+    },
     preserveScroll: true,
+    onError: (errs: any) => {
+      // Jika terjadi kesalahan CSRF atau status 419, segarkan halaman
+      if (errs && (errs.message === 'CSRF token mismatch.' || errs.csrf)) {
+        window.location.reload();
+      }
+    },
     onFinish: () => {
       form.reset('password');
     },
