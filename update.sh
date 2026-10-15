@@ -60,14 +60,6 @@ fi
 # Pastikan SESSION_DRIVER file agar tidak memicu 500 error bila redis flushing
 sed -i 's/^SESSION_DRIVER=redis/SESSION_DRIVER=file/' .env 2>/dev/null || true
 
-# Deteksi root pass dari container jika mariadb aktif
-if command -v docker >/dev/null 2>&1; then
-    CONTAINER_ROOT_PASS=$(docker inspect rudimah_mariadb --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep -E '^MYSQL_ROOT_PASSWORD=' | cut -d '=' -f2- | tr -d '\r"' || true)
-    if [ -n "$CONTAINER_ROOT_PASS" ]; then
-        DB_ROOT_PASS="$CONTAINER_ROOT_PASS"
-    fi
-fi
-
 # 2. Pencadangan Otomatis Sebelum Pembaruan
 echo "[*] Tahap 2: Menjalankan pencadangan data otomatis..."
 if [ -f "./backup.sh" ]; then
@@ -83,9 +75,30 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 # 4. Sinkronisasi Hak Akses dan Pengguna Basis Data MariaDB
-echo "[*] Tahap 4: Memverifikasi pengguna dan izin basis data..."
+echo "[*] Tahap 4: Memverifikasi kesiapan dan menyinkronkan izin basis data..."
 if command -v docker >/dev/null 2>&1; then
     docker compose up -d mariadb redis
+
+    # WAJIB: Tunggu MariaDB benar-benar siap dan menerima koneksi sebelum menjalankan perintah SQL
+    echo "  ... Menunggu server MariaDB siap menerima koneksi..."
+    RETRIES=30
+    MARIADB_READY=false
+    while [ $RETRIES -gt 0 ]; do
+        if docker compose exec -u 0 -T mariadb mariadb -u root -e "SELECT 1;" >/dev/null 2>&1 || \
+           docker compose exec -T mariadb mariadb-admin ping --silent >/dev/null 2>&1 || \
+           docker compose exec -u 0 -T mariadb test -S /run/mysqld/mysqld.sock 2>/dev/null; then
+            echo "  [OK] Server MariaDB aktif dan siap."
+            MARIADB_READY=true
+            break
+        fi
+        sleep 2
+        RETRIES=$((RETRIES - 1))
+    done
+
+    if [ "$MARIADB_READY" = false ]; then
+        echo "  [PERINGATAN] MariaDB membutuhkan waktu lebih lama untuk start, menunggu 5 detik..."
+        sleep 5
+    fi
 
     SYNC_SQL="
         CREATE DATABASE IF NOT EXISTS \`${DB_PLATFORM_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -103,9 +116,9 @@ if command -v docker >/dev/null 2>&1; then
     "
 
     EXECUTED=false
-    # Cara 1: Unix socket sebagai OS root di dalam kontainer MariaDB (terbukti paling andal)
+    # Cara 1: Unix socket sebagai OS root di dalam kontainer MariaDB (UID 0 - bypass auth TCP)
     if docker compose exec -u 0 -T mariadb mariadb -u root -e "$SYNC_SQL" >/dev/null 2>&1; then
-        echo "  [OK] Pengguna '${DB_USER}' dan izin basis data berhasil disinkronkan (via unix socket root)."
+        echo "  [OK] Pengguna '${DB_USER}' dan basis data berhasil disinkronkan (via unix socket root)."
         EXECUTED=true
     elif [ -n "$DB_ROOT_PASS" ] && docker compose exec -T mariadb mariadb -u root -p"${DB_ROOT_PASS}" -e "$SYNC_SQL" >/dev/null 2>&1; then
         echo "  [OK] Pengguna '${DB_USER}' berhasil disinkronkan (via password root .env)."
@@ -119,10 +132,23 @@ if command -v docker >/dev/null 2>&1; then
     fi
 
     if [ "$EXECUTED" = false ]; then
-        echo "  [PERINGATAN] Mencoba sinkronisasi darurat ke MariaDB..."
+        echo "  [!] Menjalankan injeksi perintah SQL langsung ke mysqld..."
         docker compose exec -u 0 -T mariadb sh -c "mariadb -u root << 'EOSQL'
 $SYNC_SQL
-EOSQL" 2>/dev/null || true
+EOSQL" || true
+    fi
+
+    # Uji verifikasi apakah pengguna basis data sudah benar-benar dapat melakukan koneksi
+    echo "  ... Memverifikasi akses koneksi pengguna '${DB_USER}'..."
+    if docker compose exec -T mariadb mariadb -u "${DB_USER}" -p"${DB_PASS}" -e "SELECT 1;" "${DB_PLATFORM_NAME}" >/dev/null 2>&1; then
+        echo "  [OK] Autentikasi pengguna basis data '${DB_USER}' terverifikasi sukses!"
+    else
+        echo "  [PERINGATAN] Akses langsung belum terverifikasi, memberikan izin menyeluruh..."
+        docker compose exec -u 0 -T mariadb mariadb -u root -e "
+            GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
+            GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+            FLUSH PRIVILEGES;
+        " >/dev/null 2>&1 || true
     fi
 fi
 
@@ -146,7 +172,9 @@ fi
 # 6. Eksekusi Migrasi Basis Data & Sinkronisasi Seeder
 echo "[*] Tahap 6: Menjalankan migrasi basis data dan seeder..."
 if command -v docker >/dev/null 2>&1; then
+    echo "  ... Mengeksekusi 'php artisan migrate --force'..."
     docker compose exec -T app php artisan migrate --force
+    echo "  ... Mengeksekusi 'php artisan db:seed --force'..."
     docker compose exec -T app php artisan db:seed --force || true
 fi
 

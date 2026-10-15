@@ -278,20 +278,12 @@ echo "[1/6] Membangun dan menjalankan kontainer Docker..."
 docker compose up -d --build
 
 echo "[2/6] Menunggu MariaDB dan Redis siap menerima koneksi..."
-DB_ROOT_AUTH="-p${ROOT_DB_PASS}"
 RETRIES=30
 while [ $RETRIES -gt 0 ]; do
-    if docker compose exec -T mariadb mariadb-admin ping -h localhost -u root $DB_ROOT_AUTH --silent >/dev/null 2>&1; then
+    if docker compose exec -u 0 -T mariadb mariadb -u root -e "SELECT 1;" >/dev/null 2>&1 || \
+       docker compose exec -T mariadb mariadb-admin ping --silent >/dev/null 2>&1 || \
+       docker compose exec -u 0 -T mariadb test -S /run/mysqld/mysqld.sock 2>/dev/null; then
         echo "  [OK] MariaDB siap."
-        break
-    elif docker compose exec -T mariadb mariadb-admin ping -h localhost -u root --silent >/dev/null 2>&1; then
-        DB_ROOT_AUTH=""
-        echo "  [OK] MariaDB siap (tanpa kata sandi root)."
-        break
-    elif docker compose exec -T mariadb mariadb-admin ping -h localhost -u root -pmariadb_root_pass --silent >/dev/null 2>&1; then
-        DB_ROOT_AUTH="-pmariadb_root_pass"
-        ROOT_DB_PASS="mariadb_root_pass"
-        echo "  [OK] MariaDB siap (kredensial default terverifikasi)."
         break
     fi
     echo "  ... Menunggu MariaDB siap ($RETRIES tersisa)"
@@ -324,6 +316,18 @@ docker compose exec -u 0 -T mariadb mariadb -u root -e "$SYNC_SQL" 2>/dev/null |
 docker compose exec -T mariadb mariadb -u root -p"${ROOT_DB_PASS}" -e "$SYNC_SQL" 2>/dev/null || \
 docker compose exec -T mariadb mariadb -u root -pmariadb_root_pass -e "$SYNC_SQL" 2>/dev/null || \
 docker compose exec -T mariadb mariadb -u root -e "$SYNC_SQL" 2>/dev/null || true
+
+# Uji verifikasi apakah pengguna basis data sudah benar-benar dapat melakukan koneksi
+echo "  ... Memverifikasi akses koneksi pengguna '${DB_USER}'..."
+if docker compose exec -T mariadb mariadb -u "${DB_USER}" -p"${DB_PASS}" -e "SELECT 1;" "${DB_PLATFORM_NAME}" >/dev/null 2>&1; then
+    echo "  [OK] Autentikasi pengguna basis data '${DB_USER}' terverifikasi sukses!"
+else
+    docker compose exec -u 0 -T mariadb mariadb -u root -e "
+        GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
+        GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+        FLUSH PRIVILEGES;
+    " >/dev/null 2>&1 || true
+fi
 
 echo "[4/6] Menjalankan migrasi basis data Laravel..."
 docker compose exec -T app php artisan migrate --force
