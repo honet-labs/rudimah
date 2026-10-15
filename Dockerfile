@@ -60,7 +60,7 @@ RUN composer config --global process-timeout 2000 \
     && SUCCESS=0; \
     for i in 1 2 3 4 5; do \
         echo "[*] Menjalankan composer install via IPv4 (percobaan $i/5)..." && \
-        COMPOSER_IPRESOLVE=4 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts --no-audit && { SUCCESS=1; break; } || \
+        COMPOSER_IPRESOLVE=4 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts && { SUCCESS=1; break; } || \
         (echo "[!] Percobaan $i gagal, mencoba kembali dalam 5 detik..." && sleep 5); \
     done; \
     if [ "$SUCCESS" -ne 1 ] || [ ! -f /var/www/html/vendor/autoload.php ]; then \
