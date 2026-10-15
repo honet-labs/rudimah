@@ -10,19 +10,18 @@ fi
 set -e
 
 LOCK_FILE="/tmp/rudimah_update.lock"
+trap 'rm -f "$LOCK_FILE"' EXIT INT TERM
 
 if [ -f "$LOCK_FILE" ]; then
     OLD_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+    if [ -n "$OLD_PID" ] && [ "$OLD_PID" != "$$" ] && kill -0 "$OLD_PID" 2>/dev/null; then
         echo "[!] Proses pembaruan lain sedang berjalan (PID $OLD_PID). Silakan tunggu hingga selesai."
         exit 1
-    else
-        rm -f "$LOCK_FILE"
     fi
+    rm -f "$LOCK_FILE"
 fi
 
 echo $$ > "$LOCK_FILE"
-trap 'rm -f "$LOCK_FILE"' EXIT INT TERM
 
 echo "=================================================================="
 echo "          PROSES PEMBARUAN SISTEM RUDIMAH                        "
@@ -31,11 +30,12 @@ echo "=================================================================="
 # 0. Tarik Pembaruan Kode Terbaru dari Repositori Git jika Tersedia
 if [ "${RUDIMAH_UPDATED_SELF:-0}" != "1" ] && [ -d ".git" ] && command -v git >/dev/null 2>&1; then
     echo "[*] Tahap 0: Mengambil kode terbaru dari repositori Git..."
-    if git pull origin main; then
+    PULL_OUT=$(git pull origin main 2>&1 || true)
+    echo "$PULL_OUT"
+    if echo "$PULL_OUT" | grep -q -E "Fast-forward|Updating [0-9a-f]"; then
         export RUDIMAH_UPDATED_SELF=1
+        rm -f "$LOCK_FILE"
         exec bash "$0" "$@"
-    else
-        echo "  [PERINGATAN] Git pull mengalami kendala. Melanjutkan pembaruan dengan kode lokal."
     fi
 fi
 
@@ -87,23 +87,7 @@ echo "[*] Tahap 4: Memverifikasi pengguna dan izin basis data..."
 if command -v docker >/dev/null 2>&1; then
     docker compose up -d mariadb redis
 
-    DB_ROOT_AUTH="-p${DB_ROOT_PASS}"
-    RETRIES=15
-    while [ $RETRIES -gt 0 ]; do
-        if docker compose exec -T mariadb mariadb-admin ping -h localhost -u root $DB_ROOT_AUTH --silent >/dev/null 2>&1; then
-            break
-        elif docker compose exec -T mariadb mariadb-admin ping -h localhost -u root --silent >/dev/null 2>&1; then
-            DB_ROOT_AUTH=""
-            break
-        elif docker compose exec -T mariadb mariadb-admin ping -h localhost -u root -pmariadb_root_pass --silent >/dev/null 2>&1; then
-            DB_ROOT_AUTH="-pmariadb_root_pass"
-            break
-        fi
-        sleep 2
-        RETRIES=$((RETRIES - 1))
-    done
-
-    docker compose exec -T mariadb mariadb -u root $DB_ROOT_AUTH -e "
+    SYNC_SQL="
         CREATE DATABASE IF NOT EXISTS \`${DB_PLATFORM_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
         CREATE DATABASE IF NOT EXISTS \`${DB_PEKAN_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
         CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
@@ -114,8 +98,32 @@ if command -v docker >/dev/null 2>&1; then
         GRANT ALL PRIVILEGES ON \`${DB_PLATFORM_NAME}\`.* TO '${DB_USER}'@'localhost';
         GRANT ALL PRIVILEGES ON \`${DB_PEKAN_NAME}\`.* TO '${DB_USER}'@'%';
         GRANT ALL PRIVILEGES ON \`${DB_PEKAN_NAME}\`.* TO '${DB_USER}'@'localhost';
+        ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASS}';
         FLUSH PRIVILEGES;
-    " 2>/dev/null || true
+    "
+
+    EXECUTED=false
+    # Cara 1: Unix socket sebagai OS root di dalam kontainer MariaDB (terbukti paling andal)
+    if docker compose exec -u 0 -T mariadb mariadb -u root -e "$SYNC_SQL" >/dev/null 2>&1; then
+        echo "  [OK] Pengguna '${DB_USER}' dan izin basis data berhasil disinkronkan (via unix socket root)."
+        EXECUTED=true
+    elif [ -n "$DB_ROOT_PASS" ] && docker compose exec -T mariadb mariadb -u root -p"${DB_ROOT_PASS}" -e "$SYNC_SQL" >/dev/null 2>&1; then
+        echo "  [OK] Pengguna '${DB_USER}' berhasil disinkronkan (via password root .env)."
+        EXECUTED=true
+    elif docker compose exec -T mariadb mariadb -u root -pmariadb_root_pass -e "$SYNC_SQL" >/dev/null 2>&1; then
+        echo "  [OK] Pengguna '${DB_USER}' berhasil disinkronkan (via password root default)."
+        EXECUTED=true
+    elif docker compose exec -T mariadb mariadb -u root -e "$SYNC_SQL" >/dev/null 2>&1; then
+        echo "  [OK] Pengguna '${DB_USER}' berhasil disinkronkan tanpa password."
+        EXECUTED=true
+    fi
+
+    if [ "$EXECUTED" = false ]; then
+        echo "  [PERINGATAN] Mencoba sinkronisasi darurat ke MariaDB..."
+        docker compose exec -u 0 -T mariadb sh -c "mariadb -u root << 'EOSQL'
+$SYNC_SQL
+EOSQL" 2>/dev/null || true
+    fi
 fi
 
 # 5. Muat Ulang Kontainer dengan Kode Baru
@@ -125,7 +133,7 @@ if command -v docker >/dev/null 2>&1; then
     docker compose restart app horizon scheduler || true
 
     echo "  ... Menunggu kontainer aplikasi siap..."
-    APP_RETRIES=15
+    APP_RETRIES=20
     while [ $APP_RETRIES -gt 0 ]; do
         if docker compose exec -T app php -v >/dev/null 2>&1; then
             break
