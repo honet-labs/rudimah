@@ -117,20 +117,47 @@ if [ -n "$CONFIG_FILE" ] && [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 fi
 
-# Generate password acak jika kosong
-if [ -z "$DB_PASS" ]; then
+# Pertahankan kredensial yang ada jika .env atau kontainer basis data telah ada
+if [ -f .env ]; then
+    echo "[*] Berkas .env terdeteksi. Membaca kredensial tersimpan..."
+    EXISTING_APP_KEY=$(grep '^APP_KEY=' .env | cut -d '=' -f2- | tr -d '\r' || true)
+    EXISTING_ROOT_PASS=$(grep '^DB_ROOT_PASSWORD=' .env | cut -d '=' -f2- | tr -d '\r' || true)
+    EXISTING_DB_PASS=$(grep '^DB_PLATFORM_PASSWORD=' .env | cut -d '=' -f2- | tr -d '\r' || true)
+    EXISTING_ADMIN_PASS=$(grep '^INITIAL_ADMIN_PASSWORD=' .env | cut -d '=' -f2- | tr -d '\r' || true)
+
+    [ -n "$EXISTING_APP_KEY" ] && APP_KEY="$EXISTING_APP_KEY"
+    [ -n "$EXISTING_ROOT_PASS" ] && ROOT_DB_PASS="$EXISTING_ROOT_PASS"
+    [ -n "$EXISTING_DB_PASS" ] && DB_PASS="$EXISTING_DB_PASS"
+    [ -n "$EXISTING_ADMIN_PASS" ] && ADMIN_PASS="$EXISTING_ADMIN_PASS"
+fi
+
+if command -v docker >/dev/null 2>&1; then
+    CONTAINER_ROOT_PASS=$(docker inspect rudimah_mariadb --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^MYSQL_ROOT_PASSWORD=' | cut -d '=' -f2- | tr -d '\r' || true)
+    if [ -n "$CONTAINER_ROOT_PASS" ]; then
+        ROOT_DB_PASS="$CONTAINER_ROOT_PASS"
+    fi
+    CONTAINER_DB_PASS=$(docker inspect rudimah_mariadb --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^MYSQL_PASSWORD=' | cut -d '=' -f2- | tr -d '\r' || true)
+    if [ -n "$CONTAINER_DB_PASS" ]; then
+        DB_PASS="$CONTAINER_DB_PASS"
+    fi
+fi
+
+# Generate password acak jika masih kosong
+if [ -z "${DB_PASS:-}" ]; then
     DB_PASS=$(openssl rand -hex 16 2>/dev/null || echo "SecretRudimahDbPass2026")
 fi
 
-if [ -z "$ROOT_DB_PASS" ]; then
+if [ -z "${ROOT_DB_PASS:-}" ]; then
     ROOT_DB_PASS=$(openssl rand -hex 16 2>/dev/null || echo "SecretRudimahRootPass2026")
 fi
 
-if [ -z "$ADMIN_PASS" ]; then
+if [ -z "${ADMIN_PASS:-}" ]; then
     ADMIN_PASS=$(openssl rand -hex 12 2>/dev/null || echo "AdminRUDIMAH2026!")
 fi
 
-APP_KEY="base64:$(openssl rand -base64 32 2>/dev/null || echo "KjU2aGs4OWpmODkzag==")"
+if [ -z "${APP_KEY:-}" ]; then
+    APP_KEY="base64:$(openssl rand -base64 32 2>/dev/null || echo "KjU2aGs4OWpmODkzag==")"
+fi
 
 echo ""
 echo "[*] Ringkasan Konfigurasi RUDIMAH:"
@@ -215,10 +242,20 @@ echo "[1/6] Membangun dan menjalankan kontainer Docker..."
 docker compose up -d --build
 
 echo "[2/6] Menunggu MariaDB dan Redis siap menerima koneksi..."
+DB_ROOT_AUTH="-p${ROOT_DB_PASS}"
 RETRIES=30
 while [ $RETRIES -gt 0 ]; do
-    if docker compose exec -T mariadb mariadb-admin ping -h localhost -u root -p"${ROOT_DB_PASS}" --silent >/dev/null 2>&1; then
+    if docker compose exec -T mariadb mariadb-admin ping -h localhost -u root $DB_ROOT_AUTH --silent >/dev/null 2>&1; then
         echo "  [OK] MariaDB siap."
+        break
+    elif docker compose exec -T mariadb mariadb-admin ping -h localhost -u root --silent >/dev/null 2>&1; then
+        DB_ROOT_AUTH=""
+        echo "  [OK] MariaDB siap (tanpa kata sandi root)."
+        break
+    elif docker compose exec -T mariadb mariadb-admin ping -h localhost -u root -pmariadb_root_pass --silent >/dev/null 2>&1; then
+        DB_ROOT_AUTH="-pmariadb_root_pass"
+        ROOT_DB_PASS="mariadb_root_pass"
+        echo "  [OK] MariaDB siap (kredensial default terverifikasi)."
         break
     fi
     echo "  ... Menunggu MariaDB siap ($RETRIES tersisa)"
@@ -232,13 +269,13 @@ if [ $RETRIES -eq 0 ]; then
 fi
 
 echo "[3/6] Memverifikasi ketersediaan basis data Platform dan PEKAN..."
-docker compose exec -T mariadb mariadb -u root -p"${ROOT_DB_PASS}" -e "
+docker compose exec -T mariadb mariadb -u root $DB_ROOT_AUTH -e "
     CREATE DATABASE IF NOT EXISTS \`${DB_PLATFORM_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     CREATE DATABASE IF NOT EXISTS \`${DB_PEKAN_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     GRANT ALL PRIVILEGES ON \`${DB_PLATFORM_NAME}\`.* TO '${DB_USER}'@'%';
     GRANT ALL PRIVILEGES ON \`${DB_PEKAN_NAME}\`.* TO '${DB_USER}'@'%';
     FLUSH PRIVILEGES;
-" || true
+" 2>/dev/null || true
 
 echo "[4/6] Menjalankan migrasi basis data Laravel..."
 docker compose exec -T app php artisan migrate --force

@@ -43,7 +43,8 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-ENV COMPOSER_ALLOW_SUPERUSER=1 \
+ENV COMPOSER_IPRESOLVE=4 \
+    COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_MEMORY_LIMIT=-1 \
     COMPOSER_PROCESS_TIMEOUT=2000 \
     COMPOSER_MAX_PARALLEL_HTTP=2
@@ -54,13 +55,18 @@ COPY --from=frontend-builder /app/public/build ./public/build
 COPY --from=frontend-builder /app/public/build /var/www/html/build_dist
 RUN cp -rf /var/www/html/public /var/www/html/public_dist
 
-# Install Composer Dependencies dengan retry otomatis untuk ketahanan jaringan
+# Install Composer Dependencies dengan resolusi IPv4 eksplisit dan retry otomatis
 RUN composer config --global process-timeout 2000 \
-    && for i in 1 2 3 4 5; do \
-        echo "[*] Menjalankan composer install (percobaan $i/5)..." && \
-        composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts --no-audit && break || \
-        (echo "[!] Percobaan $i gagal karena koneksi jaringan, mencoba kembali dalam 5 detik..." && sleep 5); \
-    done
+    && SUCCESS=0; \
+    for i in 1 2 3 4 5; do \
+        echo "[*] Menjalankan composer install via IPv4 (percobaan $i/5)..." && \
+        COMPOSER_IPRESOLVE=4 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts --no-audit && { SUCCESS=1; break; } || \
+        (echo "[!] Percobaan $i gagal, mencoba kembali dalam 5 detik..." && sleep 5); \
+    done; \
+    if [ "$SUCCESS" -ne 1 ] || [ ! -f /var/www/html/vendor/autoload.php ]; then \
+        echo "[!] ERROR: Gagal menginstal dependensi Composer via Packagist!"; \
+        exit 1; \
+    fi
 
 # Setup Storage & Cache Directories
 RUN mkdir -p \

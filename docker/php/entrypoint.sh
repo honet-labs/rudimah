@@ -64,6 +64,12 @@ if [ "$1" = "php-fpm" ]; then
         RETRIES=$((RETRIES - 1))
     done
 
+    # Pastikan dependensi vendor terpasang sebelum menjalankan perintah artisan
+    if [ ! -f /var/www/html/vendor/autoload.php ]; then
+        echo "[*] Direktori vendor belum lengkap. Menjalankan composer install..."
+        COMPOSER_IPRESOLVE=4 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts || true
+    fi
+
     # Jalankan migrasi dan seeding otomatis (aman & idempotent)
     echo "[*] Menjalankan migrasi basis data..."
     php artisan migrate --force || true
