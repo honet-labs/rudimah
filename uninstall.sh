@@ -3,7 +3,11 @@
 # RUDIMAH - Skrip Penghapusan Deployment
 # ==============================================================================
 
-set -euo pipefail
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec bash "$0" "$@"
+fi
+
+set -e
 
 PURGE_DATA=false
 

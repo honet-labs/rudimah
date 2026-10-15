@@ -3,7 +3,11 @@
 # RUDIMAH - Skrip Rekonfigurasi Pengaturan Sistem
 # ==============================================================================
 
-set -euo pipefail
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec bash "$0" "$@"
+fi
+
+set -e
 
 echo "=================================================================="
 echo "          REKONFIGURASI PENGATURAN PLATFORM RUDIMAH              "

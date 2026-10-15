@@ -4,27 +4,24 @@
 # Ruang Digital Manajemen Harian
 # ==============================================================================
 
-set -euo pipefail
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec bash "$0" "$@"
+fi
+
+set -e
 
 echo "=================================================================="
 echo "          PENGATURAN ULANG KATA SANDI ADMINISTRATOR              "
 echo "          Platform RUDIMAH (Ruang Digital Manajemen Harian)      "
 echo "=================================================================="
 
-# 1. Pemuatan Konfigurasi Lingkungan
-if [ -f ".env" ]; then
-    set -a
-    source .env 2>/dev/null || . .env 2>/dev/null || true
-    set +a
-fi
-
-# 2. Verifikasi Ketersediaan Docker
+# 1. Verifikasi Ketersediaan Docker
 if ! command -v docker >/dev/null 2>&1; then
     echo "[!] Kesalahan: Docker CLI tidak terdeteksi pada sistem ini."
     exit 1
 fi
 
-# 3. Eksekusi Perintah Artisan Reset Password
+# 2. Eksekusi Perintah Artisan Reset Password
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^rudimah_app$"; then
     echo "[*] Menjalankan pembaruan kata sandi pada kontainer aktif (rudimah_app)..."
     if [ -t 0 ]; then

@@ -3,7 +3,11 @@
 # RUDIMAH - Skrip Pemantauan Status Kesehatan Sistem
 # ==============================================================================
 
-set -euo pipefail
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec bash "$0" "$@"
+fi
+
+set -e
 
 echo "=================================================================="
 echo "          STATUS KESEHATAN LAYANAN RUDIMAH                       "
@@ -12,7 +16,7 @@ echo "=================================================================="
 # 1. Status Kontainer Docker
 echo "[*] Kontainer Layanan:"
 if command -v docker >/dev/null 2>&1; then
-    docker compose ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}" || true
+    docker compose ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || docker compose ps || true
 else
     echo "  [INFO] Docker CLI tidak tersedia di lingkungan saat ini."
 fi
@@ -20,14 +24,14 @@ fi
 echo ""
 echo "[*] Konektivitas Basis Data & Cache:"
 # Cek MariaDB
-if command -v docker >/dev/null 2>&1 && docker ps | grep -q "rudimah_mariadb"; then
+if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^rudimah_mariadb$"; then
     echo "  - MariaDB  : Aktif (Healthy)"
 else
     echo "  - MariaDB  : Siap dikonfigurasi"
 fi
 
 # Cek Redis
-if command -v docker >/dev/null 2>&1 && docker ps | grep -q "rudimah_redis"; then
+if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^rudimah_redis$"; then
     echo "  - Redis    : Aktif (Healthy)"
 else
     echo "  - Redis    : Siap dikonfigurasi"
@@ -36,7 +40,7 @@ fi
 echo ""
 echo "[*] Ketersediaan Berkas Konfigurasi:"
 if [ -f ".env" ]; then
-    echo "  - Berkas .env : Tersedia (Izin: $(stat -c %a .env 2>/dev/null || echo '0600'))"
+    echo "  - Berkas .env : Tersedia"
 else
     echo "  - Berkas .env : Belum dibuat (Jalankan ./installer.sh)"
 fi

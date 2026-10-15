@@ -4,7 +4,11 @@
 # Platform Ruang Digital Manajemen Harian
 # ==============================================================================
 
-set -euo pipefail
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec bash "$0" "$@"
+fi
+
+set -e
 
 # Inisialisasi variabel default
 NON_INTERACTIVE=false
@@ -83,47 +87,37 @@ else
     echo "  [OK] Docker Compose terdeteksi: $(docker compose version --short 2>/dev/null || echo 'v2')"
 fi
 
-# 2. Input Konfigurasi (Interaktif jika bukan non-interactive)
-if [ "$NON_INTERACTIVE" = false ] && [ -z "$CONFIG_FILE" ]; then
-    echo ""
-    echo "Silakan masukkan parameter instalasi (tekan Enter untuk memakai nilai default):"
-    
-    read -rp "Port HTTP publik [default: 80]: " input_http
-    APP_PORT="${input_http:-80}"
+# 2. Muat Konfigurasi Sebelumnya dari .env jika Ada
+DEFAULT_HTTP="80"
+DEFAULT_HTTPS="443"
+DEFAULT_P_DB="rudimah_platform"
+DEFAULT_M_DB="rudimah_pekan"
+DEFAULT_DB_USER="rudimah_user"
+DEFAULT_ADMIN_EMAIL="admin@rudimah.id"
+DEFAULT_AI="gemini"
 
-    read -rp "Port HTTPS publik [default: 443]: " input_https
-    HTTPS_PORT="${input_https:-443}"
-
-    read -rp "Nama basis data Platform [default: rudimah_platform]: " input_p_db
-    DB_PLATFORM_NAME="${input_p_db:-rudimah_platform}"
-
-    read -rp "Nama basis data Modul PEKAN [default: rudimah_pekan]: " input_m_db
-    DB_PEKAN_NAME="${input_m_db:-rudimah_pekan}"
-
-    read -rp "Username basis data [default: rudimah_user]: " input_db_user
-    DB_USER="${input_db_user:-rudimah_user}"
-
-    read -rp "Email administrator utama [default: admin@rudimah.id]: " input_admin_email
-    ADMIN_EMAIL="${input_admin_email:-admin@rudimah.id}"
-
-    read -rp "Penyedia AI default (gemini/openai/hermes/openclaw/mock) [default: gemini]: " input_ai
-    AI_PROVIDER="${input_ai:-gemini}"
-fi
-
-# Muat dari file konfigurasi bila diberikan
-if [ -n "$CONFIG_FILE" ] && [ -f "$CONFIG_FILE" ]; then
-    echo "[*] Memuat konfigurasi dari $CONFIG_FILE..."
-    # shellcheck disable=SC1090
-    source "$CONFIG_FILE"
-fi
-
-# Pertahankan kredensial yang ada jika .env atau kontainer basis data telah ada
 if [ -f .env ]; then
-    echo "[*] Berkas .env terdeteksi. Membaca kredensial tersimpan..."
-    EXISTING_APP_KEY=$(grep '^APP_KEY=' .env | cut -d '=' -f2- | tr -d '\r' || true)
-    EXISTING_ROOT_PASS=$(grep '^DB_ROOT_PASSWORD=' .env | cut -d '=' -f2- | tr -d '\r' || true)
-    EXISTING_DB_PASS=$(grep '^DB_PLATFORM_PASSWORD=' .env | cut -d '=' -f2- | tr -d '\r' || true)
-    EXISTING_ADMIN_PASS=$(grep '^INITIAL_ADMIN_PASSWORD=' .env | cut -d '=' -f2- | tr -d '\r' || true)
+    echo "[*] Berkas .env terdeteksi. Membaca konfigurasi sebelumnya sebagai nilai default..."
+    EXISTING_HTTP=$(grep -E '^HTTP_PORT=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+    EXISTING_HTTPS=$(grep -E '^HTTPS_PORT=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+    EXISTING_P_DB=$(grep -E '^DB_PLATFORM_DATABASE=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+    EXISTING_M_DB=$(grep -E '^DB_PEKAN_DATABASE=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+    EXISTING_DB_USER=$(grep -E '^DB_PLATFORM_USERNAME=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+    EXISTING_ADMIN_EMAIL=$(grep -E '^INITIAL_ADMIN_EMAIL=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+    EXISTING_AI=$(grep -E '^AI_DEFAULT_PROVIDER=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+
+    EXISTING_APP_KEY=$(grep -E '^APP_KEY=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+    EXISTING_ROOT_PASS=$(grep -E '^DB_ROOT_PASSWORD=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+    EXISTING_DB_PASS=$(grep -E '^DB_PLATFORM_PASSWORD=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+    EXISTING_ADMIN_PASS=$(grep -E '^INITIAL_ADMIN_PASSWORD=' .env | cut -d '=' -f2- | tr -d '\r"' || true)
+
+    [ -n "$EXISTING_HTTP" ] && DEFAULT_HTTP="$EXISTING_HTTP"
+    [ -n "$EXISTING_HTTPS" ] && DEFAULT_HTTPS="$EXISTING_HTTPS"
+    [ -n "$EXISTING_P_DB" ] && DEFAULT_P_DB="$EXISTING_P_DB"
+    [ -n "$EXISTING_M_DB" ] && DEFAULT_M_DB="$EXISTING_M_DB"
+    [ -n "$EXISTING_DB_USER" ] && DEFAULT_DB_USER="$EXISTING_DB_USER"
+    [ -n "$EXISTING_ADMIN_EMAIL" ] && DEFAULT_ADMIN_EMAIL="$EXISTING_ADMIN_EMAIL"
+    [ -n "$EXISTING_AI" ] && DEFAULT_AI="$EXISTING_AI"
 
     [ -n "$EXISTING_APP_KEY" ] && APP_KEY="$EXISTING_APP_KEY"
     [ -n "$EXISTING_ROOT_PASS" ] && ROOT_DB_PASS="$EXISTING_ROOT_PASS"
@@ -140,6 +134,48 @@ if command -v docker >/dev/null 2>&1; then
     if [ -n "$CONTAINER_DB_PASS" ]; then
         DB_PASS="$CONTAINER_DB_PASS"
     fi
+fi
+
+# Input Konfigurasi (Interaktif jika bukan non-interactive)
+if [ "$NON_INTERACTIVE" = false ] && [ -z "$CONFIG_FILE" ]; then
+    echo ""
+    echo "Silakan masukkan parameter instalasi (tekan Enter untuk memakai nilai default):"
+    
+    read -rp "Port HTTP publik [default: ${DEFAULT_HTTP}]: " input_http
+    APP_PORT="${input_http:-$DEFAULT_HTTP}"
+
+    read -rp "Port HTTPS publik [default: ${DEFAULT_HTTPS}]: " input_https
+    HTTPS_PORT="${input_https:-$DEFAULT_HTTPS}"
+
+    read -rp "Nama basis data Platform [default: ${DEFAULT_P_DB}]: " input_p_db
+    DB_PLATFORM_NAME="${input_p_db:-$DEFAULT_P_DB}"
+
+    read -rp "Nama basis data Modul PEKAN [default: ${DEFAULT_M_DB}]: " input_m_db
+    DB_PEKAN_NAME="${input_m_db:-$DEFAULT_M_DB}"
+
+    read -rp "Username basis data [default: ${DEFAULT_DB_USER}]: " input_db_user
+    DB_USER="${input_db_user:-$DEFAULT_DB_USER}"
+
+    read -rp "Email administrator utama [default: ${DEFAULT_ADMIN_EMAIL}]: " input_admin_email
+    ADMIN_EMAIL="${input_admin_email:-$DEFAULT_ADMIN_EMAIL}"
+
+    read -rp "Penyedia AI default (gemini/openai/hermes/openclaw/mock) [default: ${DEFAULT_AI}]: " input_ai
+    AI_PROVIDER="${input_ai:-$DEFAULT_AI}"
+else
+    APP_PORT="${APP_PORT:-$DEFAULT_HTTP}"
+    HTTPS_PORT="${HTTPS_PORT:-$DEFAULT_HTTPS}"
+    DB_PLATFORM_NAME="${DB_PLATFORM_NAME:-$DEFAULT_P_DB}"
+    DB_PEKAN_NAME="${DB_PEKAN_NAME:-$DEFAULT_M_DB}"
+    DB_USER="${DB_USER:-$DEFAULT_DB_USER}"
+    ADMIN_EMAIL="${ADMIN_EMAIL:-$DEFAULT_ADMIN_EMAIL}"
+    AI_PROVIDER="${AI_PROVIDER:-$DEFAULT_AI}"
+fi
+
+# Muat dari file konfigurasi bila diberikan
+if [ -n "$CONFIG_FILE" ] && [ -f "$CONFIG_FILE" ]; then
+    echo "[*] Memuat konfigurasi dari $CONFIG_FILE..."
+    # shellcheck disable=SC1090
+    source "$CONFIG_FILE"
 fi
 
 # Generate password acak jika masih kosong
