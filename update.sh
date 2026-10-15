@@ -43,7 +43,7 @@ fi
 # 2. Build Image Docker Terbaru
 echo "[*] Tahap 2: Membangun image container aplikasi terbaru..."
 if command -v docker >/dev/null 2>&1; then
-    docker compose build app horizon scheduler
+    docker compose build app
 fi
 
 # 3. Eksekusi Migrasi Basis Data Aman (Forward-Compatible) & Seeding Data Awal

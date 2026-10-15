@@ -44,7 +44,9 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
-    COMPOSER_MEMORY_LIMIT=-1
+    COMPOSER_MEMORY_LIMIT=-1 \
+    COMPOSER_PROCESS_TIMEOUT=2000 \
+    COMPOSER_MAX_PARALLEL_HTTP=2
 
 # Copy Application Code
 COPY . .
@@ -52,8 +54,13 @@ COPY --from=frontend-builder /app/public/build ./public/build
 COPY --from=frontend-builder /app/public/build /var/www/html/build_dist
 RUN cp -rf /var/www/html/public /var/www/html/public_dist
 
-# Install Composer Dependencies
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+# Install Composer Dependencies dengan retry otomatis untuk ketahanan jaringan
+RUN composer config --global process-timeout 2000 \
+    && for i in 1 2 3 4 5; do \
+        echo "[*] Menjalankan composer install (percobaan $i/5)..." && \
+        composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts --no-audit && break || \
+        (echo "[!] Percobaan $i gagal karena koneksi jaringan, mencoba kembali dalam 5 detik..." && sleep 5); \
+    done
 
 # Setup Storage & Cache Directories
 RUN mkdir -p \
