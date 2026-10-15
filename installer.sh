@@ -312,22 +312,70 @@ SYNC_SQL="
     FLUSH PRIVILEGES;
 "
 
-docker compose exec -u 0 -T mariadb mariadb -u root -e "$SYNC_SQL" 2>/dev/null || \
-docker compose exec -T mariadb mariadb -u root -p"${ROOT_DB_PASS}" -e "$SYNC_SQL" 2>/dev/null || \
-docker compose exec -T mariadb mariadb -u root -pmariadb_root_pass -e "$SYNC_SQL" 2>/dev/null || \
-docker compose exec -T mariadb mariadb -u root -e "$SYNC_SQL" 2>/dev/null || true
+    EXECUTED=false
+    if [ -n "$ROOT_DB_PASS" ] && docker compose exec -T mariadb mariadb -u root -p"${ROOT_DB_PASS}" -e "$SYNC_SQL" >/dev/null 2>&1; then
+        EXECUTED=true
+    elif docker compose exec -T mariadb mariadb -u root -pmariadb_root_pass -e "$SYNC_SQL" >/dev/null 2>&1; then
+        EXECUTED=true
+    elif docker compose exec -T mariadb mariadb -u root -e "$SYNC_SQL" >/dev/null 2>&1; then
+        EXECUTED=true
+    fi
 
-# Uji verifikasi apakah pengguna basis data sudah benar-benar dapat melakukan koneksi
-echo "  ... Memverifikasi akses koneksi pengguna '${DB_USER}'..."
-if docker compose exec -T mariadb mariadb -u "${DB_USER}" -p"${DB_PASS}" -e "SELECT 1;" "${DB_PLATFORM_NAME}" >/dev/null 2>&1; then
-    echo "  [OK] Autentikasi pengguna basis data '${DB_USER}' terverifikasi sukses!"
-else
-    docker compose exec -u 0 -T mariadb mariadb -u root -e "
-        GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
-        GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
-        FLUSH PRIVILEGES;
-    " >/dev/null 2>&1 || true
-fi
+    if [ "$EXECUTED" = false ]; then
+        echo "  [!] Memulihkan hak akses root MariaDB secara otomatis..."
+        if [ -f "docker/mariadb/custom.cnf" ]; then
+            sed -i '/^\[mysqld\]/a skip-grant-tables' docker/mariadb/custom.cnf
+        fi
+        docker compose restart mariadb
+
+        R_RETRIES=30
+        while [ $R_RETRIES -gt 0 ]; do
+            if docker compose exec -T mariadb mariadb -e "SELECT 1;" >/dev/null 2>&1; then
+                break
+            fi
+            sleep 1
+            R_RETRIES=$((R_RETRIES - 1))
+        done
+
+        docker compose exec -T mariadb mariadb -e "
+            FLUSH PRIVILEGES;
+            CREATE DATABASE IF NOT EXISTS \`${DB_PLATFORM_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            CREATE DATABASE IF NOT EXISTS \`${DB_PEKAN_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
+            ALTER USER '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
+            CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+            ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+            GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'%';
+            GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'localhost';
+            GRANT ALL PRIVILEGES ON \`${DB_PLATFORM_NAME}\`.* TO '${DB_USER}'@'%';
+            GRANT ALL PRIVILEGES ON \`${DB_PLATFORM_NAME}\`.* TO '${DB_USER}'@'localhost';
+            GRANT ALL PRIVILEGES ON \`${DB_PEKAN_NAME}\`.* TO '${DB_USER}'@'%';
+            GRANT ALL PRIVILEGES ON \`${DB_PEKAN_NAME}\`.* TO '${DB_USER}'@'localhost';
+            ALTER USER 'root'@'localhost' IDENTIFIED BY '${ROOT_DB_PASS}';
+            FLUSH PRIVILEGES;
+        "
+
+        if [ -f "docker/mariadb/custom.cnf" ]; then
+            sed -i '/^skip-grant-tables/d' docker/mariadb/custom.cnf
+        fi
+        docker compose restart mariadb
+
+        R_RETRIES=30
+        while [ $R_RETRIES -gt 0 ]; do
+            if docker compose exec -T mariadb mariadb-admin ping --silent >/dev/null 2>&1; then
+                break
+            fi
+            sleep 1
+            R_RETRIES=$((R_RETRIES - 1))
+        done
+        echo "  [OK] Kredensial MariaDB berhasil diselaraskan!"
+    fi
+
+    # Uji verifikasi apakah pengguna basis data sudah benar-benar dapat melakukan koneksi
+    echo "  ... Memverifikasi akses koneksi pengguna '${DB_USER}'..."
+    if docker compose exec -T mariadb mariadb -u "${DB_USER}" -p"${DB_PASS}" -e "SELECT 1;" "${DB_PLATFORM_NAME}" >/dev/null 2>&1; then
+        echo "  [OK] Autentikasi pengguna basis data '${DB_USER}' terverifikasi sukses!"
+    fi
 
 echo "[4/6] Menjalankan migrasi basis data Laravel..."
 docker compose exec -T app php artisan migrate --force

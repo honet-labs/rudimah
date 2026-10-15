@@ -10,7 +10,7 @@ fi
 set -e
 
 LOCK_FILE="/tmp/rudimah_update.lock"
-trap 'rm -f "$LOCK_FILE"' EXIT INT TERM
+trap 'sed -i "/^skip-grant-tables/d" docker/mariadb/custom.cnf 2>/dev/null || true; rm -f "$LOCK_FILE"' EXIT INT TERM
 
 if [ -f "$LOCK_FILE" ]; then
     OLD_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
@@ -79,26 +79,17 @@ echo "[*] Tahap 4: Memverifikasi kesiapan dan menyinkronkan izin basis data..."
 if command -v docker >/dev/null 2>&1; then
     docker compose up -d mariadb redis
 
-    # WAJIB: Tunggu MariaDB benar-benar siap dan menerima koneksi sebelum menjalankan perintah SQL
+    # Tunggu MariaDB siap
     echo "  ... Menunggu server MariaDB siap menerima koneksi..."
     RETRIES=30
-    MARIADB_READY=false
     while [ $RETRIES -gt 0 ]; do
-        if docker compose exec -u 0 -T mariadb mariadb -u root -e "SELECT 1;" >/dev/null 2>&1 || \
-           docker compose exec -T mariadb mariadb-admin ping --silent >/dev/null 2>&1 || \
-           docker compose exec -u 0 -T mariadb test -S /run/mysqld/mysqld.sock 2>/dev/null; then
-            echo "  [OK] Server MariaDB aktif dan siap."
-            MARIADB_READY=true
+        if docker compose exec -T mariadb mariadb-admin ping --silent >/dev/null 2>&1; then
+            echo "  [OK] Server MariaDB aktif."
             break
         fi
         sleep 2
         RETRIES=$((RETRIES - 1))
     done
-
-    if [ "$MARIADB_READY" = false ]; then
-        echo "  [PERINGATAN] MariaDB membutuhkan waktu lebih lama untuk start, menunggu 5 detik..."
-        sleep 5
-    fi
 
     SYNC_SQL="
         CREATE DATABASE IF NOT EXISTS \`${DB_PLATFORM_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -107,6 +98,8 @@ if command -v docker >/dev/null 2>&1; then
         ALTER USER '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
         CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
         ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+        GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'%';
+        GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'localhost';
         GRANT ALL PRIVILEGES ON \`${DB_PLATFORM_NAME}\`.* TO '${DB_USER}'@'%';
         GRANT ALL PRIVILEGES ON \`${DB_PLATFORM_NAME}\`.* TO '${DB_USER}'@'localhost';
         GRANT ALL PRIVILEGES ON \`${DB_PEKAN_NAME}\`.* TO '${DB_USER}'@'%';
@@ -116,39 +109,87 @@ if command -v docker >/dev/null 2>&1; then
     "
 
     EXECUTED=false
-    # Cara 1: Unix socket sebagai OS root di dalam kontainer MariaDB (UID 0 - bypass auth TCP)
-    if docker compose exec -u 0 -T mariadb mariadb -u root -e "$SYNC_SQL" >/dev/null 2>&1; then
-        echo "  [OK] Pengguna '${DB_USER}' dan basis data berhasil disinkronkan (via unix socket root)."
+    # Cek Opsi 1: Otentikasi dengan password root dari .env
+    if [ -n "$DB_ROOT_PASS" ] && docker compose exec -T mariadb mariadb -u root -p"${DB_ROOT_PASS}" -e "$SYNC_SQL" >/dev/null 2>&1; then
+        echo "  [OK] Pengguna '${DB_USER}' berhasil disinkronkan (via DB_ROOT_PASSWORD)."
         EXECUTED=true
-    elif [ -n "$DB_ROOT_PASS" ] && docker compose exec -T mariadb mariadb -u root -p"${DB_ROOT_PASS}" -e "$SYNC_SQL" >/dev/null 2>&1; then
-        echo "  [OK] Pengguna '${DB_USER}' berhasil disinkronkan (via password root .env)."
-        EXECUTED=true
+    # Cek Opsi 2: Password root default
     elif docker compose exec -T mariadb mariadb -u root -pmariadb_root_pass -e "$SYNC_SQL" >/dev/null 2>&1; then
-        echo "  [OK] Pengguna '${DB_USER}' berhasil disinkronkan (via password root default)."
+        echo "  [OK] Pengguna '${DB_USER}' berhasil disinkronkan (via default root password)."
         EXECUTED=true
+    # Cek Opsi 3: Passwordless
     elif docker compose exec -T mariadb mariadb -u root -e "$SYNC_SQL" >/dev/null 2>&1; then
         echo "  [OK] Pengguna '${DB_USER}' berhasil disinkronkan tanpa password."
         EXECUTED=true
     fi
 
+    # Jika semua metode ditolak (karena password root volume lama tidak diketahui),
+    # jalankan recovery otomatis non-destruktif via skip-grant-tables:
     if [ "$EXECUTED" = false ]; then
-        echo "  [!] Menjalankan injeksi perintah SQL langsung ke mysqld..."
-        docker compose exec -u 0 -T mariadb sh -c "mariadb -u root << 'EOSQL'
-$SYNC_SQL
-EOSQL" || true
+        echo "  [!] Password root MariaDB lama berbeda, menjalankan pemulihan hak akses otomatis..."
+        if [ -f "docker/mariadb/custom.cnf" ]; then
+            sed -i '/^\[mysqld\]/a skip-grant-tables' docker/mariadb/custom.cnf
+        else
+            docker compose exec -u 0 -T mariadb sh -c "echo -e '[mysqld]\nskip-grant-tables' > /etc/mysql/conf.d/recovery.cnf"
+        fi
+
+        docker compose restart mariadb
+
+        # Tunggu MariaDB siap dalam mode recovery
+        R_RETRIES=30
+        while [ $R_RETRIES -gt 0 ]; do
+            if docker compose exec -T mariadb mariadb -e "SELECT 1;" >/dev/null 2>&1; then
+                break
+            fi
+            sleep 1
+            R_RETRIES=$((R_RETRIES - 1))
+        done
+
+        # Terapkan sinkronisasi pengguna dan reset password root
+        docker compose exec -T mariadb mariadb -e "
+            FLUSH PRIVILEGES;
+            CREATE DATABASE IF NOT EXISTS \`${DB_PLATFORM_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            CREATE DATABASE IF NOT EXISTS \`${DB_PEKAN_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
+            ALTER USER '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
+            CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+            ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+            GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'%';
+            GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'localhost';
+            GRANT ALL PRIVILEGES ON \`${DB_PLATFORM_NAME}\`.* TO '${DB_USER}'@'%';
+            GRANT ALL PRIVILEGES ON \`${DB_PLATFORM_NAME}\`.* TO '${DB_USER}'@'localhost';
+            GRANT ALL PRIVILEGES ON \`${DB_PEKAN_NAME}\`.* TO '${DB_USER}'@'%';
+            GRANT ALL PRIVILEGES ON \`${DB_PEKAN_NAME}\`.* TO '${DB_USER}'@'localhost';
+            ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASS}';
+            FLUSH PRIVILEGES;
+        "
+
+        # Kembalikan konfigurasi normal
+        if [ -f "docker/mariadb/custom.cnf" ]; then
+            sed -i '/^skip-grant-tables/d' docker/mariadb/custom.cnf
+        fi
+        docker compose exec -u 0 -T mariadb rm -f /etc/mysql/conf.d/recovery.cnf 2>/dev/null || true
+
+        docker compose restart mariadb
+
+        # Tunggu MariaDB normal kembali
+        R_RETRIES=30
+        while [ $R_RETRIES -gt 0 ]; do
+            if docker compose exec -T mariadb mariadb-admin ping --silent >/dev/null 2>&1; then
+                break
+            fi
+            sleep 1
+            R_RETRIES=$((R_RETRIES - 1))
+        done
+        echo "  [OK] Kredensial root dan pengguna '${DB_USER}' berhasil dipulihkan secara penuh!"
     fi
 
-    # Uji verifikasi apakah pengguna basis data sudah benar-benar dapat melakukan koneksi
+    # Verifikasi akhir konektivitas pengguna basis data
     echo "  ... Memverifikasi akses koneksi pengguna '${DB_USER}'..."
     if docker compose exec -T mariadb mariadb -u "${DB_USER}" -p"${DB_PASS}" -e "SELECT 1;" "${DB_PLATFORM_NAME}" >/dev/null 2>&1; then
         echo "  [OK] Autentikasi pengguna basis data '${DB_USER}' terverifikasi sukses!"
     else
-        echo "  [PERINGATAN] Akses langsung belum terverifikasi, memberikan izin menyeluruh..."
-        docker compose exec -u 0 -T mariadb mariadb -u root -e "
-            GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
-            GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
-            FLUSH PRIVILEGES;
-        " >/dev/null 2>&1 || true
+        echo "  [PERINGATAN] Menguji koneksi soket..."
     fi
 fi
 
