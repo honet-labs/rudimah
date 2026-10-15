@@ -272,10 +272,16 @@ echo "[3/6] Memverifikasi ketersediaan basis data Platform dan PEKAN..."
 docker compose exec -T mariadb mariadb -u root $DB_ROOT_AUTH -e "
     CREATE DATABASE IF NOT EXISTS \`${DB_PLATFORM_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     CREATE DATABASE IF NOT EXISTS \`${DB_PEKAN_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
+    ALTER USER '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
+    CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+    ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
     GRANT ALL PRIVILEGES ON \`${DB_PLATFORM_NAME}\`.* TO '${DB_USER}'@'%';
+    GRANT ALL PRIVILEGES ON \`${DB_PLATFORM_NAME}\`.* TO '${DB_USER}'@'localhost';
     GRANT ALL PRIVILEGES ON \`${DB_PEKAN_NAME}\`.* TO '${DB_USER}'@'%';
+    GRANT ALL PRIVILEGES ON \`${DB_PEKAN_NAME}\`.* TO '${DB_USER}'@'localhost';
     FLUSH PRIVILEGES;
-" 2>/dev/null || true
+"
 
 echo "[4/6] Menjalankan migrasi basis data Laravel..."
 docker compose exec -T app php artisan migrate --force
