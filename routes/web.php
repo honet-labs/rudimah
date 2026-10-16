@@ -51,6 +51,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::get('/admin', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+    Route::post('/admin/notifications', [AdminController::class, 'updateNotifications'])->name('admin.notifications.update');
+    Route::post('/admin/notifications/test', [AdminController::class, 'testNotification'])->name('admin.notifications.test');
 });
 
 // Rute Terikat Ruang Kerja (Tenant Scoped: Asisten AI & Modul Aplikasi)

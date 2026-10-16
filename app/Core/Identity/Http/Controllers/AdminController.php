@@ -4,7 +4,9 @@ namespace App\Core\Identity\Http\Controllers;
 
 use App\Core\Applications\AppRegistry;
 use App\Core\Identity\Models\User;
+use App\Core\Notifications\Services\PlatformNotificationService;
 use App\Core\Tenancy\Models\Tenant;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -44,10 +46,7 @@ class AdminController
         });
 
         $appsList = AppRegistry::all();
-
-        $mailConfigured = !empty(config('rudimah.notifications.mail.host', env('MAIL_HOST'))) && env('MAIL_MAILER', 'smtp') !== 'log';
-        $telegramConfigured = !empty(config('rudimah.notifications.telegram.bot_token', env('TELEGRAM_BOT_TOKEN')));
-        $whatsappConfigured = !empty(config('rudimah.notifications.whatsapp.waha_api_url', env('WAHA_API_URL', env('WHATSAPP_API_URL'))));
+        $notificationSettings = PlatformNotificationService::getSettings();
 
         return Inertia::render('Admin/Dashboard', [
             'user' => [
@@ -57,6 +56,8 @@ class AdminController
                 'has_mfa' => (bool) $user->mfaMethods()->where('is_verified', true)->exists(),
             ],
             'tenant' => null,
+            'status' => session('status'),
+            'error' => session('error'),
             'systemStats' => [
                 'totalTenants' => $totalTenants,
                 'totalUsers' => $totalUsers,
@@ -64,26 +65,82 @@ class AdminController
                 'redisConnected' => true,
                 'appVersion' => '1.0.0-rudimah',
             ],
-            'notificationChannels' => [
-                'mail' => [
-                    'name' => 'Email (SMTP)',
-                    'configured' => $mailConfigured,
-                    'detail' => $mailConfigured ? config('rudimah.notifications.mail.host', env('MAIL_HOST')) : 'Belum diatur (MAIL_HOST)',
-                ],
-                'telegram' => [
-                    'name' => 'Telegram Bot API',
-                    'configured' => $telegramConfigured,
-                    'detail' => $telegramConfigured ? 'Token Terpasang' : 'Belum diatur (TELEGRAM_BOT_TOKEN)',
-                ],
-                'whatsapp' => [
-                    'name' => 'WhatsApp (WAHA)',
-                    'configured' => $whatsappConfigured,
-                    'detail' => $whatsappConfigured ? 'Endpoint Terpasang' : 'Belum diatur (WAHA_API_URL)',
-                ],
-            ],
+            'notificationSettings' => $notificationSettings,
             'tenantsList' => $tenantsList,
             'usersList' => $usersList,
             'appsList' => $appsList,
         ]);
+    }
+
+    /**
+     * Simpan konfigurasi pengiriman notifikasi (Email SMTP, WAHA WhatsApp, Telegram).
+     */
+    public function updateNotifications(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (!$user->is_super_admin) {
+            abort(403, 'Hanya Administrator Platform yang memiliki izin mengubah konfigurasi sistem.');
+        }
+
+        $validated = $request->validate([
+            'mail' => 'nullable|array',
+            'mail.enabled' => 'nullable|boolean',
+            'mail.host' => 'nullable|string|max:255',
+            'mail.port' => 'nullable|integer|min:1|max:65535',
+            'mail.username' => 'nullable|string|max:255',
+            'mail.password' => 'nullable|string|max:255',
+            'mail.encryption' => 'nullable|string|in:tls,ssl,none',
+            'mail.from_address' => 'nullable|string|max:255',
+            'mail.from_name' => 'nullable|string|max:255',
+
+            'telegram' => 'nullable|array',
+            'telegram.enabled' => 'nullable|boolean',
+            'telegram.bot_token' => 'nullable|string|max:255',
+            'telegram.bot_username' => 'nullable|string|max:255',
+
+            'whatsapp' => 'nullable|array',
+            'whatsapp.enabled' => 'nullable|boolean',
+            'whatsapp.waha_api_url' => 'nullable|string|max:255',
+            'whatsapp.waha_api_key' => 'nullable|string|max:255',
+            'whatsapp.waha_session' => 'nullable|string|max:100',
+        ]);
+
+        PlatformNotificationService::saveSettings($validated);
+
+        return back()->with('status', 'Konfigurasi notifikasi platform berhasil disimpan dan diterapkan untuk semua ruang kerja.');
+    }
+
+    /**
+     * Jalankan uji coba pengiriman atau koneksi kanal notifikasi terpilih.
+     */
+    public function testNotification(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (!$user->is_super_admin) {
+            abort(403, 'Hanya Administrator Platform yang memiliki izin menguji kanal notifikasi.');
+        }
+
+        $validated = $request->validate([
+            'channel' => 'required|in:mail,telegram,whatsapp',
+            'target' => 'nullable|string|max:255',
+        ]);
+
+        $channel = $validated['channel'];
+        $target = $validated['target'] ?? null;
+
+        if ($channel === 'mail') {
+            $recipient = !empty($target) ? trim($target) : $user->email;
+            $res = PlatformNotificationService::testEmail($recipient);
+        } elseif ($channel === 'telegram') {
+            $res = PlatformNotificationService::testTelegram();
+        } else {
+            $res = PlatformNotificationService::testWhatsApp($target);
+        }
+
+        if ($res['success']) {
+            return back()->with('status', $res['message']);
+        }
+
+        return back()->with('error', $res['message']);
     }
 }

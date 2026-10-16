@@ -29,5 +29,8 @@ class AppServiceProvider extends ServiceProvider
         ) {
             URL::forceScheme('https');
         }
+
+        // Terapkan konfigurasi notifikasi global dari basis data sistem
+        \App\Core\Notifications\Services\PlatformNotificationService::applyRuntimeConfig();
     }
 }
