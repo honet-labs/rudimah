@@ -52,10 +52,8 @@ DB_ROOT_PASS=$(grep -E '^DB_ROOT_PASSWORD=' .env | cut -d '=' -f2- | tr -d '\r"'
 DB_PLATFORM_NAME=$(grep -E '^DB_PLATFORM_DATABASE=' .env | cut -d '=' -f2- | tr -d '\r"' || echo "rudimah_platform")
 DB_PEKAN_NAME=$(grep -E '^DB_PEKAN_DATABASE=' .env | cut -d '=' -f2- | tr -d '\r"' || echo "rudimah_pekan")
 
-# Pastikan AUTH_MODEL terkonfigurasi di .env
-if ! grep -q '^AUTH_MODEL=' .env; then
-    echo "AUTH_MODEL=App\\Core\\Identity\\Models\\User" >> .env
-fi
+# Pastikan AUTH_MODEL tidak menduplikasi konfigurasi internal
+sed -i '/^AUTH_MODEL=/d' .env 2>/dev/null || true
 
 # Pastikan SESSION_DRIVER file agar tidak memicu 500 error bila redis flushing
 sed -i 's/^SESSION_DRIVER=redis/SESSION_DRIVER=file/' .env 2>/dev/null || true
@@ -196,11 +194,11 @@ fi
 # 5. Muat Ulang Kontainer dengan Kode Baru
 echo "[*] Tahap 5: Memuat ulang layanan kontainer..."
 if command -v docker >/dev/null 2>&1; then
-    docker compose up -d --remove-orphans
-    docker compose restart app horizon scheduler || true
+    docker compose up -d --force-recreate --remove-orphans app horizon scheduler
+    docker compose restart nginx || true
 
     echo "  ... Menunggu kontainer aplikasi siap..."
-    APP_RETRIES=20
+    APP_RETRIES=30
     while [ $APP_RETRIES -gt 0 ]; do
         if docker compose exec -T app php -v >/dev/null 2>&1; then
             break
