@@ -76,13 +76,23 @@ Route::prefix('t/{tenantSlug}')->middleware(['auth', ResolveTenantMiddleware::cl
             Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
             Route::get('/transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
             Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
-            Route::get('/transactions/{id}', [TransactionController::class, 'show'])->name('transactions.show');
-            Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
+            Route::get('/transactions/{id}', [TransactionController::class, 'show'])->name('transactions.show')->where('id', '[0-9a-zA-Z\-]{10,}');
+            Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('transactions.destroy')->where('id', '[0-9a-zA-Z\-]{10,}');
 
-            // Anggaran, Tabungan, Pengingat
+            // Anggaran
             Route::get('/budgets', [BudgetController::class, 'index'])->name('budgets.index');
+            Route::get('/budgets/create', [BudgetController::class, 'create'])->name('budgets.create');
+            Route::post('/budgets', [BudgetController::class, 'store'])->name('budgets.store');
+
+            // Tabungan
             Route::get('/savings', [SavingsController::class, 'index'])->name('savings.index');
+            Route::get('/savings/create', [SavingsController::class, 'create'])->name('savings.create');
+            Route::post('/savings', [SavingsController::class, 'store'])->name('savings.store');
+
+            // Pengingat Tagihan
             Route::get('/reminders', [ReminderController::class, 'index'])->name('reminders.index');
+            Route::get('/reminders/create', [ReminderController::class, 'create'])->name('reminders.create');
+            Route::post('/reminders', [ReminderController::class, 'store'])->name('reminders.store');
 
             // Master Data
             Route::get('/master-data', [MasterDataController::class, 'index'])->name('masterdata.index');

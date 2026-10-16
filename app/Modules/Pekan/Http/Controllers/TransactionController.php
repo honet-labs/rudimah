@@ -53,7 +53,7 @@ class TransactionController
         ]);
     }
 
-    public function create(Request $request): Response
+    public function create(Request $request, ?string $tenantSlug = null): Response
     {
         $tenant = TenantContext::get();
         $user = $request->user();
@@ -61,21 +61,28 @@ class TransactionController
         $accounts = FinanceAccount::where('is_active', true)->get();
         $categories = FinanceCategory::where('is_active', true)->get();
 
+        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
+            $t = $m->tenant;
+            if ($t) $t->role = $m->role;
+            return $t;
+        })->filter()->values() : [];
+
         return Inertia::render('Pekan/Transactions/Create', [
             'user' => $user ? [
                 'id' => $user->id,
                 'name' => $user->full_name,
                 'email' => $user->email,
+                'has_mfa' => (bool) $user->mfaMethods()->where('is_verified', true)->exists(),
             ] : null,
             'tenant' => $tenant,
-            'tenants' => $user ? $user->memberships()->with('tenant')->get()->pluck('tenant') : [],
+            'tenants' => $tenants,
             'apps' => AppRegistry::all(),
             'accounts' => $accounts,
             'categories' => $categories,
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, ?string $tenantSlug = null): RedirectResponse
     {
         $validated = $request->validate([
             'account_id' => 'required|string',
@@ -95,31 +102,45 @@ class TransactionController
         $this->transactionService->createTransaction($validated, $items);
 
         $tenant = TenantContext::get();
-        return redirect("/t/{$tenant->slug}/apps/pekan/transactions")
+        $slug = $tenant?->slug ?: $tenantSlug;
+        return redirect("/t/{$slug}/apps/pekan/transactions")
             ->with('status', 'Transaksi berhasil disimpan.');
     }
 
-    public function show(string $tenantSlug, string $id): Response
+    public function show(Request $request, string $tenantSlug, string $id): Response
     {
         $tenant = TenantContext::get();
+        $user = $request->user();
         $transaction = FinanceTransaction::with(['account', 'category', 'items', 'attachments'])
             ->findOrFail($id);
 
+        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
+            $t = $m->tenant;
+            if ($t) $t->role = $m->role;
+            return $t;
+        })->filter()->values() : [];
+
         return Inertia::render('Pekan/Transactions/Detail', [
-            'user' => auth()->user(),
+            'user' => $user ? [
+                'id' => $user->id,
+                'name' => $user->full_name,
+                'email' => $user->email,
+            ] : null,
             'tenant' => $tenant,
+            'tenants' => $tenants,
             'apps' => AppRegistry::all(),
             'transaction' => $transaction,
         ]);
     }
 
-    public function destroy(string $tenantSlug, string $id): RedirectResponse
+    public function destroy(Request $request, string $tenantSlug, string $id): RedirectResponse
     {
         $transaction = FinanceTransaction::findOrFail($id);
         $transaction->delete();
 
         $tenant = TenantContext::get();
-        return redirect("/t/{$tenant->slug}/apps/pekan/transactions")
+        $slug = $tenant?->slug ?: $tenantSlug;
+        return redirect("/t/{$slug}/apps/pekan/transactions")
             ->with('status', 'Transaksi berhasil dihapus.');
     }
 }

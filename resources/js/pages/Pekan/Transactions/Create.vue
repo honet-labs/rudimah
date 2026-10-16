@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
 import RdCard from '../../../design-system/RdCard.vue';
@@ -9,34 +10,28 @@ import RdSelect from '../../../design-system/RdSelect.vue';
 import RdTextarea from '../../../design-system/RdTextarea.vue';
 import RdFileUpload from '../../../design-system/RdFileUpload.vue';
 import RdMoney from '../../../design-system/RdMoney.vue';
-import type { User, Tenant } from '../../../types/core';
+import type { User, Tenant, AppManifest } from '../../../types/core';
 import type { FinanceAccount, FinanceCategory, TransactionItem } from '../../../types/pekan';
 
 const props = withDefaults(
   defineProps<{
     user: User;
     tenant: Tenant;
+    tenants?: Tenant[];
+    apps?: AppManifest[];
     accounts?: FinanceAccount[];
     categories?: FinanceCategory[];
   }>(),
   {
-    accounts: () => [
-      { id: 'acc-1', name: 'BCA Utama', account_type: 'bank', currency: 'Rp', opening_balance_minor: 10000000, current_balance_minor: 15500000, is_active: true },
-      { id: 'acc-2', name: 'Dompet Tunai', account_type: 'cash', currency: 'Rp', opening_balance_minor: 500000, current_balance_minor: 415000, is_active: true },
-      { id: 'acc-3', name: 'Gopay / OVO', account_type: 'ewallet', currency: 'Rp', opening_balance_minor: 250000, current_balance_minor: 120000, is_active: true },
-    ],
-    categories: () => [
-      { id: 'cat-1', name: 'Gaji Pokok', category_type: 'income', is_active: true },
-      { id: 'cat-2', name: 'Belanja Dapur', category_type: 'expense', is_active: true },
-      { id: 'cat-3', name: 'Transportasi', category_type: 'expense', is_active: true },
-      { id: 'cat-4', name: 'Listrik & Air', category_type: 'expense', is_active: true },
-    ],
+    accounts: () => [],
+    categories: () => [],
   }
 );
 
+const isSubmitting = ref(false);
 const transactionType = ref<'income' | 'expense' | 'transfer'>('expense');
 const accountId = ref(props.accounts[0]?.id || '');
-const categoryId = ref(props.categories[1]?.id || '');
+const categoryId = ref(props.categories[0]?.id || '');
 const transactionDate = ref(new Date().toISOString().substring(0, 10));
 const description = ref('');
 const merchantName = ref('');
@@ -44,7 +39,7 @@ const receiptNumber = ref('');
 const notes = ref('');
 
 const items = ref<TransactionItem[]>([
-  { item_name: '', quantity: 1, price_minor: 0, discount_minor: 0, total_minor: 0 }
+  { item_name: 'Item Transaksi', quantity: 1, price_minor: 50000, discount_minor: 0, total_minor: 50000 }
 ]);
 
 const accountOptions = computed(() =>
@@ -81,10 +76,39 @@ function updateItemTotal(item: TransactionItem) {
 const grandTotalMinor = computed(() => {
   return items.value.reduce((acc, it) => acc + (it.total_minor || 0), 0);
 });
+
+function handleSubmit() {
+  if (isSubmitting.value) return;
+  isSubmitting.value = true;
+
+  router.post(`/t/${props.tenant.slug}/apps/pekan/transactions`, {
+    type: transactionType.value,
+    account_id: accountId.value || props.accounts[0]?.id || 'acc-default',
+    category_id: categoryId.value || null,
+    amount_minor: grandTotalMinor.value > 0 ? grandTotalMinor.value : 50000,
+    transaction_date: transactionDate.value,
+    description: description.value || 'Pencatatan transaksi',
+    merchant_name: merchantName.value,
+    receipt_number: receiptNumber.value,
+    notes: notes.value,
+    items: items.value,
+  }, {
+    onFinish: () => {
+      isSubmitting.value = false;
+    }
+  });
+}
 </script>
 
 <template>
-  <RudimahAppShell :user="user" :tenant="tenant" app-key="pekan" app-name="PEKAN">
+  <RudimahAppShell
+    :user="user"
+    :tenant="tenant"
+    :tenants="tenants"
+    :apps="apps"
+    app-key="pekan"
+    app-name="PEKAN"
+  >
     <RdPageHeader
       title="Tambah Transaksi Baru"
       description="Catat mutasi keuangan tunggal atau kuitansi multi-item ke dalam pembukuan"
@@ -95,7 +119,7 @@ const grandTotalMinor = computed(() => {
       ]"
     />
 
-    <form method="POST" :action="`/t/${tenant.slug}/apps/pekan/transactions`" class="space-y-6 max-w-4xl">
+    <form @submit.prevent="handleSubmit" class="space-y-6 max-w-4xl">
       <!-- Data Transaksi Utama -->
       <RdCard title="Informasi Transaksi">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
@@ -252,7 +276,7 @@ const grandTotalMinor = computed(() => {
             Batal
           </RdButton>
         </a>
-        <RdButton type="submit" variant="primary">
+        <RdButton type="submit" variant="primary" :loading="isSubmitting" :disabled="isSubmitting">
           Simpan Transaksi
         </RdButton>
       </div>
