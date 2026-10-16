@@ -138,6 +138,13 @@ function isCurrentRoute(path: string): boolean {
             </span>
           </button>
 
+          <!-- Backdrop penutup dropdown ketika klik di luar -->
+          <div
+            v-if="isUserMenuOpen"
+            class="fixed inset-0 z-40"
+            @click="isUserMenuOpen = false"
+          ></div>
+
           <div
             v-if="isUserMenuOpen"
             class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 z-50 py-1"
