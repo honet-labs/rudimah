@@ -51,6 +51,7 @@ interface NotificationSettingsProp {
     bot_token?: string;
     has_bot_token: boolean;
     bot_username: string;
+    default_group?: string;
     is_configured: boolean;
   };
   whatsapp: {
@@ -59,6 +60,7 @@ interface NotificationSettingsProp {
     waha_api_key?: string;
     has_api_key: boolean;
     waha_session: string;
+    default_group?: string;
     is_configured: boolean;
   };
 }
@@ -125,12 +127,14 @@ const form = ref({
     enabled: props.notificationSettings?.telegram?.enabled ?? false,
     bot_token: '',
     bot_username: props.notificationSettings?.telegram?.bot_username ?? '',
+    default_group: props.notificationSettings?.telegram?.default_group ?? '',
   },
   whatsapp: {
     enabled: props.notificationSettings?.whatsapp?.enabled ?? false,
     waha_api_url: props.notificationSettings?.whatsapp?.waha_api_url ?? '',
     waha_api_key: '',
     waha_session: props.notificationSettings?.whatsapp?.waha_session ?? 'default',
+    default_group: props.notificationSettings?.whatsapp?.default_group ?? '',
   },
 });
 
@@ -139,7 +143,10 @@ const showTestEmailModal = ref(false);
 const testEmailTarget = ref(props.user?.email || '');
 
 const showTestWaModal = ref(false);
-const testWaTarget = ref('');
+const testWaTarget = ref(props.notificationSettings?.whatsapp?.default_group || '');
+
+const showTestTelegramModal = ref(false);
+const testTelegramTarget = ref(props.notificationSettings?.telegram?.default_group || '');
 
 function saveNotificationSettings() {
   isSaving.value = true;
@@ -161,6 +168,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       testingChannel.value = null;
       if (channel === 'mail') showTestEmailModal.value = false;
       if (channel === 'whatsapp') showTestWaModal.value = false;
+      if (channel === 'telegram') showTestTelegramModal.value = false;
     },
   });
 }
@@ -335,8 +343,8 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
     <!-- Seksi 4: Panel Konfigurasi Notifikasi Seluruh Ruang Kerja -->
     <div id="notifications" class="mb-8">
       <RdCard
-        title="Pusat Konfigurasi Saluran Notifikasi (Platform-Wide)"
-        description="Konfigurasikan saluran pengiriman Email SMTP, WhatsApp (WAHA), dan Telegram untuk seluruh ruang kerja. Digunakan pada pemulihan akun, kode MFA, dan notifikasi pengingat transaksi."
+        title="Pusat Konfigurasi Saluran Notifikasi & Push Grup (Platform-Wide)"
+        description="Konfigurasikan saluran pengiriman Email SMTP, WhatsApp (WAHA), dan Telegram untuk seluruh ruang kerja. Mendukung pengiriman ke nomor pribadi maupun Push Grup WhatsApp & Grup/Channel Telegram."
       >
         <!-- Ringkasan Status Kanal (Responsive 1 col mobile, 2 tablet, 3 desktop) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
@@ -527,7 +535,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
               <RdCheckbox
                 v-model="form.whatsapp.enabled"
                 label="Aktifkan Notifikasi via WhatsApp (WAHA)"
-                description="Kirimkan kode OTP dan pengingat tagihan keuangan langsung ke nomor WhatsApp pengguna via gateway WAHA"
+                description="Kirimkan kode OTP, pengingat keuangan, atau push ke Grup WhatsApp via gateway WAHA"
               />
               <div class="flex gap-2 self-start sm:self-auto shrink-0 w-full sm:w-auto">
                 <RdButton
@@ -539,7 +547,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
                   @click="showTestWaModal = true"
                 >
                   <span v-if="testingChannel === 'whatsapp'">Menguji WAHA...</span>
-                  <span v-else>💬 Uji Koneksi WAHA</span>
+                  <span v-else>💬 Uji Kirim / Koneksi WAHA</span>
                 </RdButton>
               </div>
             </div>
@@ -570,11 +578,20 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
                 hint="Nama sesi WhatsApp yang terotentikasi di server WAHA (default: 'default')"
                 required
               />
+
+              <div class="md:col-span-2">
+                <RdInput
+                  v-model="form.whatsapp.default_group"
+                  label="ID Grup WhatsApp Notifikasi Platform (Opsional)"
+                  placeholder="Contoh: 120363024829102938@g.us"
+                  hint="Masukkan ID Grup WhatsApp jika ingin pesan/alert sistem otomatis di-push ke grup WhatsApp tim"
+                />
+              </div>
             </div>
 
             <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg text-xs text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
-              <span class="font-semibold text-slate-800 dark:text-slate-200">Integrasi WAHA (WhatsApp HTTP API):</span>
-              Pastikan kontainer WAHA sudah dalam keadaan <span class="text-teal-600 dark:text-teal-400 font-medium">SCAN_QR_CODE / WORKING</span>. Pengujian koneksi akan melakukan verifikasi sesi aktif ke endpoint <code class="font-mono text-xs">/api/sessions</code>.
+              <span class="font-semibold text-slate-800 dark:text-slate-200">Dukungan Push ke Grup WhatsApp:</span>
+              Sistem mendukung pengiriman langsung ke <strong>Grup WhatsApp</strong> menggunakan Chat ID berakhiran <code class="font-mono text-xs">@g.us</code>. Gunakan tombol *"Uji Kirim / Koneksi WAHA"* di atas untuk menguji pengiriman ke grup.
             </div>
           </div>
 
@@ -584,7 +601,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
               <RdCheckbox
                 v-model="form.telegram.enabled"
                 label="Aktifkan Notifikasi via Telegram Bot"
-                description="Kirimkan pemberitahuan sistem dan tautan login melalui Bot Telegram resmi platform"
+                description="Kirimkan pemberitahuan sistem dan ringkasan ke obrolan pribadi atau Push ke Grup/Kanal Telegram"
               />
               <div class="flex gap-2 self-start sm:self-auto shrink-0 w-full sm:w-auto">
                 <RdButton
@@ -593,10 +610,10 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
                   size="sm"
                   class="w-full sm:w-auto"
                   :disabled="isTesting || (!form.telegram.bot_token && !notificationSettings?.telegram?.has_bot_token)"
-                  @click="runTest('telegram')"
+                  @click="showTestTelegramModal = true"
                 >
-                  <span v-if="testingChannel === 'telegram'">Memverifikasi Token...</span>
-                  <span v-else>🤖 Uji Koneksi Telegram (getMe)</span>
+                  <span v-if="testingChannel === 'telegram'">Menguji Telegram...</span>
+                  <span v-else>🤖 Uji Kirim / Koneksi Telegram</span>
                 </RdButton>
               </div>
             </div>
@@ -617,11 +634,20 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
                 placeholder="Contoh: rudimah_notification_bot"
                 hint="Nama pengguna publik bot tanpa tanda @ (misal: rudimah_notif_bot)"
               />
+
+              <div class="md:col-span-2">
+                <RdInput
+                  v-model="form.telegram.default_group"
+                  label="Chat ID Grup / Kanal Telegram (Opsional)"
+                  placeholder="Contoh: -1001234567890 atau @nama_kanal"
+                  hint="ID Chat grup Telegram (biasanya diawali -100) atau username publik kanal tujuan push notifikasi"
+                />
+              </div>
             </div>
 
             <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg text-xs text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
-              <span class="font-semibold text-slate-800 dark:text-slate-200">Cara Mendapatkan Token Bot Telegram:</span>
-              Buka aplikasi Telegram, kirim pesan ke <a href="https://t.me/BotFather" target="_blank" rel="noopener" class="text-teal-600 dark:text-teal-400 underline font-medium">@BotFather</a>, ketik perintah <code class="font-mono text-xs">/newbot</code>, dan salin token API HTTP yang diberikan ke formulir di atas.
+              <span class="font-semibold text-slate-800 dark:text-slate-200">Dukungan Push ke Grup Telegram:</span>
+              Untuk mengirim ke grup, tambahkan bot Anda ke dalam grup Telegram, berikan hak pengirim pesan, dan masukkan ID grup (misal <code class="font-mono text-xs">-100xxxxxxxxxx</code>) pada formulir di atas.
             </div>
           </div>
 
@@ -690,22 +716,22 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       </template>
     </RdModal>
 
-    <!-- MODAL: UJI KONEKSI WHATSAPP (WAHA) (Responsive modal actions) -->
+    <!-- MODAL: UJI KONEKSI & PUSH WHATSAPP (WAHA) -->
     <RdModal
       v-model="showTestWaModal"
-      title="Uji Koneksi WhatsApp WAHA"
-      description="Uji konektivitas ke server REST API WAHA dan kirim pesan uji coba ke nomor tujuan"
+      title="Uji Koneksi & Push WhatsApp (WAHA)"
+      description="Uji konektivitas ke server REST API WAHA dan kirim pesan uji coba ke nomor pribadi atau Grup WhatsApp (@g.us)"
       max-width="md"
     >
       <div class="space-y-3 py-2">
         <RdInput
           v-model="testWaTarget"
-          label="Nomor WhatsApp Tujuan (Opsional)"
-          placeholder="Contoh: 08123456789 atau 628123456789"
-          hint="Kosongkan jika hanya ingin menguji konektivitas status server & sesi WAHA"
+          label="Nomor WhatsApp atau ID Grup WhatsApp (@g.us)"
+          placeholder="Contoh: 08123456789 atau 120363024829102938@g.us"
+          hint="Dapat diisi nomor HP pribadi (08xxx) atau Group ID WhatsApp (@g.us). Kosongkan jika hanya ingin cek server sesi WAHA."
         />
         <p class="text-xs text-slate-500">
-          Jika nomor diisi, sistem akan mengirimkan satu pesan teks percobaan via sesi WAHA terpilih.
+          Jika nomor atau ID grup diisi, sistem akan mengirimkan satu pesan teks uji coba via sesi WAHA terpilih.
         </p>
       </div>
 
@@ -727,7 +753,51 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
             :disabled="isTesting"
             @click="runTest('whatsapp', testWaTarget)"
           >
-            <span v-if="isTesting">Menguji Koneksi...</span>
+            <span v-if="isTesting">Menguji Koneksi / Mengirim...</span>
+            <span v-else>Jalankan Pengujian</span>
+          </RdButton>
+        </div>
+      </template>
+    </RdModal>
+
+    <!-- MODAL: UJI KONEKSI & PUSH TELEGRAM -->
+    <RdModal
+      v-model="showTestTelegramModal"
+      title="Uji Koneksi & Push Telegram"
+      description="Uji koneksi ke bot Telegram atau kirimkan pesan uji coba langsung ke Grup / Kanal / Pengguna"
+      max-width="md"
+    >
+      <div class="space-y-3 py-2">
+        <RdInput
+          v-model="testTelegramTarget"
+          label="Chat ID Grup / Kanal / Pengguna Telegram (Opsional)"
+          placeholder="Contoh: -1001234567890 atau @nama_kanal"
+          hint="Masukkan Chat ID grup Telegram tempat bot berada. Kosongkan jika hanya ingin verifikasi token bot via getMe."
+        />
+        <p class="text-xs text-slate-500">
+          Jika Chat ID diisi, bot akan mengirimkan pesan tes ke grup tersebut. Pastikan bot sudah diundang ke dalam grup.
+        </p>
+      </div>
+
+      <template #footer>
+        <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 w-full">
+          <RdButton
+            variant="outline"
+            size="sm"
+            class="w-full sm:w-auto"
+            :disabled="isTesting"
+            @click="showTestTelegramModal = false"
+          >
+            Batal
+          </RdButton>
+          <RdButton
+            variant="primary"
+            size="sm"
+            class="w-full sm:w-auto"
+            :disabled="isTesting"
+            @click="runTest('telegram', testTelegramTarget)"
+          >
+            <span v-if="isTesting">Menguji Telegram...</span>
             <span v-else>Jalankan Pengujian</span>
           </RdButton>
         </div>

@@ -97,12 +97,14 @@ class AdminController
             'telegram.enabled' => 'nullable|boolean',
             'telegram.bot_token' => 'nullable|string|max:255',
             'telegram.bot_username' => 'nullable|string|max:255',
+            'telegram.default_group' => 'nullable|string|max:255',
 
             'whatsapp' => 'nullable|array',
             'whatsapp.enabled' => 'nullable|boolean',
             'whatsapp.waha_api_url' => 'nullable|string|max:255',
             'whatsapp.waha_api_key' => 'nullable|string|max:255',
             'whatsapp.waha_session' => 'nullable|string|max:100',
+            'whatsapp.default_group' => 'nullable|string|max:255',
         ]);
 
         PlatformNotificationService::saveSettings($validated);
@@ -132,7 +134,7 @@ class AdminController
             $recipient = !empty($target) ? trim($target) : $user->email;
             $res = PlatformNotificationService::testEmail($recipient);
         } elseif ($channel === 'telegram') {
-            $res = PlatformNotificationService::testTelegram();
+            $res = PlatformNotificationService::testTelegram($target);
         } else {
             $res = PlatformNotificationService::testWhatsApp($target);
         }

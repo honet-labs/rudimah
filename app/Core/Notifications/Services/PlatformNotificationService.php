@@ -35,12 +35,14 @@ class PlatformNotificationService
         // 2. Telegram Bot
         $telegramRawToken = $dbSettings->get('telegram_bot_token', env('TELEGRAM_BOT_TOKEN', ''));
         $telegramUsername = $dbSettings->get('telegram_bot_username', env('TELEGRAM_BOT_USERNAME', ''));
+        $telegramDefaultGroup = $dbSettings->get('telegram_default_group', '');
         $telegramEnabled = filter_var($dbSettings->get('telegram_enabled', !empty($telegramRawToken)), FILTER_VALIDATE_BOOLEAN);
 
         // 3. WhatsApp (WAHA)
         $wahaApiUrl = $dbSettings->get('waha_api_url', env('WAHA_API_URL', env('WHATSAPP_API_URL', '')));
         $wahaRawApiKey = $dbSettings->get('waha_api_key', env('WAHA_API_KEY', env('WHATSAPP_API_KEY', '')));
         $wahaSession = $dbSettings->get('waha_session', env('WAHA_SESSION', 'default'));
+        $wahaDefaultGroup = $dbSettings->get('waha_default_group', '');
         $wahaEnabled = filter_var($dbSettings->get('waha_enabled', !empty($wahaApiUrl)), FILTER_VALIDATE_BOOLEAN);
 
         return [
@@ -61,6 +63,7 @@ class PlatformNotificationService
                 'bot_token' => '', // Jangan kirim plaintext ke browser
                 'has_bot_token' => !empty($telegramRawToken),
                 'bot_username' => $telegramUsername,
+                'default_group' => $telegramDefaultGroup,
                 'is_configured' => !empty($telegramRawToken),
             ],
             'whatsapp' => [
@@ -69,6 +72,7 @@ class PlatformNotificationService
                 'waha_api_key' => '', // Jangan kirim plaintext ke browser
                 'has_api_key' => !empty($wahaRawApiKey),
                 'waha_session' => $wahaSession ?: 'default',
+                'default_group' => $wahaDefaultGroup,
                 'is_configured' => !empty($wahaApiUrl),
             ],
         ];
@@ -101,6 +105,7 @@ class PlatformNotificationService
             $t = $data['telegram'];
             SystemSetting::set('telegram_enabled', !empty($t['enabled']) ? '1' : '0', 'telegram');
             SystemSetting::set('telegram_bot_username', trim($t['bot_username'] ?? ''), 'telegram');
+            SystemSetting::set('telegram_default_group', trim($t['default_group'] ?? ''), 'telegram');
 
             if (!empty($t['bot_token']) && $t['bot_token'] !== '******') {
                 SystemSetting::set('telegram_bot_token', trim($t['bot_token']), 'telegram', true);
@@ -113,6 +118,7 @@ class PlatformNotificationService
             SystemSetting::set('waha_enabled', !empty($w['enabled']) ? '1' : '0', 'whatsapp');
             SystemSetting::set('waha_api_url', rtrim(trim($w['waha_api_url'] ?? ''), '/'), 'whatsapp');
             SystemSetting::set('waha_session', trim($w['waha_session'] ?? 'default'), 'whatsapp');
+            SystemSetting::set('waha_default_group', trim($w['default_group'] ?? ''), 'whatsapp');
 
             if (!empty($w['waha_api_key']) && $w['waha_api_key'] !== '******') {
                 SystemSetting::set('waha_api_key', trim($w['waha_api_key']), 'whatsapp', true);
@@ -143,11 +149,13 @@ class PlatformNotificationService
 
             $telegramToken = $settings->get('telegram_bot_token', env('TELEGRAM_BOT_TOKEN', ''));
             $telegramUsername = $settings->get('telegram_bot_username', env('TELEGRAM_BOT_USERNAME', ''));
+            $telegramDefaultGroup = $settings->get('telegram_default_group', '');
             $telegramEnabled = filter_var($settings->get('telegram_enabled', !empty($telegramToken)), FILTER_VALIDATE_BOOLEAN);
 
             $wahaUrl = $settings->get('waha_api_url', env('WAHA_API_URL', env('WHATSAPP_API_URL', '')));
             $wahaKey = $settings->get('waha_api_key', env('WAHA_API_KEY', env('WHATSAPP_API_KEY', '')));
             $wahaSession = $settings->get('waha_session', env('WAHA_SESSION', 'default'));
+            $wahaDefaultGroup = $settings->get('waha_default_group', '');
             $wahaEnabled = filter_var($settings->get('waha_enabled', !empty($wahaUrl)), FILTER_VALIDATE_BOOLEAN);
 
             if (!empty($mailHost)) {
@@ -172,14 +180,15 @@ class PlatformNotificationService
                 'rudimah.notifications.telegram.enabled' => $telegramEnabled,
                 'rudimah.notifications.telegram.bot_token' => $telegramToken,
                 'rudimah.notifications.telegram.bot_username' => $telegramUsername,
+                'rudimah.notifications.telegram.default_group' => $telegramDefaultGroup,
 
                 'rudimah.notifications.whatsapp.enabled' => $wahaEnabled,
                 'rudimah.notifications.whatsapp.waha_api_url' => $wahaUrl,
                 'rudimah.notifications.whatsapp.waha_api_key' => $wahaKey,
                 'rudimah.notifications.whatsapp.waha_session' => $wahaSession,
+                'rudimah.notifications.whatsapp.default_group' => $wahaDefaultGroup,
             ]);
         } catch (\Throwable $e) {
-            // Tangkap graceful saat migrasi belum dijalankan
             Log::debug('[PlatformNotificationService] Belum dapat menerapkan konfigurasi runtime: ' . $e->getMessage());
         }
     }
@@ -222,9 +231,9 @@ class PlatformNotificationService
     }
 
     /**
-     * Uji coba koneksi Bot Telegram menggunakan endpoint getMe.
+     * Uji coba koneksi Bot Telegram menggunakan endpoint getMe atau kirim ke chat/group.
      */
-    public static function testTelegram(): array
+    public static function testTelegram(?string $targetChat = null): array
     {
         $token = SystemSetting::get('telegram_bot_token', env('TELEGRAM_BOT_TOKEN', ''));
         if (empty($token)) {
@@ -235,6 +244,29 @@ class PlatformNotificationService
         }
 
         try {
+            // Jika ada target chat/group, kirim pesan uji coba ke grup atau chat ID tersebut
+            if (!empty($targetChat)) {
+                $chatId = trim($targetChat);
+                $sendRes = Http::timeout(10)->post("https://api.telegram.org/bot{$token}/sendMessage", [
+                    'chat_id' => $chatId,
+                    'text' => "[RUDIMAH] Uji Coba Pengiriman Notifikasi Telegram Berhasil!\nPesan berhasil diteruskan ke grup/chat ini.\nWaktu: " . now()->toIso8601String(),
+                ]);
+
+                if ($sendRes->successful() && ($sendRes->json('ok') ?? false)) {
+                    return [
+                        'success' => true,
+                        'message' => "Pesan uji coba Telegram berhasil dikirim ke grup/chat ID {$chatId}.",
+                    ];
+                }
+
+                $desc = $sendRes->json('description') ?? $sendRes->body();
+                return [
+                    'success' => false,
+                    'message' => "Gagal mengirim ke grup/chat Telegram: {$desc}",
+                ];
+            }
+
+            // Jika tidak ada target chat, uji koneksi bot via getMe
             $response = Http::timeout(10)
                 ->get("https://api.telegram.org/bot{$token}/getMe");
 
@@ -265,9 +297,9 @@ class PlatformNotificationService
     }
 
     /**
-     * Uji coba koneksi WhatsApp WAHA endpoint.
+     * Uji coba koneksi WhatsApp WAHA endpoint, mendukung nomor pribadi maupun WhatsApp Group (@g.us).
      */
-    public static function testWhatsApp(?string $targetPhone = null): array
+    public static function testWhatsApp(?string $target = null): array
     {
         $url = rtrim(SystemSetting::get('waha_api_url', env('WAHA_API_URL', env('WHATSAPP_API_URL', ''))), '/');
         $apiKey = SystemSetting::get('waha_api_key', env('WAHA_API_KEY', env('WHATSAPP_API_KEY', '')));
@@ -286,26 +318,40 @@ class PlatformNotificationService
                 $client = $client->withHeaders(['X-Api-Key' => $apiKey]);
             }
 
-            // Jika ada targetPhone, coba kirim pesan uji coba
-            if (!empty($targetPhone)) {
-                $cleanPhone = preg_replace('/[^0-9]/', '', $targetPhone);
-                if (str_starts_with($cleanPhone, '08')) {
-                    $cleanPhone = '628' . substr($cleanPhone, 2);
+            // Jika ada target, kirim pesan uji coba (mendukung personal & WhatsApp Group)
+            if (!empty($target)) {
+                $trimmed = trim($target);
+                // Deteksi apakah target adalah Group ID WhatsApp (@g.us)
+                if (str_contains($trimmed, '@g.us') || str_ends_with($trimmed, '@g.us')) {
+                    $chatId = $trimmed;
+                } elseif (preg_match('/^[0-9]+-[0-9]+$/', $trimmed) || str_starts_with($trimmed, '120363')) {
+                    $chatId = $trimmed . '@g.us';
+                } else {
+                    $cleanPhone = preg_replace('/[^0-9]/', '', $trimmed);
+                    if (str_starts_with($cleanPhone, '08')) {
+                        $cleanPhone = '628' . substr($cleanPhone, 2);
+                    }
+                    $chatId = $cleanPhone . '@c.us';
                 }
-                $chatId = $cleanPhone . '@c.us';
 
                 $sendRes = $client->post("{$url}/api/sendText", [
                     'session' => $session,
                     'chatId' => $chatId,
-                    'text' => "[RUDIMAH] Uji Coba Pengiriman Notifikasi WhatsApp berhasil terhubung melalui sesi '{$session}'.\nWaktu: " . now()->toIso8601String(),
+                    'text' => "[RUDIMAH] Uji Coba Pengiriman Notifikasi WhatsApp berhasil terhubung melalui sesi '{$session}'.\nPesan ini berhasil dikirim ke grup/nomor ini.\nWaktu: " . now()->toIso8601String(),
                 ]);
 
                 if ($sendRes->successful()) {
+                    $label = str_contains($chatId, '@g.us') ? "Grup WhatsApp ({$chatId})" : "nomor {$chatId}";
                     return [
                         'success' => true,
-                        'message' => "Pesan uji coba WhatsApp berhasil dikirim ke {$cleanPhone}.",
+                        'message' => "Pesan uji coba WhatsApp berhasil dikirim ke {$label}.",
                     ];
                 }
+
+                return [
+                    'success' => false,
+                    'message' => "Gagal mengirim WhatsApp: " . ($sendRes->json('message') ?? $sendRes->body()),
+                ];
             }
 
             // Cek endpoint sesi atau versi WAHA
