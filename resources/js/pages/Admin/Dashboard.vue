@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../design-system/RdPageHeader.vue';
@@ -83,17 +83,17 @@ const props = defineProps<{
 const tenantColumns = [
   { key: 'name', label: 'Nama Ruang Kerja' },
   { key: 'slug', label: 'Slug URL' },
-  { key: 'members_count', label: 'Anggota', width: '100px', align: 'center' as const },
-  { key: 'created_at', label: 'Terdaftar', width: '130px' },
-  { key: 'status', label: 'Status', width: '110px', align: 'center' as const },
-  { key: 'actions', label: 'Aksi', width: '150px', align: 'center' as const },
+  { key: 'members_count', label: 'Anggota', width: '90px', align: 'center' as const },
+  { key: 'created_at', label: 'Terdaftar', width: '120px' },
+  { key: 'status', label: 'Status', width: '100px', align: 'center' as const },
+  { key: 'actions', label: 'Aksi', width: '140px', align: 'center' as const },
 ];
 
 const userColumns = [
   { key: 'name', label: 'Nama Pengguna' },
   { key: 'email', label: 'Alamat Email' },
-  { key: 'has_mfa', label: 'Keamanan MFA', width: '140px', align: 'center' as const },
-  { key: 'is_super_admin', label: 'Hak Akses', width: '140px', align: 'center' as const },
+  { key: 'has_mfa', label: 'Keamanan MFA', width: '130px', align: 'center' as const },
+  { key: 'is_super_admin', label: 'Hak Akses', width: '130px', align: 'center' as const },
   { key: 'workspaces_count', label: 'Ruang Kerja', width: '110px', align: 'center' as const },
 ];
 
@@ -174,8 +174,8 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       :breadcrumbs="[{ label: 'Beranda', href: '/workspaces' }, { label: 'Administrasi Platform' }]"
     >
       <template #actions>
-        <a href="/workspaces">
-          <RdButton variant="outline" size="sm">
+        <a href="/workspaces" class="w-full sm:w-auto">
+          <RdButton variant="outline" size="sm" class="w-full sm:w-auto">
             Kembali ke Pemilih Ruang Kerja
           </RdButton>
         </a>
@@ -183,50 +183,50 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
     </RdPageHeader>
 
     <!-- Feedback Banner Notifikasi Sukses / Gagal -->
-    <div v-if="status" class="mb-6">
+    <div v-if="status" class="mb-4 sm:mb-6">
       <RdAlert variant="success" title="Operasi Berhasil">
         {{ status }}
       </RdAlert>
     </div>
-    <div v-if="error" class="mb-6">
+    <div v-if="error" class="mb-4 sm:mb-6">
       <RdAlert variant="error" title="Perhatian / Kendala Sistem">
         {{ error }}
       </RdAlert>
     </div>
 
-    <!-- Kartu Metrik Sistem & Kesehatan Platform -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- Kartu Metrik Sistem & Kesehatan Platform (Responsive 2 cols di mobile, 4 di desktop) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
       <RdCard padding>
-        <span class="text-xs text-slate-500 font-medium">Total Ruang Kerja</span>
-        <div class="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+        <span class="text-[11px] sm:text-xs text-slate-500 font-medium truncate block">Total Ruang Kerja</span>
+        <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5 sm:mt-1">
           {{ systemStats?.totalTenants ?? 1 }}
         </div>
-        <p class="text-[11px] text-slate-500 mt-1">Tenant terisolasi aktif</p>
+        <p class="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 sm:mt-1 truncate">Tenant terisolasi aktif</p>
       </RdCard>
 
       <RdCard padding>
-        <span class="text-xs text-slate-500 font-medium">Total Pengguna Terdaftar</span>
-        <div class="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+        <span class="text-[11px] sm:text-xs text-slate-500 font-medium truncate block">Total Pengguna</span>
+        <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5 sm:mt-1">
           {{ systemStats?.totalUsers ?? 1 }}
         </div>
-        <p class="text-[11px] text-slate-500 mt-1">Akun identitas global</p>
+        <p class="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 sm:mt-1 truncate">Akun identitas global</p>
       </RdCard>
 
       <RdCard padding>
-        <span class="text-xs text-slate-500 font-medium">Basis Data Utama</span>
-        <div class="text-base font-semibold text-slate-900 dark:text-white mt-1">
-          {{ systemStats?.dbEngine || 'MariaDB 11 (InnoDB)' }}
+        <span class="text-[11px] sm:text-xs text-slate-500 font-medium truncate block">Basis Data</span>
+        <div class="text-xs sm:text-base font-semibold text-slate-900 dark:text-white mt-1 truncate">
+          {{ systemStats?.dbEngine || 'MariaDB 11' }}
         </div>
-        <p class="text-[11px] text-slate-500 mt-1">Dual Database (Platform & PEKAN)</p>
+        <p class="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 sm:mt-1 truncate">Dual Database</p>
       </RdCard>
 
       <RdCard padding>
-        <span class="text-xs text-slate-500 font-medium">Layanan Antrean & Cache</span>
-        <div class="mt-1 flex items-center gap-2">
+        <span class="text-[11px] sm:text-xs text-slate-500 font-medium truncate block">Antrean & Cache</span>
+        <div class="mt-1 flex items-center gap-1.5 sm:gap-2">
           <RdBadge variant="success">Redis Aktif</RdBadge>
-          <span class="text-xs text-slate-500">v7.2</span>
+          <span class="text-[11px] sm:text-xs text-slate-500 hidden sm:inline">v7.2</span>
         </div>
-        <p class="text-[11px] text-slate-500 mt-1">Laravel Horizon & Queues</p>
+        <p class="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 sm:mt-1 truncate">Horizon & Queues</p>
       </RdCard>
     </div>
 
@@ -238,26 +238,26 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       >
         <RdTable :columns="tenantColumns" :items="tenantsList || []">
           <template #name="{ item }">
-            <span class="font-semibold text-slate-900 dark:text-slate-100">{{ item.name }}</span>
+            <span class="font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">{{ item.name }}</span>
           </template>
           <template #slug="{ value }">
-            <code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs">
+            <code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs whitespace-nowrap">
               /t/{{ value }}
             </code>
           </template>
           <template #members_count="{ value }">
-            <span class="font-semibold">{{ value }}</span>
+            <span class="font-semibold whitespace-nowrap">{{ value }}</span>
           </template>
           <template #created_at="{ value }">
-            <span class="text-xs text-slate-500">{{ value || '-' }}</span>
+            <span class="text-xs text-slate-500 whitespace-nowrap">{{ value || '-' }}</span>
           </template>
           <template #status="{ value }">
-            <RdBadge :variant="value === 'active' ? 'success' : 'neutral'">
+            <RdBadge :variant="value === 'active' ? 'success' : 'neutral'" class="whitespace-nowrap">
               {{ value === 'active' ? 'Aktif' : 'Nonaktif' }}
             </RdBadge>
           </template>
           <template #actions="{ item }">
-            <a :href="`/t/${item.slug}/apps/pekan/dashboard`">
+            <a :href="`/t/${item.slug}/apps/pekan/dashboard`" class="inline-block whitespace-nowrap">
               <RdButton variant="outline" size="sm">
                 Buka Ruang Kerja
               </RdButton>
@@ -275,23 +275,23 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       >
         <RdTable :columns="userColumns" :items="usersList || []">
           <template #name="{ item }">
-            <span class="font-semibold text-slate-900 dark:text-slate-100">{{ item.name }}</span>
+            <span class="font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">{{ item.name }}</span>
           </template>
           <template #email="{ value }">
-            <span class="text-xs text-slate-600 dark:text-slate-400 font-mono">{{ value }}</span>
+            <span class="text-xs text-slate-600 dark:text-slate-400 font-mono whitespace-nowrap">{{ value }}</span>
           </template>
           <template #has_mfa="{ value }">
-            <RdBadge :variant="value ? 'success' : 'warning'">
+            <RdBadge :variant="value ? 'success' : 'warning'" class="whitespace-nowrap">
               {{ value ? 'MFA Aktif' : 'Belum Ada MFA' }}
             </RdBadge>
           </template>
           <template #is_super_admin="{ value }">
-            <RdBadge :variant="value ? 'info' : 'neutral'">
+            <RdBadge :variant="value ? 'info' : 'neutral'" class="whitespace-nowrap">
               {{ value ? 'Super Admin' : 'Pengguna Biasa' }}
             </RdBadge>
           </template>
           <template #workspaces_count="{ value }">
-            <span class="text-xs font-medium">{{ value }} Ruang Kerja</span>
+            <span class="text-xs font-medium whitespace-nowrap">{{ value }} Ruang Kerja</span>
           </template>
         </RdTable>
       </RdCard>
@@ -303,7 +303,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
         title="Katalog Modul Aplikasi Platform"
         description="Daftar aplikasi web modular yang terintegrasi pada portal RUDIMAH"
       >
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 pt-1">
           <div
             v-for="app in (appsList || [
               { key: 'pekan', name: 'PEKAN', description: 'Pengelolaan Keuangan Keluarga & Catatan Mutasi Kas', status: 'available' },
@@ -311,18 +311,20 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
               { key: 'app2', name: 'App2 (Skeleton)', description: 'Modul Ekstensi 2 terintegrasi SSO & Tenancy', status: 'available' }
             ])"
             :key="app.key"
-            class="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2"
+            class="p-3.5 sm:p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 flex flex-col justify-between"
           >
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-sm text-slate-900 dark:text-white">{{ app.name }}</span>
-              <RdBadge :variant="app.key === 'pekan' ? 'success' : 'neutral'">
-                {{ app.key === 'pekan' ? 'Aktif Penuh' : 'Skeleton' }}
-              </RdBadge>
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-sm text-slate-900 dark:text-white">{{ app.name }}</span>
+                <RdBadge :variant="app.key === 'pekan' ? 'success' : 'neutral'">
+                  {{ app.key === 'pekan' ? 'Aktif Penuh' : 'Skeleton' }}
+                </RdBadge>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ app.description }}
+              </p>
             </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400">
-              {{ app.description }}
-            </p>
-            <div class="pt-2 text-[11px] text-slate-400 font-mono">
+            <div class="pt-2 text-[11px] text-slate-400 font-mono border-t border-slate-100 dark:border-slate-800">
               Key: {{ app.key }}
             </div>
           </div>
@@ -336,60 +338,60 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
         title="Pusat Konfigurasi Saluran Notifikasi (Platform-Wide)"
         description="Konfigurasikan saluran pengiriman Email SMTP, WhatsApp (WAHA), dan Telegram untuk seluruh ruang kerja. Digunakan pada pemulihan akun, kode MFA, dan notifikasi pengingat transaksi."
       >
-        <!-- Ringkasan Status Kanal -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="text-lg">✉️</span>
-                <span class="text-sm font-semibold text-slate-900 dark:text-white">Email (SMTP)</span>
+        <!-- Ringkasan Status Kanal (Responsive 1 col mobile, 2 tablet, 3 desktop) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+          <div class="p-3.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between gap-3">
+            <div class="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+              <div class="flex items-center gap-1.5 sm:gap-2">
+                <span class="text-base sm:text-lg">✉️</span>
+                <span class="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white truncate">Email (SMTP)</span>
               </div>
-              <p class="text-xs text-slate-500 font-mono">
+              <p class="text-[11px] sm:text-xs text-slate-500 font-mono truncate">
                 {{ notificationSettings?.mail?.host || 'Belum diisi' }}
               </p>
             </div>
-            <RdBadge :variant="notificationSettings?.mail?.is_configured ? 'success' : 'neutral'">
+            <RdBadge :variant="notificationSettings?.mail?.is_configured ? 'success' : 'neutral'" class="shrink-0">
               {{ notificationSettings?.mail?.is_configured ? 'Terkonfigurasi' : 'Belum Lengkap' }}
             </RdBadge>
           </div>
 
-          <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="text-lg">💬</span>
-                <span class="text-sm font-semibold text-slate-900 dark:text-white">WhatsApp (WAHA)</span>
+          <div class="p-3.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between gap-3">
+            <div class="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+              <div class="flex items-center gap-1.5 sm:gap-2">
+                <span class="text-base sm:text-lg">💬</span>
+                <span class="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white truncate">WhatsApp (WAHA)</span>
               </div>
-              <p class="text-xs text-slate-500 font-mono">
+              <p class="text-[11px] sm:text-xs text-slate-500 font-mono truncate">
                 {{ notificationSettings?.whatsapp?.waha_api_url || 'Belum diisi' }}
               </p>
             </div>
-            <RdBadge :variant="notificationSettings?.whatsapp?.is_configured ? 'success' : 'neutral'">
+            <RdBadge :variant="notificationSettings?.whatsapp?.is_configured ? 'success' : 'neutral'" class="shrink-0">
               {{ notificationSettings?.whatsapp?.is_configured ? 'Terkonfigurasi' : 'Belum Lengkap' }}
             </RdBadge>
           </div>
 
-          <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="text-lg">🤖</span>
-                <span class="text-sm font-semibold text-slate-900 dark:text-white">Telegram Bot</span>
+          <div class="p-3.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between gap-3 sm:col-span-2 lg:col-span-1">
+            <div class="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+              <div class="flex items-center gap-1.5 sm:gap-2">
+                <span class="text-base sm:text-lg">🤖</span>
+                <span class="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white truncate">Telegram Bot</span>
               </div>
-              <p class="text-xs text-slate-500 font-mono">
+              <p class="text-[11px] sm:text-xs text-slate-500 font-mono truncate">
                 {{ notificationSettings?.telegram?.bot_username ? '@' + notificationSettings.telegram.bot_username : 'Token belum diisi' }}
               </p>
             </div>
-            <RdBadge :variant="notificationSettings?.telegram?.is_configured ? 'success' : 'neutral'">
+            <RdBadge :variant="notificationSettings?.telegram?.is_configured ? 'success' : 'neutral'" class="shrink-0">
               {{ notificationSettings?.telegram?.is_configured ? 'Terkonfigurasi' : 'Belum Lengkap' }}
             </RdBadge>
           </div>
         </div>
 
-        <!-- Navigasi Tab Saluran -->
-        <div class="border-b border-slate-200 dark:border-slate-800 mb-6 flex gap-2">
+        <!-- Navigasi Tab Saluran (Scrollable di Mobile) -->
+        <div class="border-b border-slate-200 dark:border-slate-800 mb-6 flex gap-1 sm:gap-2 overflow-x-auto pb-1 -mb-px">
           <button
             type="button"
             :class="[
-              'px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-2',
+              'px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 sm:gap-2 shrink-0 cursor-pointer',
               activeTab === 'mail'
                 ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -404,7 +406,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
           <button
             type="button"
             :class="[
-              'px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-2',
+              'px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 sm:gap-2 shrink-0 cursor-pointer',
               activeTab === 'whatsapp'
                 ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -419,7 +421,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
           <button
             type="button"
             :class="[
-              'px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-2',
+              'px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 sm:gap-2 shrink-0 cursor-pointer',
               activeTab === 'telegram'
                 ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -435,17 +437,18 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
         <form @submit.prevent="saveNotificationSettings">
           <!-- TAB 1: EMAIL (SMTP) -->
           <div v-show="activeTab === 'mail'" class="space-y-4">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
               <RdCheckbox
                 v-model="form.mail.enabled"
                 label="Aktifkan Notifikasi via Email"
                 description="Gunakan server SMTP ini untuk mengirim email pemulihan akun, aktivasi, dan notifikasi tagihan"
               />
-              <div class="flex gap-2">
+              <div class="flex gap-2 self-start sm:self-auto shrink-0 w-full sm:w-auto">
                 <RdButton
                   type="button"
                   variant="outline"
                   size="sm"
+                  class="w-full sm:w-auto"
                   :disabled="isTesting || !notificationSettings?.mail?.is_configured"
                   @click="showTestEmailModal = true"
                 >
@@ -455,7 +458,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
               </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <RdInput
                 v-model="form.mail.host"
                 label="Host SMTP"
@@ -464,7 +467,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
                 required
               />
 
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2">
                 <RdInput
                   v-model.number="form.mail.port"
                   label="Port SMTP"
@@ -520,17 +523,18 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
 
           <!-- TAB 2: WHATSAPP (WAHA) -->
           <div v-show="activeTab === 'whatsapp'" class="space-y-4">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
               <RdCheckbox
                 v-model="form.whatsapp.enabled"
                 label="Aktifkan Notifikasi via WhatsApp (WAHA)"
                 description="Kirimkan kode OTP dan pengingat tagihan keuangan langsung ke nomor WhatsApp pengguna via gateway WAHA"
               />
-              <div class="flex gap-2">
+              <div class="flex gap-2 self-start sm:self-auto shrink-0 w-full sm:w-auto">
                 <RdButton
                   type="button"
                   variant="outline"
                   size="sm"
+                  class="w-full sm:w-auto"
                   :disabled="isTesting || !form.whatsapp.waha_api_url"
                   @click="showTestWaModal = true"
                 >
@@ -540,7 +544,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
               </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div class="md:col-span-2">
                 <RdInput
                   v-model="form.whatsapp.waha_api_url"
@@ -576,17 +580,18 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
 
           <!-- TAB 3: TELEGRAM BOT -->
           <div v-show="activeTab === 'telegram'" class="space-y-4">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
               <RdCheckbox
                 v-model="form.telegram.enabled"
                 label="Aktifkan Notifikasi via Telegram Bot"
                 description="Kirimkan pemberitahuan sistem dan tautan login melalui Bot Telegram resmi platform"
               />
-              <div class="flex gap-2">
+              <div class="flex gap-2 self-start sm:self-auto shrink-0 w-full sm:w-auto">
                 <RdButton
                   type="button"
                   variant="outline"
                   size="sm"
+                  class="w-full sm:w-auto"
                   :disabled="isTesting || (!form.telegram.bot_token && !notificationSettings?.telegram?.has_bot_token)"
                   @click="runTest('telegram')"
                 >
@@ -596,7 +601,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
               </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <RdInput
                 v-model="form.telegram.bot_token"
                 label="Token Bot Telegram"
@@ -620,15 +625,16 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
             </div>
           </div>
 
-          <!-- Aksi Simpan Global -->
-          <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <p class="text-xs text-slate-500">
+          <!-- Aksi Simpan Global (Responsive stacked on mobile) -->
+          <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p class="text-xs text-slate-500 text-center sm:text-left">
               Pengaturan ini berlaku instan ke seluruh ruang kerja (workspaces) tanpa perlu merestart server.
             </p>
             <RdButton
               type="submit"
               variant="primary"
               :disabled="isSaving"
+              class="w-full sm:w-auto shrink-0"
             >
               <span v-if="isSaving">Menyimpan Konfigurasi...</span>
               <span v-else>Simpan Konfigurasi Notifikasi</span>
@@ -638,7 +644,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       </RdCard>
     </div>
 
-    <!-- MODAL: UJI KIRIM EMAIL -->
+    <!-- MODAL: UJI KIRIM EMAIL (Responsive modal actions) -->
     <RdModal
       v-model="showTestEmailModal"
       title="Uji Kirim Notifikasi Email"
@@ -660,10 +666,11 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
+        <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 w-full">
           <RdButton
             variant="outline"
             size="sm"
+            class="w-full sm:w-auto"
             :disabled="isTesting"
             @click="showTestEmailModal = false"
           >
@@ -672,6 +679,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
           <RdButton
             variant="primary"
             size="sm"
+            class="w-full sm:w-auto"
             :disabled="isTesting || !testEmailTarget"
             @click="runTest('mail', testEmailTarget)"
           >
@@ -682,7 +690,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       </template>
     </RdModal>
 
-    <!-- MODAL: UJI KONEKSI WHATSAPP (WAHA) -->
+    <!-- MODAL: UJI KONEKSI WHATSAPP (WAHA) (Responsive modal actions) -->
     <RdModal
       v-model="showTestWaModal"
       title="Uji Koneksi WhatsApp WAHA"
@@ -702,10 +710,11 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
+        <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 w-full">
           <RdButton
             variant="outline"
             size="sm"
+            class="w-full sm:w-auto"
             :disabled="isTesting"
             @click="showTestWaModal = false"
           >
@@ -714,6 +723,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
           <RdButton
             variant="primary"
             size="sm"
+            class="w-full sm:w-auto"
             :disabled="isTesting"
             @click="runTest('whatsapp', testWaTarget)"
           >

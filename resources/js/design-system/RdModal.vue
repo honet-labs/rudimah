@@ -67,7 +67,7 @@ onUnmounted(() => {
           <!-- Kotak Panel Modal (relative z-20, solid background, elevated shadow) -->
           <div
             :class="[
-              'relative z-20 w-full transform overflow-hidden rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 text-left shadow-2xl transition-all sm:my-8',
+              'relative z-20 w-full transform overflow-hidden rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 text-left shadow-2xl transition-all sm:my-8',
               maxWidth === 'sm' ? 'max-w-sm' : maxWidth === 'lg' ? 'max-w-lg' : maxWidth === 'xl' ? 'max-w-xl' : maxWidth === '2xl' ? 'max-w-2xl' : 'max-w-md'
             ]"
             @click.stop
