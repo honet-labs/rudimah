@@ -6,6 +6,7 @@ use App\Core\AI\Models\AiConversation;
 use App\Core\AI\Models\AiMessage;
 use App\Core\AI\Models\TenantAiSetting;
 use App\Core\AI\Services\TenantAssistantService;
+use App\Core\Applications\AppRegistry;
 use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\Models\TenantMembership;
 use App\Core\Tenancy\TenantContext;
@@ -33,7 +34,8 @@ class AiAssistantController
             abort(403, 'Konteks ruang kerja belum aktif.');
         }
 
-        $userId = auth()->id();
+        $user = $request->user();
+        $userId = $user?->id;
 
         $conversations = AiConversation::where('tenant_id', $tenant->id)
             ->where('user_id', $userId)
@@ -48,8 +50,24 @@ class AiAssistantController
 
         $canManageSettings = auth()->user()?->is_super_admin || in_array($membership?->role, ['owner', 'admin']);
 
+        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
+            $t = $m->tenant;
+            if ($t) {
+                $t->role = $m->role;
+            }
+            return $t;
+        })->filter()->values() : [];
+
         return Inertia::render('Assistant/Index', [
+            'user' => $user ? [
+                'id' => $user->id,
+                'name' => $user->full_name,
+                'email' => $user->email,
+                'has_mfa' => (bool) $user->mfaMethods()->where('is_verified', true)->exists(),
+            ] : null,
             'tenant' => $tenant,
+            'tenants' => $tenants,
+            'apps' => AppRegistry::all(),
             'conversations' => $conversations,
             'settings' => [
                 'provider' => $setting?->provider ?: config('rudimah.ai.default_provider', 'gemini'),

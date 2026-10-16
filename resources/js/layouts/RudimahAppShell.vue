@@ -16,10 +16,12 @@ const props = withDefaults(
     tenants?: Tenant[];
     apps?: AppManifest[];
     user?: User;
+    noPadding?: boolean;
   }>(),
   {
     appKey: 'pekan',
     appName: 'PEKAN',
+    noPadding: false,
   }
 );
 
@@ -74,9 +76,9 @@ function isCurrentRoute(path: string): boolean {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans">
+  <div :class="['bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans', noPadding ? 'h-screen overflow-hidden' : 'min-h-screen']">
     <!-- Global Header -->
-    <header class="sticky top-0 z-40 h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 flex items-center justify-between">
+    <header class="sticky top-0 z-40 h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 flex items-center justify-between shrink-0">
       <div class="flex items-center gap-3">
         <!-- Mobile hamburger -->
         <button
@@ -183,9 +185,9 @@ function isCurrentRoute(path: string): boolean {
     </header>
 
     <!-- Shell Body: Sidebar + Main Content -->
-    <div class="flex-1 flex w-full">
+    <div :class="['flex-1 flex w-full', noPadding ? 'min-h-0 overflow-hidden' : '']">
       <!-- Desktop Sidebar -->
-      <aside class="hidden md:flex flex-col w-56 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 min-h-[calc(100vh-3.5rem)]">
+      <aside :class="['hidden md:flex flex-col w-56 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0', noPadding ? 'h-full overflow-y-auto' : 'min-h-[calc(100vh-3.5rem)]']">
         <div class="p-3 flex-1 flex flex-col gap-1">
           <div class="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Navigasi {{ appName }}
@@ -266,7 +268,7 @@ function isCurrentRoute(path: string): boolean {
       </div>
 
       <!-- Main Content Container (Full Width Fluid) -->
-      <main class="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 w-full">
+      <main :class="['flex-1 min-w-0 w-full', noPadding ? 'h-full overflow-hidden p-0 flex flex-col' : 'p-4 sm:p-6 lg:p-8']">
         <slot />
       </main>
     </div>

@@ -7,7 +7,7 @@ import RdCard from '../../design-system/RdCard.vue';
 import RdBadge from '../../design-system/RdBadge.vue';
 import RdModal from '../../design-system/RdModal.vue';
 import RdAlert from '../../design-system/RdAlert.vue';
-import type { Tenant } from '../../types/core';
+import type { Tenant, AppManifest, User } from '../../types/core';
 
 interface Conversation {
   id: string;
@@ -45,6 +45,9 @@ interface ProviderOption {
 
 const props = defineProps<{
   tenant: Tenant;
+  tenants?: Tenant[];
+  apps?: AppManifest[];
+  user?: User;
   conversations: Conversation[];
   settings: AiSettings;
   can_manage_settings: boolean;
@@ -58,6 +61,7 @@ const inputMessage = ref('');
 const isSending = ref(false);
 const isLoadingConversation = ref(false);
 const chatContainer = ref<HTMLElement | null>(null);
+const isHistoryDrawerOpen = ref(false);
 
 // Modal Pengaturan AI
 const isSettingsModalOpen = ref(false);
@@ -273,23 +277,43 @@ onMounted(() => {
 </script>
 
 <template>
-  <RudimahAppShell app-key="pekan" app-name="PEKAN" :tenant="tenant">
-    <div class="flex-1 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-slate-50 dark:bg-slate-950">
-      <!-- Top Subheader -->
-      <div class="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-3">
-          <h1 class="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+  <RudimahAppShell
+    app-key="pekan"
+    app-name="PEKAN"
+    :tenant="tenant"
+    :tenants="tenants"
+    :apps="apps"
+    :user="user"
+    :no-padding="true"
+  >
+    <div class="flex-1 min-h-0 flex flex-col h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
+      <!-- Top Subheader (Compact h-12) -->
+      <div class="h-12 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+          <!-- Mobile toggle riwayat percakapan -->
+          <button
+            type="button"
+            class="md:hidden p-1.5 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
+            @click="isHistoryDrawerOpen = !isHistoryDrawerOpen"
+            title="Buka Riwayat Percakapan"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+          </button>
+
+          <h1 class="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 truncate flex items-center gap-2">
             <span>Asisten Cerdas Ruang Kerja</span>
           </h1>
-          <RdBadge variant="neutral" size="sm">
+          <RdBadge variant="neutral" size="sm" class="hidden sm:inline-flex shrink-0">
             Konteks Aman: {{ tenant.name }}
           </RdBadge>
-          <RdBadge variant="info" size="sm">
+          <RdBadge variant="info" size="sm" class="hidden md:inline-flex shrink-0">
             Provider: {{ formSettings.provider.toUpperCase() }}
           </RdBadge>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 shrink-0">
           <RdButton
             v-if="can_manage_settings"
             variant="outline"
@@ -309,13 +333,37 @@ onMounted(() => {
       </div>
 
       <!-- Main Chat Layout -->
-      <div class="flex-1 flex overflow-hidden">
+      <div class="flex-1 min-h-0 flex overflow-hidden relative">
+        <!-- Backdrop Mobile Riwayat -->
+        <div
+          v-if="isHistoryDrawerOpen"
+          class="fixed inset-0 bg-slate-900/50 z-20 md:hidden"
+          @click="isHistoryDrawerOpen = false"
+        ></div>
+
         <!-- Sidebar Riwayat Percakapan -->
-        <aside class="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0">
-          <div class="p-3 border-b border-slate-100 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Riwayat Percakapan
+        <aside
+          :class="[
+            'w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-col shrink-0 h-full transition-all duration-200',
+            isHistoryDrawerOpen
+              ? 'flex fixed inset-y-0 left-0 z-30 pt-14 md:pt-0 shadow-2xl md:shadow-none'
+              : 'hidden md:flex'
+          ]"
+        >
+          <div class="p-3 border-b border-slate-100 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center justify-between shrink-0">
+            <span>Riwayat Percakapan</span>
+            <button
+              v-if="isHistoryDrawerOpen"
+              type="button"
+              class="md:hidden text-slate-400 hover:text-slate-600 p-1"
+              @click="isHistoryDrawerOpen = false"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <div class="flex-1 overflow-y-auto p-2 space-y-1">
+          <div class="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
             <div
               v-if="conversationsList.length === 0"
               class="p-4 text-center text-xs text-slate-400"
@@ -332,7 +380,7 @@ onMounted(() => {
                   ? 'bg-slate-100 dark:bg-slate-800 font-semibold text-slate-900 dark:text-slate-100'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
               ]"
-              @click="loadConversation(conv.id)"
+              @click="loadConversation(conv.id); isHistoryDrawerOpen = false"
             >
               <span class="truncate flex-1 pr-2">{{ conv.title }}</span>
               <button
@@ -346,31 +394,31 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="p-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
+          <div class="p-2.5 px-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 shrink-0">
             Terisolasi ketat pada ID: {{ tenant.id }}
           </div>
         </aside>
 
         <!-- Area Pesan & Dialog -->
-        <main class="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
-          <!-- Banner Keamanan Tenant -->
-          <div class="p-3 bg-slate-100/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between">
-            <div>
+        <section aria-label="Percakapan Asisten AI" class="flex-1 min-w-0 flex flex-col bg-slate-50 dark:bg-slate-950 h-full overflow-hidden">
+          <!-- Banner Keamanan Tenant (Compact) -->
+          <div class="p-2.5 px-4 bg-slate-100/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between shrink-0">
+            <div class="truncate mr-2">
               <span class="font-semibold text-slate-800 dark:text-slate-200">Proteksi Keamanan Aktif:</span>
-              Asisten ini dilarang keras dan tidak memiliki izin teknis untuk mengakses data dari ruang kerja/tenant lain.
+              Asisten dibatasi ketat dan terisolasi pada konteks ruang kerja ini.
             </div>
-            <span class="text-[11px] text-slate-400">Fail-Closed Tenant Context</span>
+            <span class="text-[11px] text-slate-400 shrink-0 hidden sm:inline">Fail-Closed Context</span>
           </div>
 
           <!-- Message List -->
           <div
             ref="chatContainer"
-            class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
+            class="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-4"
           >
             <!-- Tampilan Saat Percakapan Kosong -->
             <div
               v-if="messages.length === 0 && !isLoadingConversation"
-              class="max-w-2xl mx-auto py-8 text-center space-y-4"
+              class="max-w-2xl mx-auto py-4 md:py-6 text-center space-y-3"
             >
               <div class="text-sm font-semibold text-slate-700 dark:text-slate-300">
                 Selamat Datang di Asisten Finansial Ruang Kerja {{ tenant.name }}
@@ -385,7 +433,7 @@ onMounted(() => {
                   v-for="prompt in quickPrompts"
                   :key="prompt"
                   type="button"
-                  class="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 text-xs text-slate-700 dark:text-slate-300 text-left transition-all cursor-pointer"
+                  class="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 text-xs text-slate-700 dark:text-slate-300 text-left transition-all cursor-pointer shadow-sm hover:shadow"
                   @click="handleSendMessage(prompt)"
                 >
                   {{ prompt }}
@@ -431,8 +479,8 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- Input Bar -->
-          <div class="p-3 md:p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
+          <!-- Input Bar (Pinned at Bottom) -->
+          <div class="p-3 md:p-3.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
             <form
               class="max-w-4xl mx-auto flex gap-2 items-center"
               @submit.prevent="handleSendMessage()"
@@ -441,7 +489,7 @@ onMounted(() => {
                 v-model="inputMessage"
                 type="text"
                 placeholder="Tanyakan hal terkait keuangan ruang kerja Anda... (Tekan Enter untuk mengirim)"
-                class="flex-1 px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                class="flex-1 px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-teal-600"
                 :disabled="isSending"
               />
               <RdButton
@@ -455,7 +503,7 @@ onMounted(() => {
               </RdButton>
             </form>
           </div>
-        </main>
+        </section>
       </div>
 
       <!-- Modal Pengaturan AI Ruang Kerja -->
