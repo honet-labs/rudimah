@@ -69,8 +69,32 @@ const pekanNavItems = computed(() => [
   { name: 'Pengaturan', path: `/t/${tenantSlug.value}/apps/pekan/settings`, icon: 'cog' },
 ]);
 
+const adminNavItems = computed(() => [
+  { name: 'Ringkasan Sistem', path: '/admin', icon: 'server' },
+  { name: 'Semua Ruang Kerja', path: '/admin#workspaces', icon: 'building' },
+  { name: 'Pengguna Terdaftar', path: '/admin#users', icon: 'users' },
+  { name: 'Kanal Notifikasi & OTP', path: '/admin#notifications', icon: 'bell' },
+  { name: 'Katalog Modul Aplikasi', path: '/admin#apps', icon: 'apps' },
+  { name: 'Pilih Ruang Kerja', path: '/workspaces', icon: 'arrow-left' },
+]);
+
+const currentNavItems = computed(() => {
+  if (props.appKey === 'admin') {
+    return adminNavItems.value;
+  }
+  if (props.appKey === 'pekan') {
+    return pekanNavItems.value;
+  }
+  return [
+    { name: 'Beranda Modul', path: `/t/${tenantSlug.value}/apps/${props.appKey}`, icon: 'home' }
+  ];
+});
+
 function isCurrentRoute(path: string): boolean {
   if (typeof window === 'undefined') return false;
+  if (path.includes('#')) {
+    return window.location.pathname + window.location.hash === path;
+  }
   return window.location.pathname.startsWith(path);
 }
 </script>
@@ -107,8 +131,14 @@ function isCurrentRoute(path: string): boolean {
           :tenant-slug="tenantSlug"
         />
 
-        <!-- Tenant Switcher -->
+        <!-- Tenant Switcher atau Indikator Global Platform -->
+        <div v-if="appKey === 'admin'" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+          <span class="w-2 h-2 rounded-full bg-teal-600"></span>
+          <span class="hidden sm:inline">Platform Global (Seluruh Ruang Kerja)</span>
+          <span class="sm:hidden">Global Admin</span>
+        </div>
         <RdTenantSwitcher
+          v-else
           :current-tenant="currentTenant"
           :tenants="tenants && tenants.length > 0 ? tenants : [currentTenant]"
         />
@@ -192,34 +222,28 @@ function isCurrentRoute(path: string): boolean {
           <div class="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Navigasi {{ appName }}
           </div>
-          <template v-if="appKey === 'pekan'">
-            <a
-              v-for="item in pekanNavItems"
-              :key="item.path"
-              :href="item.path"
-              :class="[
-                'flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors',
-                isCurrentRoute(item.path)
-                  ? 'bg-teal-50 dark:bg-teal-950/30 text-teal-800 dark:text-teal-400 font-semibold'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-              ]"
-            >
-              <span class="w-1.5 h-1.5 rounded-full" :class="isCurrentRoute(item.path) ? 'bg-teal-600' : 'bg-slate-300 dark:bg-slate-600'"></span>
-              <span>{{ item.name }}</span>
-            </a>
-          </template>
-          <template v-else>
-            <a
-              :href="`/t/${tenantSlug}/apps/${appKey}`"
-              class="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium bg-slate-100 text-slate-900"
-            >
-              <span>Beranda Modul</span>
-            </a>
-          </template>
+          <a
+            v-for="item in currentNavItems"
+            :key="item.path"
+            :href="item.path"
+            :class="[
+              'flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors',
+              isCurrentRoute(item.path)
+                ? 'bg-teal-50 dark:bg-teal-950/30 text-teal-800 dark:text-teal-400 font-semibold'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+            ]"
+          >
+            <span class="w-1.5 h-1.5 rounded-full" :class="isCurrentRoute(item.path) ? 'bg-teal-600' : 'bg-slate-300 dark:bg-slate-600'"></span>
+            <span>{{ item.name }}</span>
+          </a>
         </div>
 
-        <!-- Footer Workspace Status -->
-        <div class="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+        <!-- Footer Workspace / Platform Status -->
+        <div v-if="appKey === 'admin'" class="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+          <div class="font-semibold text-slate-800 dark:text-slate-200">Cakupan: Seluruh Platform</div>
+          <div class="text-[10px] text-teal-700 dark:text-teal-400 font-bold uppercase mt-0.5">Hak: Super Administrator</div>
+        </div>
+        <div v-else class="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
           <div>Ruang: {{ currentTenant.name }}</div>
           <div class="text-[10px] text-slate-400">Peran: {{ tenantRole }}</div>
         </div>
@@ -249,7 +273,7 @@ function isCurrentRoute(path: string): boolean {
 
           <div class="flex-1 flex flex-col gap-1 overflow-y-auto">
             <a
-              v-for="item in pekanNavItems"
+              v-for="item in currentNavItems"
               :key="item.path"
               :href="item.path"
               class="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"

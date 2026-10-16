@@ -2,9 +2,9 @@
 
 namespace App\Core\Identity\Http\Controllers;
 
+use App\Core\Applications\AppRegistry;
 use App\Core\Identity\Models\User;
 use App\Core\Tenancy\Models\Tenant;
-use App\Core\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,7 +20,30 @@ class AdminController
 
         $totalTenants = Tenant::count();
         $totalUsers = User::count();
-        $tenantsList = Tenant::latest()->limit(10)->get();
+        $tenantsList = Tenant::withCount('memberships')->latest()->get()->map(function ($t) {
+            return [
+                'id' => $t->id,
+                'name' => $t->name,
+                'slug' => $t->slug,
+                'status' => $t->status,
+                'members_count' => $t->memberships_count,
+                'created_at' => $t->created_at?->toDateString(),
+            ];
+        });
+
+        $usersList = User::withCount('memberships')->latest()->limit(50)->get()->map(function ($u) {
+            return [
+                'id' => $u->id,
+                'name' => $u->full_name,
+                'email' => $u->email,
+                'is_super_admin' => (bool) $u->is_super_admin,
+                'has_mfa' => (bool) $u->mfaMethods()->where('is_verified', true)->exists(),
+                'workspaces_count' => $u->memberships_count,
+                'created_at' => $u->created_at?->toDateString(),
+            ];
+        });
+
+        $appsList = AppRegistry::all();
 
         $mailConfigured = !empty(config('rudimah.notifications.mail.host', env('MAIL_HOST'))) && env('MAIL_MAILER', 'smtp') !== 'log';
         $telegramConfigured = !empty(config('rudimah.notifications.telegram.bot_token', env('TELEGRAM_BOT_TOKEN')));
@@ -31,8 +54,9 @@ class AdminController
                 'id' => $user->id,
                 'name' => $user->full_name,
                 'email' => $user->email,
+                'has_mfa' => (bool) $user->mfaMethods()->where('is_verified', true)->exists(),
             ],
-            'tenant' => TenantContext::get() ?? $user->memberships()->first()?->tenant,
+            'tenant' => null,
             'systemStats' => [
                 'totalTenants' => $totalTenants,
                 'totalUsers' => $totalUsers,
@@ -58,6 +82,8 @@ class AdminController
                 ],
             ],
             'tenantsList' => $tenantsList,
+            'usersList' => $usersList,
+            'appsList' => $appsList,
         ]);
     }
 }
