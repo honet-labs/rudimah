@@ -9,11 +9,12 @@ interface Column {
 withDefaults(
   defineProps<{
     columns: Column[];
-    items: Record<string, any>[];
+    items?: Record<string, any>[];
     loading?: boolean;
     emptyText?: string;
   }>(),
   {
+    items: () => [],
     loading: false,
     emptyText: 'Tidak ada data untuk ditampilkan',
   }
@@ -51,13 +52,13 @@ withDefaults(
               </div>
             </td>
           </tr>
-          <tr v-else-if="items.length === 0">
+          <tr v-else-if="!items || items.length === 0">
             <td :colspan="columns.length" class="px-4 py-8 text-center text-slate-500 dark:text-slate-400 text-xs">
               {{ emptyText }}
             </td>
           </tr>
           <tr
-            v-for="(item, idx) in items"
+            v-for="(item, idx) in (items || [])"
             v-else
             :key="item.id || idx"
             class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"

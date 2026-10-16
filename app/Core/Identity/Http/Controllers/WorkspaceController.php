@@ -48,6 +48,7 @@ class WorkspaceController
             $counter++;
         }
 
+        $tenantId = (string) Str::uuid();
         $tenant = Tenant::create([
             'id' => $tenantId,
             'code' => $slug,

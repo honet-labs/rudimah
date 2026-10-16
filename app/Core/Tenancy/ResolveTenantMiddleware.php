@@ -35,6 +35,10 @@ class ResolveTenantMiddleware
                 if (!$membership && !$user->is_super_admin) {
                     abort(403, 'Anda bukan anggota aktif dari ruang kerja ini.');
                 }
+
+                $tenant->role = $membership ? $membership->role : ($user->is_super_admin ? 'admin' : 'member');
+            } else {
+                $tenant->role = 'viewer';
             }
 
             TenantContext::set($tenant);

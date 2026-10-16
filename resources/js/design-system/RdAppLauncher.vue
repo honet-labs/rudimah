@@ -2,11 +2,28 @@
 import { ref } from 'vue';
 import type { AppManifest } from '../types/core';
 
-defineProps<{
-  apps: AppManifest[];
-  currentAppKey: string;
-  tenantSlug: string;
-}>();
+const defaultApps: AppManifest[] = [
+  { key: 'pekan', slug: 'pekan', name: 'PEKAN', description: 'Pengelolaan keuangan dan anggaran', icon: 'wallet', route_prefix: '/pekan', enabled: true },
+  { key: 'app1', slug: 'app1', name: 'Catatan Harian', description: 'Log harian dan agenda tugas', icon: 'calendar', route_prefix: '/app1', enabled: false },
+  { key: 'app2', slug: 'app2', name: 'Inventaris Rumah', description: 'Pencatatan aset dan garansi barang', icon: 'box', route_prefix: '/app2', enabled: false },
+];
+
+const props = withDefaults(
+  defineProps<{
+    apps?: AppManifest[];
+    currentAppKey?: string;
+    tenantSlug?: string;
+  }>(),
+  {
+    apps: () => [
+      { key: 'pekan', slug: 'pekan', name: 'PEKAN', description: 'Pengelolaan keuangan dan anggaran', icon: 'wallet', route_prefix: '/pekan', enabled: true },
+      { key: 'app1', slug: 'app1', name: 'Catatan Harian', description: 'Log harian dan agenda tugas', icon: 'calendar', route_prefix: '/app1', enabled: false },
+      { key: 'app2', slug: 'app2', name: 'Inventaris Rumah', description: 'Pencatatan aset dan garansi barang', icon: 'box', route_prefix: '/app2', enabled: false },
+    ],
+    currentAppKey: 'pekan',
+    tenantSlug: '',
+  }
+);
 
 const isOpen = ref(false);
 
@@ -37,7 +54,7 @@ function toggle() {
       </div>
       <div class="grid grid-cols-1 gap-1">
         <a
-          v-for="app in apps"
+          v-for="app in (apps && apps.length > 0 ? apps : defaultApps)"
           :key="app.key"
           :href="app.enabled ? `/t/${tenantSlug}/apps/${app.slug}` : '#'"
           :class="[

@@ -12,8 +12,10 @@ import type { Transaction, FinanceBudget, FinanceSavings } from '../../types/pek
 
 withDefaults(
   defineProps<{
-    user: User;
+    user?: User;
     tenant: Tenant;
+    tenants?: Tenant[];
+    apps?: any[];
     summary?: {
       incomeMinor: number;
       expenseMinor: number;
@@ -25,11 +27,13 @@ withDefaults(
     activeSavings?: FinanceSavings[];
   }>(),
   {
+    tenants: () => [],
+    apps: () => [],
     summary: () => ({
-      incomeMinor: 15500000,
-      expenseMinor: 8250000,
-      netMinor: 7250000,
-      savingsMinor: 12400000,
+      incomeMinor: 0,
+      expenseMinor: 0,
+      netMinor: 0,
+      savingsMinor: 0,
     }),
     recentTransactions: () => [
       {
@@ -128,19 +132,26 @@ const txColumns = [
 </script>
 
 <template>
-  <RudimahAppShell :user="user" :tenant="tenant" app-key="pekan" app-name="PEKAN">
+  <RudimahAppShell
+    :user="user"
+    :tenant="tenant"
+    :tenants="tenants"
+    :apps="apps"
+    app-key="pekan"
+    app-name="PEKAN"
+  >
     <RdPageHeader
       title="Dasbor Keuangan"
       description="Ringkasan arus kas, anggaran belanja, dan capaian tabungan bulan berjalan"
-      :breadcrumbs="[{ label: 'Ruang Kerja', href: '/workspaces' }, { label: 'PEKAN', href: `/t/${tenant.slug}/apps/pekan/dashboard` }, { label: 'Dasbor' }]"
+      :breadcrumbs="[{ label: 'Ruang Kerja', href: '/workspaces' }, { label: 'PEKAN', href: `/t/${tenant?.slug || ''}/apps/pekan/dashboard` }, { label: 'Dasbor' }]"
     >
       <template #actions>
-        <a :href="`/t/${tenant.slug}/apps/pekan/receipt-scan`">
+        <a :href="`/t/${tenant?.slug || ''}/apps/pekan/receipt-scan`">
           <RdButton variant="outline" size="sm">
             Pindai Struk OCR
           </RdButton>
         </a>
-        <a :href="`/t/${tenant.slug}/apps/pekan/transactions/create`">
+        <a :href="`/t/${tenant?.slug || ''}/apps/pekan/transactions/create`">
           <RdButton variant="primary" size="sm">
             Tambah Transaksi
           </RdButton>
@@ -189,7 +200,7 @@ const txColumns = [
       <div class="lg:col-span-2">
         <RdCard title="Transaksi Terkini" description="5 transaksi terbaru yang dicatat dalam ruang kerja ini">
           <template #actions>
-            <a :href="`/t/${tenant.slug}/apps/pekan/transactions`" class="text-xs text-teal-700 dark:text-teal-400 font-semibold hover:underline">
+            <a :href="`/t/${tenant?.slug || ''}/apps/pekan/transactions`" class="text-xs text-teal-700 dark:text-teal-400 font-semibold hover:underline">
               Lihat Semua
             </a>
           </template>
@@ -213,7 +224,7 @@ const txColumns = [
       <div>
         <RdCard title="Pemantauan Anggaran" description="Alokasi batas pengeluaran kategori aktif">
           <template #actions>
-            <a :href="`/t/${tenant.slug}/apps/pekan/budgets`" class="text-xs text-teal-700 dark:text-teal-400 font-semibold hover:underline">
+            <a :href="`/t/${tenant?.slug || ''}/apps/pekan/budgets`" class="text-xs text-teal-700 dark:text-teal-400 font-semibold hover:underline">
               Kelola
             </a>
           </template>
@@ -225,12 +236,12 @@ const txColumns = [
             >
               <div class="flex items-center justify-between font-semibold mb-1">
                 <span>{{ b.name }}</span>
-                <span>{{ b.progress_percent }}%</span>
+                <span>{{ Math.round(b.progress_percent || 0) }}%</span>
               </div>
               <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden mb-1.5">
                 <div
                   class="h-full bg-teal-700 dark:bg-teal-500"
-                  :style="{ width: `${Math.min(b.progress_percent, 100)}%` }"
+                  :style="{ width: `${Math.min(b.progress_percent || 0, 100)}%` }"
                 ></div>
               </div>
               <div class="flex items-center justify-between text-slate-500 text-[11px]">
@@ -246,7 +257,7 @@ const txColumns = [
     <!-- Baris Bawah: Impian & Tabungan -->
     <RdCard title="Pos Tabungan Aktif" description="Kemajuan akumulasi dana target impian keluarga">
       <template #actions>
-        <a :href="`/t/${tenant.slug}/apps/pekan/savings`" class="text-xs text-teal-700 dark:text-teal-400 font-semibold hover:underline">
+        <a :href="`/t/${tenant?.slug || ''}/apps/pekan/savings`" class="text-xs text-teal-700 dark:text-teal-400 font-semibold hover:underline">
           Lihat Rincian
         </a>
       </template>
@@ -258,10 +269,10 @@ const txColumns = [
         >
           <div class="flex items-center justify-between mb-2">
             <h4 class="text-xs font-bold text-slate-800 dark:text-slate-100">{{ s.name }}</h4>
-            <RdBadge variant="neutral">{{ Math.round(s.progress_percent) }}%</RdBadge>
+            <RdBadge variant="neutral">{{ Math.round(s.progress_percent || 0) }}%</RdBadge>
           </div>
           <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mb-2">
-            <div class="bg-teal-700 h-full" :style="{ width: `${s.progress_percent}%` }"></div>
+            <div class="bg-teal-700 h-full" :style="{ width: `${Math.min(s.progress_percent || 0, 100)}%` }"></div>
           </div>
           <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
             <span>Terkumpul: <RdMoney :amount-minor="s.current_amount_minor" /></span>

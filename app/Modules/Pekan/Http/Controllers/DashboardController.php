@@ -35,13 +35,35 @@ class DashboardController
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at')
             ->limit(5)
-            ->get();
+            ->get()
+            ->map(function ($tx) {
+                return [
+                    'id' => $tx->id,
+                    'account_id' => $tx->account_id,
+                    'account_name' => $tx->account?->name ?? 'Kas Utama',
+                    'category_name' => $tx->category?->name ?? 'Umum',
+                    'type' => $tx->type,
+                    'amount_minor' => $tx->amount_minor,
+                    'currency' => $tx->currency ?? 'Rp',
+                    'transaction_date' => $tx->transaction_date ? $tx->transaction_date->toDateString() : now()->toDateString(),
+                    'description' => $tx->description ?? '-',
+                    'created_at' => $tx->created_at ? $tx->created_at->toIso8601String() : now()->toIso8601String(),
+                ];
+            });
 
         $activeBudgets = FinanceBudget::with('category')
             ->where('status', 'active')
             ->get();
 
         $activeSavings = FinanceSavings::where('status', 'active')->get();
+
+        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
+            $t = $m->tenant;
+            if ($t) {
+                $t->role = $m->role;
+            }
+            return $t;
+        })->filter()->values() : [];
 
         return Inertia::render('Pekan/Dashboard', [
             'user' => $user ? [
@@ -51,7 +73,7 @@ class DashboardController
                 'has_mfa' => (bool) $user->mfaMethods()->where('is_verified', true)->exists(),
             ] : null,
             'tenant' => $tenant,
-            'tenants' => $user ? $user->memberships()->with('tenant')->get()->pluck('tenant') : [],
+            'tenants' => $tenants,
             'apps' => AppRegistry::all(),
             'summary' => [
                 'incomeMinor' => $incomeMinor,

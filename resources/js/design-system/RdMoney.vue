@@ -3,12 +3,13 @@ import { computed } from 'vue';
 
 const props = withDefaults(
   defineProps<{
-    amountMinor: number;
+    amountMinor?: number | null;
     currency?: string;
     showSign?: boolean;
     compact?: boolean;
   }>(),
   {
+    amountMinor: 0,
     currency: 'Rp',
     showSign: false,
     compact: false,
@@ -16,7 +17,8 @@ const props = withDefaults(
 );
 
 const formatted = computed(() => {
-  const value = Math.round(props.amountMinor);
+  const raw = props.amountMinor ?? 0;
+  const value = isNaN(raw) ? 0 : Math.round(raw);
   const isNegative = value < 0;
   const absValue = Math.abs(value);
 

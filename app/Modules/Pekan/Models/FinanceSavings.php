@@ -39,6 +39,10 @@ class FinanceSavings extends Model
         'target_date' => 'date',
     ];
 
+    protected $appends = [
+        'progress_percent',
+    ];
+
     protected static function booted(): void
     {
         static::addGlobalScope(new TenantScope);

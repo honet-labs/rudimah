@@ -2,7 +2,10 @@
 
 namespace App\Core\Applications;
 
-class AppManifest
+use Illuminate\Contracts\Support\Arrayable;
+use JsonSerializable;
+
+class AppManifest implements Arrayable, JsonSerializable
 {
     public function __construct(
         public readonly string $key,
@@ -21,5 +24,10 @@ class AppManifest
             'description' => $this->description,
             'enabled' => $this->enabled,
         ];
+    }
+
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

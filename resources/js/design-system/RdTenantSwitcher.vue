@@ -2,10 +2,15 @@
 import { ref } from 'vue';
 import type { Tenant } from '../types/core';
 
-const props = defineProps<{
-  currentTenant: Tenant;
-  tenants: Tenant[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    currentTenant: Tenant;
+    tenants?: Tenant[];
+  }>(),
+  {
+    tenants: () => [],
+  }
+);
 
 const isOpen = ref(false);
 
@@ -15,14 +20,14 @@ function toggle() {
 
 function selectTenant(tenant: Tenant) {
   isOpen.value = false;
-  if (tenant.id !== props.currentTenant.id) {
+  if (tenant && props.currentTenant && tenant.id !== props.currentTenant.id && tenant.slug) {
     window.location.href = `/t/${tenant.slug}/apps/pekan/dashboard`;
   }
 }
 </script>
 
 <template>
-  <div class="relative inline-block text-left">
+  <div class="relative inline-block text-left" v-if="currentTenant">
     <button
       type="button"
       class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-700 cursor-pointer transition-colors"
@@ -31,7 +36,7 @@ function selectTenant(tenant: Tenant) {
       :aria-expanded="isOpen"
     >
       <span class="w-2 h-2 rounded-full bg-teal-600" aria-hidden="true"></span>
-      <span class="truncate max-w-32">{{ currentTenant.name }}</span>
+      <span class="truncate max-w-32">{{ currentTenant.name || 'Ruang Kerja' }}</span>
       <svg class="h-3 w-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
       </svg>
@@ -46,7 +51,7 @@ function selectTenant(tenant: Tenant) {
         Pilih Ruang Kerja
       </div>
       <button
-        v-for="t in tenants"
+        v-for="t in (tenants.length > 0 ? tenants : [currentTenant])"
         :key="t.id"
         type="button"
         :class="[
@@ -58,7 +63,7 @@ function selectTenant(tenant: Tenant) {
         @click="selectTenant(t)"
       >
         <span class="truncate">{{ t.name }}</span>
-        <span class="text-[10px] text-slate-400 uppercase ml-2">{{ t.role }}</span>
+        <span v-if="t.role" class="text-[10px] text-slate-400 uppercase ml-2">{{ t.role }}</span>
       </button>
       <div class="border-t border-slate-100 dark:border-slate-800 mt-1 pt-1">
         <a

@@ -34,6 +34,15 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    protected $appends = [
+        'name',
+    ];
+
+    public function getNameAttribute(): string
+    {
+        return $this->full_name ?? '';
+    }
+
     protected function casts(): array
     {
         return [

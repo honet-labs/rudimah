@@ -3,16 +3,27 @@ import { computed } from 'vue';
 
 const props = withDefaults(
   defineProps<{
-    value: string | Date;
+    value?: string | Date | null;
     format?: 'date' | 'datetime' | 'time';
   }>(),
   {
+    value: null,
     format: 'date',
   }
 );
 
+const isoDatetime = computed(() => {
+  if (!props.value) return undefined;
+  if (typeof props.value === 'string') return props.value;
+  try {
+    return props.value.toISOString();
+  } catch {
+    return undefined;
+  }
+});
+
 const formatted = computed(() => {
-  if (!props.value) return '';
+  if (!props.value) return '-';
   const d = new Date(props.value);
   if (isNaN(d.getTime())) return String(props.value);
 
@@ -44,7 +55,7 @@ const formatted = computed(() => {
 </script>
 
 <template>
-  <time :datetime="typeof value === 'string' ? value : value.toISOString()">
+  <time :datetime="isoDatetime">
     {{ formatted }}
   </time>
 </template>

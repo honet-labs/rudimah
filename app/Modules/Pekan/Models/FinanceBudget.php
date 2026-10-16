@@ -44,6 +44,10 @@ class FinanceBudget extends Model
         'end_date' => 'date',
     ];
 
+    protected $appends = [
+        'progress_percent',
+    ];
+
     protected static function booted(): void
     {
         static::addGlobalScope(new TenantScope);

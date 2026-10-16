@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import RdTenantSwitcher from '../design-system/RdTenantSwitcher.vue';
 import RdAppLauncher from '../design-system/RdAppLauncher.vue';
 import RdThemeToggle from '../design-system/RdThemeToggle.vue';
 import type { Tenant, AppManifest, User } from '../types/core';
+
+const page = usePage();
 
 const props = withDefaults(
   defineProps<{
@@ -18,47 +20,52 @@ const props = withDefaults(
   {
     appKey: 'pekan',
     appName: 'PEKAN',
-    tenant: () => ({
-      id: 'default-tenant-uuid',
-      name: 'Keluarga Mandiri',
-      slug: 'keluarga-mandiri',
-      status: 'active',
-      role: 'owner',
-    }),
-    tenants: () => [
-      { id: 'default-tenant-uuid', name: 'Keluarga Mandiri', slug: 'keluarga-mandiri', status: 'active', role: 'owner' },
-      { id: 'kantor-tenant-uuid', name: 'Usaha Kreatif', slug: 'usaha-kreatif', status: 'active', role: 'admin' },
-    ],
-    apps: () => [
-      { key: 'pekan', slug: 'pekan', name: 'PEKAN', description: 'Pengelolaan keuangan dan anggaran', icon: 'wallet', route_prefix: '/pekan', enabled: true },
-      { key: 'app1', slug: 'app1', name: 'Catatan Harian', description: 'Log harian dan agenda tugas', icon: 'calendar', route_prefix: '/app1', enabled: false },
-      { key: 'app2', slug: 'app2', name: 'Inventaris Rumah', description: 'Pencatatan aset dan garansi barang', icon: 'box', route_prefix: '/app2', enabled: false },
-    ],
-    user: () => ({
-      id: 'user-default-uuid',
-      name: 'Andri Susanto',
-      email: 'andri@honet.web.id',
-      has_mfa: true,
-      mfa_type: 'TOTP',
-    }),
   }
 );
 
 const isMobileNavOpen = ref(false);
 const isUserMenuOpen = ref(false);
 
-const pekanNavItems = [
-  { name: 'Dasbor Keuangan', path: `/t/${props.tenant.slug}/apps/pekan/dashboard`, icon: 'dashboard' },
-  { name: 'Transaksi', path: `/t/${props.tenant.slug}/apps/pekan/transactions`, icon: 'receipt' },
-  { name: 'Anggaran', path: `/t/${props.tenant.slug}/apps/pekan/budgets`, icon: 'budget' },
-  { name: 'Tabungan', path: `/t/${props.tenant.slug}/apps/pekan/savings`, icon: 'savings' },
-  { name: 'Pengingat Tagihan', path: `/t/${props.tenant.slug}/apps/pekan/reminders`, icon: 'bell' },
-  { name: 'Master Data', path: `/t/${props.tenant.slug}/apps/pekan/master-data`, icon: 'folder' },
-  { name: 'Pindai Struk OCR', path: `/t/${props.tenant.slug}/apps/pekan/receipt-scan`, icon: 'camera' },
-  { name: 'Asisten AI', path: `/t/${props.tenant.slug}/assistant`, icon: 'chat' },
-  { name: 'Laporan', path: `/t/${props.tenant.slug}/apps/pekan/reports`, icon: 'chart' },
-  { name: 'Pengaturan', path: `/t/${props.tenant.slug}/apps/pekan/settings`, icon: 'cog' },
-];
+const currentUser = computed(() => {
+  return props.user || (page.props.auth as any)?.user || {
+    id: '',
+    name: 'Pengguna',
+    email: '',
+  };
+});
+
+const userName = computed(() => {
+  return (currentUser.value as any)?.name || (currentUser.value as any)?.full_name || 'Pengguna';
+});
+
+const currentTenant = computed(() => {
+  return props.tenant || {
+    id: 'default-tenant-uuid',
+    name: 'Ruang Kerja',
+    slug: 'default',
+    status: 'active',
+    role: 'owner',
+  };
+});
+
+const tenantSlug = computed(() => currentTenant.value?.slug || '');
+
+const tenantRole = computed(() => {
+  return (currentTenant.value?.role || 'anggota').toUpperCase();
+});
+
+const pekanNavItems = computed(() => [
+  { name: 'Dasbor Keuangan', path: `/t/${tenantSlug.value}/apps/pekan/dashboard`, icon: 'dashboard' },
+  { name: 'Transaksi', path: `/t/${tenantSlug.value}/apps/pekan/transactions`, icon: 'receipt' },
+  { name: 'Anggaran', path: `/t/${tenantSlug.value}/apps/pekan/budgets`, icon: 'budget' },
+  { name: 'Tabungan', path: `/t/${tenantSlug.value}/apps/pekan/savings`, icon: 'savings' },
+  { name: 'Pengingat Tagihan', path: `/t/${tenantSlug.value}/apps/pekan/reminders`, icon: 'bell' },
+  { name: 'Master Data', path: `/t/${tenantSlug.value}/apps/pekan/master-data`, icon: 'folder' },
+  { name: 'Pindai Struk OCR', path: `/t/${tenantSlug.value}/apps/pekan/receipt-scan`, icon: 'camera' },
+  { name: 'Asisten AI', path: `/t/${tenantSlug.value}/assistant`, icon: 'chat' },
+  { name: 'Laporan', path: `/t/${tenantSlug.value}/apps/pekan/reports`, icon: 'chart' },
+  { name: 'Pengaturan', path: `/t/${tenantSlug.value}/apps/pekan/settings`, icon: 'cog' },
+]);
 
 function isCurrentRoute(path: string): boolean {
   if (typeof window === 'undefined') return false;
@@ -95,13 +102,13 @@ function isCurrentRoute(path: string): boolean {
         <RdAppLauncher
           :apps="apps"
           :current-app-key="appKey"
-          :tenant-slug="tenant.slug"
+          :tenant-slug="tenantSlug"
         />
 
         <!-- Tenant Switcher -->
         <RdTenantSwitcher
-          :current-tenant="tenant"
-          :tenants="tenants"
+          :current-tenant="currentTenant"
+          :tenants="tenants && tenants.length > 0 ? tenants : [currentTenant]"
         />
       </div>
 
@@ -124,10 +131,10 @@ function isCurrentRoute(path: string): boolean {
             aria-label="Menu profil pengguna"
           >
             <div class="w-7 h-7 rounded-full bg-teal-700 text-white text-xs font-semibold flex items-center justify-center">
-              {{ user.name.charAt(0) }}
+              {{ userName.charAt(0).toUpperCase() }}
             </div>
             <span class="text-xs font-medium hidden sm:inline-block max-w-28 truncate">
-              {{ user.name }}
+              {{ userName }}
             </span>
           </button>
 
@@ -136,8 +143,8 @@ function isCurrentRoute(path: string): boolean {
             class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 z-50 py-1"
           >
             <div class="px-3 py-2 border-b border-slate-100 dark:border-slate-800 text-xs">
-              <p class="font-semibold text-slate-800 dark:text-slate-100 truncate">{{ user.name }}</p>
-              <p class="text-slate-500 dark:text-slate-400 text-[11px] truncate">{{ user.email }}</p>
+              <p class="font-semibold text-slate-800 dark:text-slate-100 truncate">{{ userName }}</p>
+              <p class="text-slate-500 dark:text-slate-400 text-[11px] truncate">{{ currentUser.email }}</p>
             </div>
             <a
               href="/profile"
@@ -194,7 +201,7 @@ function isCurrentRoute(path: string): boolean {
           </template>
           <template v-else>
             <a
-              :href="`/t/${tenant.slug}/apps/${appKey}`"
+              :href="`/t/${tenantSlug}/apps/${appKey}`"
               class="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium bg-slate-100 text-slate-900"
             >
               <span>Beranda Modul</span>
@@ -204,8 +211,8 @@ function isCurrentRoute(path: string): boolean {
 
         <!-- Footer Workspace Status -->
         <div class="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
-          <div>Ruang: {{ tenant.name }}</div>
-          <div class="text-[10px] text-slate-400">Peran: {{ tenant.role.toUpperCase() }}</div>
+          <div>Ruang: {{ currentTenant.name }}</div>
+          <div class="text-[10px] text-slate-400">Peran: {{ tenantRole }}</div>
         </div>
       </aside>
 
