@@ -40,8 +40,13 @@ class WorkspaceController
         ]);
 
         $user = $request->user();
-        $tenantId = (string) Str::uuid();
-        $slug = Str::slug($validated['name']);
+        $baseSlug = Str::slug($validated['name']) ?: 'ruang-kerja';
+        $slug = $baseSlug;
+        $counter = 1;
+        while (Tenant::where('slug', $slug)->orWhere('code', $slug)->exists()) {
+            $slug = "{$baseSlug}-{$counter}";
+            $counter++;
+        }
 
         $tenant = Tenant::create([
             'id' => $tenantId,
