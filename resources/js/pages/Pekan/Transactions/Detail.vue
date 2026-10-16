@@ -52,7 +52,7 @@ const itemColumns = [
       </template>
     </RdPageHeader>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-5xl">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
       <!-- Rincian Inti & Item Belanja (2 Kolom) -->
       <div class="lg:col-span-2 space-y-6">
         <RdCard title="Informasi Faktur & Pembayaran">

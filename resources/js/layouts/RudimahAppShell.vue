@@ -265,8 +265,8 @@ function isCurrentRoute(path: string): boolean {
         </div>
       </div>
 
-      <!-- Main Content Container -->
-      <main class="flex-1 min-w-0 p-4 md:p-8 max-w-7xl mx-auto w-full">
+      <!-- Main Content Container (Full Width Fluid) -->
+      <main class="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 w-full">
         <slot />
       </main>
     </div>

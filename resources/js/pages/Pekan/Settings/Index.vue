@@ -21,7 +21,7 @@ defineProps<{
       :breadcrumbs="[{ label: 'PEKAN', href: `/t/${tenant.slug}/apps/pekan/dashboard` }, { label: 'Pengaturan' }]"
     />
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
       <!-- Pengaturan Pengingat & Notifikasi -->
       <RdCard title="Kanal Notifikasi Tagihan" description="Pilih media pengiriman pengingat jatuh tempo pembayaran">
         <div class="space-y-4">
