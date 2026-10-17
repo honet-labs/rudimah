@@ -22,12 +22,14 @@
 17. Buat output per tahap: temuan faktual, perubahan file, perintah & hasil testing, gap, risiko, langkah lanjut.
 18. **Desain Bersih & Profesional (No Emojis / Minimal Ikon Berwarna)**: Dilarang menggunakan emoticon/emoji unicode berwarna (seperti ✉️, 💬, 🤖, 📊, 💳, 💰, 🚀, dll) maupun ikon warna-warni yang berlebihan pada antarmuka RUDIMAH. Gunakan tipografi bersih, hierarki teks yang jelas, token netral, dan badge status semantik resmi platform. Penggunaan ikon harus diminimalkan hanya untuk aksi esensial dan wajib berupa outline/monokromatis netral.
 19. **Bebas Dead Code (Dead Code Hygiene)**: Dilarang keras membiarkan dead code tersisa dalam codebase. Saat menghapus, merestrukturisasi, atau membatalkan suatu fitur, agen wajib membersihkan seluruh residunya: hapus unused imports, unused variables, unused props, unused computed properties, dead routes, dead controller actions, dan unused database queries/eager-loads (`with(...)`). Jangan meninggalkan kode mati atau komentar blok kode basi.
+20. **Selalu Commit & Push ke Remote Repository (Always Push to Remote)**: Setiap kali menyelesaikan instruksi perbaikan kode, penambahan fitur, atau refaktorisasi, agen wajib membuat git commit dengan pesan deskriptif dan langsung melakukan push ke remote repository (`git push origin <branch>`) tanpa harus menunggu instruksi berulang dari pengguna.
 
 ## Mandatory PR gate
 - [ ] Feature parity mapped and verified where affected.
 - [ ] No new custom UI patterns bypassing design system.
 - [ ] Antarmuka bersih tanpa emoji/emoticon atau icon berwarna yang berlebihan.
 - [ ] Bebas dari dead code (tidak ada unused imports, dead variables/props, dead queries, atau dead endpoints).
+- [ ] Ter-commit rapi dan ter-push ke remote repository.
 - [ ] Screenshot and UI regression evidence.
 - [ ] Tests: tenant isolation, permission & session where applicable.
 - [ ] Security + secrets checks.
