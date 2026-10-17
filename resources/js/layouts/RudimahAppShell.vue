@@ -42,15 +42,15 @@ const userName = computed(() => {
 
 const currentTenant = computed(() => {
   return props.tenant || {
-    id: 'default-tenant-uuid',
+    id: '',
     name: 'Ruang Kerja',
-    slug: 'default',
+    slug: '',
     status: 'active',
     role: 'owner',
   };
 });
 
-const tenantSlug = computed(() => currentTenant.value?.slug || '');
+const tenantSlug = computed(() => props.tenant?.slug || (currentTenant.value?.slug !== 'default' ? currentTenant.value?.slug : '') || '');
 
 const tenantRole = computed(() => {
   return (currentTenant.value?.role || 'anggota').toUpperCase();

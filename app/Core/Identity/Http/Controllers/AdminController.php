@@ -48,6 +48,32 @@ class AdminController
         $appsList = AppRegistry::all();
         $notificationSettings = PlatformNotificationService::getSettings();
 
+        // Resolve ruang kerja aktif/default bagi admin untuk navigasi aplikasi yang valid
+        $defaultTenant = null;
+        $sessionTenantSlug = session('current_tenant_slug');
+        if ($sessionTenantSlug) {
+            $defaultTenant = Tenant::where('slug', $sessionTenantSlug)->where('status', 'active')->first();
+        }
+
+        if (!$defaultTenant) {
+            $membership = $user->memberships()->where('status', 'active')->with('tenant')->first();
+            if ($membership && $membership->tenant && $membership->tenant->status === 'active') {
+                $defaultTenant = $membership->tenant;
+            }
+        }
+
+        if (!$defaultTenant) {
+            $defaultTenant = Tenant::where('status', 'active')->first();
+        }
+
+        $tenantPayload = $defaultTenant ? [
+            'id' => $defaultTenant->id,
+            'name' => $defaultTenant->name,
+            'slug' => $defaultTenant->slug,
+            'status' => $defaultTenant->status,
+            'role' => 'admin',
+        ] : null;
+
         return Inertia::render('Admin/Dashboard', [
             'user' => [
                 'id' => $user->id,
@@ -55,7 +81,7 @@ class AdminController
                 'email' => $user->email,
                 'has_mfa' => (bool) $user->mfaMethods()->where('is_verified', true)->exists(),
             ],
-            'tenant' => null,
+            'tenant' => $tenantPayload,
             'status' => session('status'),
             'error' => session('error'),
             'systemStats' => [

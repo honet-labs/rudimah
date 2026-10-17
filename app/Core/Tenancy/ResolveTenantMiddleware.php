@@ -15,10 +15,10 @@ class ResolveTenantMiddleware
         $tenantSlug = $request->route('tenantSlug') ?? $request->route('tenant');
 
         if ($tenantSlug) {
-            $tenant = Tenant::where('slug', $tenantSlug)
-                ->orWhere('code', $tenantSlug)
-                ->where('status', 'active')
-                ->first();
+            $tenant = Tenant::where(function ($query) use ($tenantSlug) {
+                $query->where('slug', $tenantSlug)
+                    ->orWhere('code', $tenantSlug);
+            })->where('status', 'active')->first();
 
             if (!$tenant) {
                 abort(404, 'Ruang kerja tidak ditemukan atau telah dinonaktifkan.');
@@ -42,6 +42,7 @@ class ResolveTenantMiddleware
             }
 
             TenantContext::set($tenant);
+            session(['current_tenant_slug' => $tenant->slug]);
         }
 
         try {

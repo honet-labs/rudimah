@@ -12,7 +12,7 @@ import RdSelect from '../../design-system/RdSelect.vue';
 import RdCheckbox from '../../design-system/RdCheckbox.vue';
 import RdAlert from '../../design-system/RdAlert.vue';
 import RdModal from '../../design-system/RdModal.vue';
-import type { User, AppManifest } from '../../types/core';
+import type { User, AppManifest, Tenant } from '../../types/core';
 
 interface AdminUserItem {
   id: string;
@@ -67,6 +67,7 @@ interface NotificationSettingsProp {
 
 const props = defineProps<{
   user: User;
+  tenant?: Tenant | null;
   status?: string;
   error?: string;
   systemStats?: {
@@ -175,7 +176,13 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
 </script>
 
 <template>
-  <RudimahAppShell :user="user" app-key="admin" app-name="Administrasi Sistem">
+  <RudimahAppShell
+    :user="user"
+    :tenant="tenant || undefined"
+    :apps="appsList"
+    app-key="admin"
+    app-name="Administrasi Sistem"
+  >
     <RdPageHeader
       title="Administrasi Platform RUDIMAH"
       description="Pusat kendali operasional server, manajemen seluruh ruang kerja, katalog aplikasi, direktori pengguna, dan konfigurasi saluran notifikasi"
@@ -332,8 +339,16 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
                 {{ app.description }}
               </p>
             </div>
-            <div class="pt-2 text-[11px] text-slate-400 font-mono border-t border-slate-100 dark:border-slate-800">
-              Key: {{ app.key }}
+            <div class="pt-2 text-[11px] text-slate-400 font-mono border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+              <span>Key: {{ app.key }}</span>
+              <a
+                :href="tenant?.slug ? `/t/${tenant.slug}/apps/${app.slug || app.key}` : `/apps/${app.slug || app.key}`"
+                class="inline-block"
+              >
+                <RdButton variant="outline" size="sm">
+                  Buka Modul
+                </RdButton>
+              </a>
             </div>
           </div>
         </div>

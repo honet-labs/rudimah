@@ -52,10 +52,19 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     Route::post('/admin/notifications', [AdminController::class, 'updateNotifications'])->name('admin.notifications.update');
     Route::post('/admin/notifications/test', [AdminController::class, 'testNotification'])->name('admin.notifications.test');
+
+    // Peluncur Cerdas Aplikasi Global (Mencegah 404 ketika diakses tanpa slug tenant spesifik)
+    Route::get('/apps', [WorkspaceController::class, 'launchApp'])->name('apps.index');
+    Route::get('/apps/{appSlug}', [WorkspaceController::class, 'launchApp'])->name('apps.launch');
 });
 
 // Rute Terikat Ruang Kerja (Tenant Scoped: Asisten AI & Modul Aplikasi)
 Route::prefix('t/{tenantSlug}')->middleware(['auth', ResolveTenantMiddleware::class])->group(function () {
+    // Pengalihan cerdas jika pengguna mengakses akar URL ruang kerja
+    Route::get('/', function (string $tenantSlug) {
+        return redirect("/t/{$tenantSlug}/apps/pekan/dashboard");
+    });
+
     // Asisten Cerdas AI (Terisolasi per Tenant)
     Route::prefix('assistant')->name('assistant.')->group(function () {
         Route::get('/', [AiAssistantController::class, 'index'])->name('index');
@@ -68,6 +77,11 @@ Route::prefix('t/{tenantSlug}')->middleware(['auth', ResolveTenantMiddleware::cl
 
     // Rute Modul Aplikasi
     Route::prefix('apps')->group(function () {
+        // Pengalihan cerdas jika pengguna mengakses /t/{tenantSlug}/apps langsung
+        Route::get('/', function (string $tenantSlug) {
+            return redirect("/t/{$tenantSlug}/apps/pekan/dashboard");
+        });
+
         // Modul PEKAN
         Route::prefix('pekan')->name('pekan.')->group(function () {
             Route::get('/', [DashboardController::class, 'index']);
@@ -107,11 +121,13 @@ Route::prefix('t/{tenantSlug}')->middleware(['auth', ResolveTenantMiddleware::cl
         // Modul Skeleton App1
         Route::prefix('app1')->name('app1.')->group(function () {
             Route::get('/', [App1Controller::class, 'index'])->name('index');
+            Route::get('/dashboard', [App1Controller::class, 'index'])->name('dashboard');
         });
 
         // Modul Skeleton App2
         Route::prefix('app2')->name('app2.')->group(function () {
             Route::get('/', [App2Controller::class, 'index'])->name('index');
+            Route::get('/dashboard', [App2Controller::class, 'index'])->name('dashboard');
         });
     });
 });

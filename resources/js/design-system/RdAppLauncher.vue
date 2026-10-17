@@ -30,6 +30,14 @@ const isOpen = ref(false);
 function toggle() {
   isOpen.value = !isOpen.value;
 }
+
+function getAppHref(app: AppManifest): string {
+  if (!app.enabled) return '#';
+  if (props.tenantSlug && props.tenantSlug.trim() !== '' && props.tenantSlug !== 'default') {
+    return `/t/${props.tenantSlug}/apps/${app.slug}`;
+  }
+  return `/apps/${app.slug}`;
+}
 </script>
 
 <template>
@@ -56,7 +64,7 @@ function toggle() {
         <a
           v-for="app in (apps && apps.length > 0 ? apps : defaultApps)"
           :key="app.key"
-          :href="app.enabled ? `/t/${tenantSlug}/apps/${app.slug}` : '#'"
+          :href="getAppHref(app)"
           :class="[
             'p-2 rounded-md flex items-start gap-2.5 transition-colors text-left',
             app.key === currentAppKey

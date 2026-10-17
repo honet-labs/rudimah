@@ -69,4 +69,50 @@ class WorkspaceController
 
         return redirect("/t/{$tenant->slug}/apps/pekan/dashboard");
     }
+
+    /**
+     * Peluncur cerdas akses modul aplikasi.
+     * Mengarahkan pengguna ke ruang kerja aktif atau default tanpa menimbulkan error 404.
+     */
+    public function launchApp(Request $request, string $appSlug = 'pekan'): RedirectResponse
+    {
+        $user = $request->user();
+        $targetSlug = $appSlug ?: 'pekan';
+
+        // 1. Cek riwayat tenant aktif di session
+        $tenant = null;
+        $sessionTenantSlug = session('current_tenant_slug');
+        if ($sessionTenantSlug) {
+            $tenant = Tenant::where('slug', $sessionTenantSlug)
+                ->where('status', 'active')
+                ->first();
+        }
+
+        // 2. Jika tidak ada di session, gunakan keanggotaan aktif pertama milik pengguna
+        if (!$tenant && $user) {
+            $membership = $user->memberships()
+                ->where('status', 'active')
+                ->with('tenant')
+                ->first();
+
+            if ($membership && $membership->tenant && $membership->tenant->status === 'active') {
+                $tenant = $membership->tenant;
+            }
+        }
+
+        // 3. Jika pengguna adalah super admin dan belum punya keanggotaan khusus, gunakan tenant aktif pertama platform
+        if (!$tenant && $user?->is_super_admin) {
+            $tenant = Tenant::where('status', 'active')->first();
+        }
+
+        // 4. Jika tenant ditemukan, simpan ke session dan arahkan ke dashboard modul tersebut
+        if ($tenant) {
+            session(['current_tenant_slug' => $tenant->slug]);
+            return redirect("/t/{$tenant->slug}/apps/{$targetSlug}");
+        }
+
+        // 5. Jika sama sekali belum ada tenant aktif terdaftar, arahkan ke halaman pembuatan ruang kerja
+        return redirect()->route('workspaces.index');
+    }
 }
+
