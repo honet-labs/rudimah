@@ -38,8 +38,6 @@ withDefaults(
     recentTransactions: () => [
       {
         id: 'tx-001',
-        account_id: 'acc-1',
-        account_name: 'BCA Utama',
         category_name: 'Gaji Pokok',
         type: 'income',
         amount_minor: 12000000,
@@ -50,8 +48,6 @@ withDefaults(
       },
       {
         id: 'tx-002',
-        account_id: 'acc-1',
-        account_name: 'BCA Utama',
         category_name: 'Belanja Dapur',
         type: 'expense',
         amount_minor: 450000,
@@ -62,8 +58,6 @@ withDefaults(
       },
       {
         id: 'tx-003',
-        account_id: 'acc-2',
-        account_name: 'Dompet Tunai',
         category_name: 'Transportasi',
         type: 'expense',
         amount_minor: 85000,
@@ -126,7 +120,6 @@ const txColumns = [
   { key: 'transaction_date', label: 'Tanggal', width: '130px' },
   { key: 'description', label: 'Keterangan' },
   { key: 'category_name', label: 'Kategori' },
-  { key: 'account_name', label: 'Rekening' },
   { key: 'amount_minor', label: 'Nominal', align: 'right' as const },
 ];
 </script>

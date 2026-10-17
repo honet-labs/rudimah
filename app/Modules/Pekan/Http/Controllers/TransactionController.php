@@ -24,7 +24,7 @@ class TransactionController
         $tenant = TenantContext::get();
         $user = $request->user();
 
-        $query = FinanceTransaction::with(['account', 'category'])
+        $query = FinanceTransaction::with(['category'])
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at');
 
@@ -58,7 +58,6 @@ class TransactionController
         $tenant = TenantContext::get();
         $user = $request->user();
 
-        $accounts = FinanceAccount::where('is_active', true)->get();
         $categories = FinanceCategory::where('is_active', true)->get();
 
         $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
@@ -77,7 +76,6 @@ class TransactionController
             'tenant' => $tenant,
             'tenants' => $tenants,
             'apps' => AppRegistry::all(),
-            'accounts' => $accounts,
             'categories' => $categories,
         ]);
     }
@@ -85,7 +83,7 @@ class TransactionController
     public function store(Request $request, ?string $tenantSlug = null): RedirectResponse
     {
         $validated = $request->validate([
-            'account_id' => 'required|string',
+            'account_id' => 'nullable|string',
             'category_id' => 'nullable|string',
             'type' => 'required|in:income,expense,transfer',
             'amount_minor' => 'required|integer|min:1',
@@ -96,6 +94,11 @@ class TransactionController
             'notes' => 'nullable|string',
             'items' => 'nullable|array',
         ]);
+
+        if (empty($validated['account_id'])) {
+            $defaultAccount = FinanceAccount::first();
+            $validated['account_id'] = $defaultAccount ? $defaultAccount->id : 'acc-default';
+        }
 
         $items = $request->input('items', []);
 
@@ -111,7 +114,7 @@ class TransactionController
     {
         $tenant = TenantContext::get();
         $user = $request->user();
-        $transaction = FinanceTransaction::with(['account', 'category', 'items', 'attachments'])
+        $transaction = FinanceTransaction::with(['category', 'items', 'attachments'])
             ->findOrFail($id);
 
         $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {

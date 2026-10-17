@@ -108,7 +108,7 @@ function submit() {
             <RdTextarea
               v-model="form.notes"
               rows="3"
-              placeholder="Tuliskan catatan atau rekening tempat penampungan dana ini..."
+              placeholder="Tuliskan catatan atau motivasi untuk pos tabungan ini..."
             />
           </div>
         </div>

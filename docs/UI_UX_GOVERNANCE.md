@@ -26,6 +26,7 @@
 8. Jangan set `z-index:999999`; gunakan layer tokens untuk overlay/dropdown/dialog/toast.
 9. Jangan memilih gaya baru dari screenshot yang hanya menggambarkan satu halaman dan menerapkannya secara global tanpa desain review.
 10. Jangan mengubah user flow eksisting atas dasar estetika saja.
+11. Jangan menggunakan emoji/emoticon unicode (seperti ✉️, 💬, 🤖, 📊, 💳, 💰, 🚀, dll) atau ikon berwarna-warni yang mencolok pada antarmuka. Terapkan estetika enterprise yang bersih, utamakan tipografi dan hierarki teks yang kuat, serta batasi ikon hanya pada outline/monokromatis netral untuk affordance aksi esensial.
 
 ## 4. Workflow implementasi halaman baru
 1. Klasifikasikan kebutuhan: global/shared, reusable module-specific, atau bespoke.
@@ -77,4 +78,5 @@ Tidak boleh upgrade library UI otomatis yang menghasilkan breaking visual tanpa 
 - [ ] Tidak ada regresi pada modul lain.
 - [ ] Visual parity PEKAN tidak berubah tanpa persetujuan.
 - [ ] Component docs dan snapshots diperbarui bila perlu.
+- [ ] Bebas dari dead code (tidak ada unused imports, unused variables, props atau payload yang tidak terpakai).
 - [ ] Skenario authorization UI tidak menggantikan backend security.

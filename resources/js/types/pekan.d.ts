@@ -1,13 +1,3 @@
-export interface FinanceAccount {
-  id: string;
-  name: string;
-  account_type: 'cash' | 'bank' | 'ewallet' | 'investment';
-  currency: string;
-  opening_balance_minor: number;
-  current_balance_minor: number;
-  is_active: boolean;
-}
-
 export interface FinanceCategory {
   id: string;
   name: string;
@@ -29,7 +19,7 @@ export interface TransactionItem {
 
 export interface Transaction {
   id: string;
-  account_id: string;
+  account_id?: string;
   account_name?: string;
   category_id?: string | null;
   category_name?: string | null;

@@ -78,7 +78,7 @@ const isSavingSettings = ref(false);
 const settingsAlert = ref<{ type: 'success' | 'error'; message: string } | null>(null);
 
 const quickPrompts = [
-  'Ringkas saldo seluruh rekening saat ini',
+  'Ringkas total pemasukan dan pengeluaran bulan ini',
   'Bagaimana status keterpakaian anggaran bulan ini?',
   'Apakah ada pengingat tagihan yang mendekati jatuh tempo?',
   'Tampilkan rincian transaksi pengeluaran terbaru',

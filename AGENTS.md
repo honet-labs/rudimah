@@ -20,10 +20,14 @@
 15. Buat unit/feature/e2e/security/visual tests. Jangan klaim tested sebelum benar-benar dijalankan. Security, performance & UI changes butuh dokumentasi dan review.
 16. Jangan menjalankan destructive scripts, migrasi produksi, mengirim email/WhatsApp/Telegram live, menghapus data, atau deploy production tanpa izin operasional yang sesuai.
 17. Buat output per tahap: temuan faktual, perubahan file, perintah & hasil testing, gap, risiko, langkah lanjut.
+18. **Desain Bersih & Profesional (No Emojis / Minimal Ikon Berwarna)**: Dilarang menggunakan emoticon/emoji unicode berwarna (seperti ✉️, 💬, 🤖, 📊, 💳, 💰, 🚀, dll) maupun ikon warna-warni yang berlebihan pada antarmuka RUDIMAH. Gunakan tipografi bersih, hierarki teks yang jelas, token netral, dan badge status semantik resmi platform. Penggunaan ikon harus diminimalkan hanya untuk aksi esensial dan wajib berupa outline/monokromatis netral.
+19. **Bebas Dead Code (Dead Code Hygiene)**: Dilarang keras membiarkan dead code tersisa dalam codebase. Saat menghapus, merestrukturisasi, atau membatalkan suatu fitur, agen wajib membersihkan seluruh residunya: hapus unused imports, unused variables, unused props, unused computed properties, dead routes, dead controller actions, dan unused database queries/eager-loads (`with(...)`). Jangan meninggalkan kode mati atau komentar blok kode basi.
 
 ## Mandatory PR gate
 - [ ] Feature parity mapped and verified where affected.
 - [ ] No new custom UI patterns bypassing design system.
+- [ ] Antarmuka bersih tanpa emoji/emoticon atau icon berwarna yang berlebihan.
+- [ ] Bebas dari dead code (tidak ada unused imports, dead variables/props, dead queries, atau dead endpoints).
 - [ ] Screenshot and UI regression evidence.
 - [ ] Tests: tenant isolation, permission & session where applicable.
 - [ ] Security + secrets checks.
@@ -31,4 +35,4 @@
 - [ ] Docs, tokens/component changelog and ADR updated.
 
 ## Coding conventions
-Backend controllers thin; form requests validate; policies authorize; services/actions own logic; Eloquent models represent data; DB transaction for financial state; queues idempotent; typed DTOs where useful. Frontend Vue Composition API + TS strict; wrappers `Rd*`; tokens from shared CSS; isolate module CSS; no UI library proliferation; shared reusable patterns. Avoid needless abstraction and overengineering.
+Backend controllers thin; form requests validate; policies authorize; services/actions own logic; Eloquent models represent data; DB transaction for financial state; queues idempotent; typed DTOs where useful; bersihkan unused eager loading dan dead queries. Frontend Vue Composition API + TS strict; wrappers `Rd*`; tokens dari shared CSS; isolasi module CSS; hindari proliferasi library UI; utamakan tipografi dan hierarki teks bersih di atas dekorasi ikon visual; no emoji di teks UI; bersihkan unused imports/props/refs; shared reusable patterns. Avoid needless abstraction and overengineering.

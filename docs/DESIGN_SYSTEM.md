@@ -13,6 +13,7 @@ Satu identitas visual serta perilaku interaksi untuk **RUDIMAH  :  Ruang Digital
 - UI/copy **Bahasa Indonesia baku dan mudah dimengerti**: `Simpan`, `Batal`, `Hapus`, `Sedang diproses`, `Coba lagi`, `Berhasil disimpan`. Jangan mencampur bahasa pada label navigasi; istilah teknis yang diperlukan boleh diberi bantuan singkat.
 - Zona waktu default `Asia/Jakarta`; tampilan tanggal `13 Okt 2026`, waktu format 24 jam; format angka `id-ID`, mata uang `IDR`/`Rp` dengan pembulatan benar. Penyimpanan waktu UTC, konversi hanya pada presentation boundary.
 - Keputusan penggunaan ilustrasi, tone, maupun aset visual dicatat di `UI_UX_GOVERNANCE.md`.
+- **Prinsip Estetika Bersih (No Emojis & Minimal Iconography)**: Antarmuka RUDIMAH mengusung gaya profesional dan tenang (*clean enterprise*). Dilarang menyematkan emoji/emoticon berwarna (seperti ✉️, 💬, 🤖, 📊, 💳, 💰, dll) pada teks kontrol, heading, tab, tombol, atau navigasi. Penggunaan ikon ditekan semaksimal mungkin, hanya digunakan saat memberikan nilai fungsional (*affordance*) dan wajib berupa outline/monokromatis netral.
 
 ## 3. Sumber kebenaran dan token
 **Tidak boleh** mengulang hex, spacing, font family, shadow, z-index atau durasi transisi di tiap modul. Token didefinisikan **sekali** di `resources/css/tokens.css` dan dipetakan ke Tailwind theme; TypeScript exports bila diperlukan untuk library grafik.

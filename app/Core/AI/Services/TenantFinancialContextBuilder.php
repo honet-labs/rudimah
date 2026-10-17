@@ -3,7 +3,6 @@
 namespace App\Core\AI\Services;
 
 use App\Core\Tenancy\TenantContext;
-use App\Modules\Pekan\Models\FinanceAccount;
 use App\Modules\Pekan\Models\FinanceBudget;
 use App\Modules\Pekan\Models\FinanceReminder;
 use App\Modules\Pekan\Models\FinanceSavings;
@@ -25,17 +24,10 @@ class TenantFinancialContextBuilder
 
         $tenantId = $tenant->id;
 
-        // 1. Akun dan Saldo Aktif (strictly scoped to tenant_id)
-        $accounts = FinanceAccount::where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->get();
-
-        $accountsSummary = [];
-        $totalBalanceMinor = 0;
-        foreach ($accounts as $acc) {
-            $totalBalanceMinor += $acc->balance_minor;
-            $accountsSummary[] = "- {$acc->name} ({$acc->type}): " . MoneyHelper::formatIdr($acc->balance_minor);
-        }
+        // 1. Arus Kas & Saldo Berjalan (strictly scoped to tenant_id)
+        $totalIncomeMinor = (int) FinanceTransaction::where('tenant_id', $tenantId)->where('type', 'income')->sum('amount_minor');
+        $totalExpenseMinor = (int) FinanceTransaction::where('tenant_id', $tenantId)->where('type', 'expense')->sum('amount_minor');
+        $netCashFlowMinor = $totalIncomeMinor - $totalExpenseMinor;
 
         // 2. Anggaran Kategori Aktif
         $budgets = FinanceBudget::where('tenant_id', $tenantId)
@@ -87,8 +79,10 @@ class TenantFinancialContextBuilder
         $contextText .= "Kode Ruang Kerja: {$tenant->code}\n";
         $contextText .= "ID Ruang Kerja: {$tenantId}\n\n";
 
-        $contextText .= "RINGKASAN REKENING & SALDO (Total: " . MoneyHelper::formatIdr($totalBalanceMinor) . "):\n";
-        $contextText .= empty($accountsSummary) ? "Belum ada rekening tercatat.\n\n" : implode("\n", $accountsSummary) . "\n\n";
+        $contextText .= "RINGKASAN ARUS KAS & SALDO BERJALAN:\n";
+        $contextText .= "- Total Pemasukan: " . MoneyHelper::formatIdr($totalIncomeMinor) . "\n";
+        $contextText .= "- Total Pengeluaran: " . MoneyHelper::formatIdr($totalExpenseMinor) . "\n";
+        $contextText .= "- Saldo Kas Bersih: " . MoneyHelper::formatIdr($netCashFlowMinor) . "\n\n";
 
         $contextText .= "RINGKASAN ANGGARAN AKTIF:\n";
         $contextText .= empty($budgetsSummary) ? "Belum ada anggaran aktif.\n\n" : implode("\n", $budgetsSummary) . "\n\n";

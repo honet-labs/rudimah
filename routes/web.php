@@ -11,7 +11,6 @@ use App\Modules\App1\Http\Controllers\App1Controller;
 use App\Modules\App2\Http\Controllers\App2Controller;
 use App\Modules\Pekan\Http\Controllers\BudgetController;
 use App\Modules\Pekan\Http\Controllers\DashboardController;
-use App\Modules\Pekan\Http\Controllers\MasterDataController;
 use App\Modules\Pekan\Http\Controllers\ReceiptScanController;
 use App\Modules\Pekan\Http\Controllers\ReminderController;
 use App\Modules\Pekan\Http\Controllers\ReportController;
@@ -95,9 +94,6 @@ Route::prefix('t/{tenantSlug}')->middleware(['auth', ResolveTenantMiddleware::cl
             Route::get('/reminders', [ReminderController::class, 'index'])->name('reminders.index');
             Route::get('/reminders/create', [ReminderController::class, 'create'])->name('reminders.create');
             Route::post('/reminders', [ReminderController::class, 'store'])->name('reminders.store');
-
-            // Master Data
-            Route::get('/master-data', [MasterDataController::class, 'index'])->name('masterdata.index');
 
             // Pindai Struk OCR
             Route::get('/receipt-scan', [ReceiptScanController::class, 'index'])->name('receiptscan.index');

@@ -145,7 +145,7 @@ class GeminiProvider implements AiProviderInterface
             }
         }
 
-        $reply = "Halo, saya adalah Asisten Cerdas RUDIMAH (mode Gemini). Terkait pesan Anda: \"" . mb_strimwidth($lastUserMsg, 0, 80, '...') . "\", seluruh data ruang kerja ini terlindungi secara aman. Anda dapat menanyakan ringkasan anggaran, saldo rekening, atau transaksi terbaru.";
+        $reply = "Halo, saya adalah Asisten Cerdas RUDIMAH (mode Gemini). Terkait pesan Anda: \"" . mb_strimwidth($lastUserMsg, 0, 80, '...') . "\", seluruh data ruang kerja ini terlindungi secara aman. Anda dapat menanyakan ringkasan anggaran, mutasi kas, atau transaksi terbaru.";
 
         return [
             'content' => $reply,

@@ -25,8 +25,6 @@ const props = withDefaults(
     transactions: () => [
       {
         id: 'tx-001',
-        account_id: 'acc-1',
-        account_name: 'BCA Utama',
         category_name: 'Gaji Pokok',
         type: 'income',
         amount_minor: 12000000,
@@ -37,8 +35,6 @@ const props = withDefaults(
       },
       {
         id: 'tx-002',
-        account_id: 'acc-1',
-        account_name: 'BCA Utama',
         category_name: 'Belanja Dapur',
         type: 'expense',
         amount_minor: 450000,
@@ -49,8 +45,6 @@ const props = withDefaults(
       },
       {
         id: 'tx-003',
-        account_id: 'acc-2',
-        account_name: 'Dompet Tunai',
         category_name: 'Transportasi',
         type: 'expense',
         amount_minor: 85000,
@@ -70,14 +64,12 @@ const typeOptions = [
   { label: 'Semua Jenis Mutasi', value: 'all' },
   { label: 'Pemasukan (Income)', value: 'income' },
   { label: 'Pengeluaran (Expense)', value: 'expense' },
-  { label: 'Transfer Antar Rekening', value: 'transfer' },
 ];
 
 const columns = [
   { key: 'transaction_date', label: 'Tanggal', width: '130px' },
   { key: 'description', label: 'Keterangan' },
   { key: 'category_name', label: 'Kategori' },
-  { key: 'account_name', label: 'Rekening Sumber' },
   { key: 'type', label: 'Jenis', width: '110px' },
   { key: 'amount_minor', label: 'Nominal', align: 'right' as const },
   { key: 'actions', label: 'Aksi', width: '100px', align: 'center' as const },

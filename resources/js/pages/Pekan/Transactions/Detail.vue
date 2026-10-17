@@ -67,14 +67,8 @@ const itemColumns = [
               <dt class="text-slate-500 font-medium">Jenis Mutasi</dt>
               <dd class="mt-0.5">
                 <RdBadge variant="neutral">
-                  {{ transaction.type === 'income' ? 'Pemasukan' : transaction.type === 'expense' ? 'Pengeluaran' : 'Transfer' }}
+                  {{ transaction.type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}
                 </RdBadge>
-              </dd>
-            </div>
-            <div>
-              <dt class="text-slate-500 font-medium">Rekening</dt>
-              <dd class="text-slate-800 dark:text-slate-100 font-medium mt-0.5">
-                {{ transaction.account_name || 'BCA Utama' }}
               </dd>
             </div>
             <div>
@@ -161,7 +155,7 @@ const itemColumns = [
     <RdConfirmDialog
       v-model="isDeleteDialogOpen"
       title="Hapus Transaksi Ini?"
-      message="Data mutasi transaksi akan dihapus dari buku kas. Saldo rekening terkait akan disesuaikan secara otomatis."
+      message="Data mutasi transaksi akan dihapus dari buku kas. Tindakan ini tidak dapat dibatalkan."
       danger
       confirm-text="Ya, Hapus Transaksi"
       @confirm="() => {}"

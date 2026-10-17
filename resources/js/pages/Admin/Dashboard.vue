@@ -351,7 +351,6 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
           <div class="p-3.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between gap-3">
             <div class="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
               <div class="flex items-center gap-1.5 sm:gap-2">
-                <span class="text-base sm:text-lg">✉️</span>
                 <span class="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white truncate">Email (SMTP)</span>
               </div>
               <p class="text-[11px] sm:text-xs text-slate-500 font-mono truncate">
@@ -366,7 +365,6 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
           <div class="p-3.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between gap-3">
             <div class="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
               <div class="flex items-center gap-1.5 sm:gap-2">
-                <span class="text-base sm:text-lg">💬</span>
                 <span class="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white truncate">WhatsApp (WAHA)</span>
               </div>
               <p class="text-[11px] sm:text-xs text-slate-500 font-mono truncate">
@@ -381,7 +379,6 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
           <div class="p-3.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between gap-3 sm:col-span-2 lg:col-span-1">
             <div class="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
               <div class="flex items-center gap-1.5 sm:gap-2">
-                <span class="text-base sm:text-lg">🤖</span>
                 <span class="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white truncate">Telegram Bot</span>
               </div>
               <p class="text-[11px] sm:text-xs text-slate-500 font-mono truncate">
@@ -406,7 +403,6 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
             ]"
             @click="activeTab = 'mail'"
           >
-            <span>✉️</span>
             <span>Email (SMTP)</span>
             <span v-if="notificationSettings?.mail?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
           </button>
@@ -421,7 +417,6 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
             ]"
             @click="activeTab = 'whatsapp'"
           >
-            <span>💬</span>
             <span>WhatsApp (WAHA)</span>
             <span v-if="notificationSettings?.whatsapp?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
           </button>
@@ -436,7 +431,6 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
             ]"
             @click="activeTab = 'telegram'"
           >
-            <span>🤖</span>
             <span>Telegram Bot</span>
             <span v-if="notificationSettings?.telegram?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
           </button>
@@ -461,7 +455,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
                   @click="showTestEmailModal = true"
                 >
                   <span v-if="testingChannel === 'mail'">Menguji...</span>
-                  <span v-else>✉️ Uji Kirim Email</span>
+                  <span v-else>Uji Kirim Email</span>
                 </RdButton>
               </div>
             </div>
@@ -547,7 +541,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
                   @click="showTestWaModal = true"
                 >
                   <span v-if="testingChannel === 'whatsapp'">Menguji WAHA...</span>
-                  <span v-else>💬 Uji Kirim / Koneksi WAHA</span>
+                  <span v-else>Uji Kirim / Koneksi WAHA</span>
                 </RdButton>
               </div>
             </div>
@@ -613,7 +607,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
                   @click="showTestTelegramModal = true"
                 >
                   <span v-if="testingChannel === 'telegram'">Menguji Telegram...</span>
-                  <span v-else>🤖 Uji Kirim / Koneksi Telegram</span>
+                  <span v-else>Uji Kirim / Koneksi Telegram</span>
                 </RdButton>
               </div>
             </div>

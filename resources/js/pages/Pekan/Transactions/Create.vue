@@ -11,7 +11,7 @@ import RdTextarea from '../../../design-system/RdTextarea.vue';
 import RdFileUpload from '../../../design-system/RdFileUpload.vue';
 import RdMoney from '../../../design-system/RdMoney.vue';
 import type { User, Tenant, AppManifest } from '../../../types/core';
-import type { FinanceAccount, FinanceCategory, TransactionItem } from '../../../types/pekan';
+import type { FinanceCategory, TransactionItem } from '../../../types/pekan';
 
 const props = withDefaults(
   defineProps<{
@@ -19,18 +19,15 @@ const props = withDefaults(
     tenant: Tenant;
     tenants?: Tenant[];
     apps?: AppManifest[];
-    accounts?: FinanceAccount[];
     categories?: FinanceCategory[];
   }>(),
   {
-    accounts: () => [],
     categories: () => [],
   }
 );
 
 const isSubmitting = ref(false);
-const transactionType = ref<'income' | 'expense' | 'transfer'>('expense');
-const accountId = ref(props.accounts[0]?.id || '');
+const transactionType = ref<'income' | 'expense'>('expense');
 const categoryId = ref(props.categories[0]?.id || '');
 const transactionDate = ref(new Date().toISOString().substring(0, 10));
 const description = ref('');
@@ -41,10 +38,6 @@ const notes = ref('');
 const items = ref<TransactionItem[]>([
   { item_name: 'Item Transaksi', quantity: 1, price_minor: 50000, discount_minor: 0, total_minor: 50000 }
 ]);
-
-const accountOptions = computed(() =>
-  props.accounts.map(a => ({ label: a.name, value: a.id }))
-);
 
 const categoryOptions = computed(() =>
   props.categories
@@ -83,7 +76,6 @@ function handleSubmit() {
 
   router.post(`/t/${props.tenant.slug}/apps/pekan/transactions`, {
     type: transactionType.value,
-    account_id: accountId.value || props.accounts[0]?.id || 'acc-default',
     category_id: categoryId.value || null,
     amount_minor: grandTotalMinor.value > 0 ? grandTotalMinor.value : 50000,
     transaction_date: transactionDate.value,
@@ -122,22 +114,14 @@ function handleSubmit() {
     <form @submit.prevent="handleSubmit" class="space-y-6 max-w-4xl">
       <!-- Data Transaksi Utama -->
       <RdCard title="Informasi Transaksi">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <RdSelect
             v-model="transactionType"
             label="Jenis Mutasi"
             :options="[
               { label: 'Pengeluaran (Belanja)', value: 'expense' },
               { label: 'Pemasukan (Pendapatan)', value: 'income' },
-              { label: 'Transfer Internal', value: 'transfer' },
             ]"
-            required
-          />
-
-          <RdSelect
-            v-model="accountId"
-            label="Rekening Sumber / Tujuan"
-            :options="accountOptions"
             required
           />
 

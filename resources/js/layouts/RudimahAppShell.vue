@@ -62,7 +62,6 @@ const pekanNavItems = computed(() => [
   { name: 'Anggaran', path: `/t/${tenantSlug.value}/apps/pekan/budgets`, icon: 'budget' },
   { name: 'Tabungan', path: `/t/${tenantSlug.value}/apps/pekan/savings`, icon: 'savings' },
   { name: 'Pengingat Tagihan', path: `/t/${tenantSlug.value}/apps/pekan/reminders`, icon: 'bell' },
-  { name: 'Master Data', path: `/t/${tenantSlug.value}/apps/pekan/master-data`, icon: 'folder' },
   { name: 'Pindai Struk OCR', path: `/t/${tenantSlug.value}/apps/pekan/receipt-scan`, icon: 'camera' },
   { name: 'Asisten AI', path: `/t/${tenantSlug.value}/assistant`, icon: 'chat' },
   { name: 'Laporan', path: `/t/${tenantSlug.value}/apps/pekan/reports`, icon: 'chart' },
@@ -217,8 +216,13 @@ function isCurrentRoute(path: string): boolean {
     <!-- Shell Body: Sidebar + Main Content -->
     <div :class="['flex-1 flex w-full', noPadding ? 'min-h-0 overflow-hidden' : '']">
       <!-- Desktop Sidebar -->
-      <aside :class="['hidden md:flex flex-col w-56 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0', noPadding ? 'h-full overflow-y-auto' : 'min-h-[calc(100vh-3.5rem)]']">
-        <div class="p-3 flex-1 flex flex-col gap-1">
+      <aside
+        :class="[
+          'hidden md:flex flex-col w-56 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 sticky top-14 h-[calc(100vh-3.5rem)] self-start z-20',
+          noPadding ? 'h-full' : ''
+        ]"
+      >
+        <div class="p-3 flex-1 flex flex-col gap-1 overflow-y-auto">
           <div class="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Navigasi {{ appName }}
           </div>
@@ -239,11 +243,11 @@ function isCurrentRoute(path: string): boolean {
         </div>
 
         <!-- Footer Workspace / Platform Status -->
-        <div v-if="appKey === 'admin'" class="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+        <div v-if="appKey === 'admin'" class="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
           <div class="font-semibold text-slate-800 dark:text-slate-200">Cakupan: Seluruh Platform</div>
           <div class="text-[10px] text-teal-700 dark:text-teal-400 font-bold uppercase mt-0.5">Hak: Super Administrator</div>
         </div>
-        <div v-else class="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+        <div v-else class="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
           <div>Ruang: {{ currentTenant.name }}</div>
           <div class="text-[10px] text-slate-400">Peran: {{ tenantRole }}</div>
         </div>

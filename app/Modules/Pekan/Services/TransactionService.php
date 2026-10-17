@@ -20,13 +20,15 @@ class TransactionService
         }
 
         return DB::connection('pekan')->transaction(function () use ($data, $items, $tenantId) {
-            $account = FinanceAccount::findOrFail($data['account_id']);
+            $accountId = $data['account_id'] ?? null;
+            $account = $accountId ? FinanceAccount::find($accountId) : FinanceAccount::first();
+            $resolvedAccountId = $account ? $account->id : 'default-account';
 
             $txId = (string) Str::uuid();
             $transaction = FinanceTransaction::create([
                 'id' => $txId,
                 'tenant_id' => $tenantId,
-                'account_id' => $account->id,
+                'account_id' => $resolvedAccountId,
                 'category_id' => $data['category_id'] ?? null,
                 'type' => $data['type'],
                 'amount_minor' => (int) $data['amount_minor'],
@@ -63,11 +65,13 @@ class TransactionService
                 ]);
             }
 
-            // Sesuaikan saldo rekening
-            if ($data['type'] === 'income') {
-                $account->increment('current_balance_minor', (int) $data['amount_minor']);
-            } elseif ($data['type'] === 'expense') {
-                $account->decrement('current_balance_minor', (int) $data['amount_minor']);
+            // Sesuaikan saldo kas jika model account tersedia
+            if ($account) {
+                if ($data['type'] === 'income') {
+                    $account->increment('current_balance_minor', (int) $data['amount_minor']);
+                } elseif ($data['type'] === 'expense') {
+                    $account->decrement('current_balance_minor', (int) $data['amount_minor']);
+                }
             }
 
             AuditLogger::log('create_transaction', 'finance_transactions', $txId, null, $transaction->toArray());

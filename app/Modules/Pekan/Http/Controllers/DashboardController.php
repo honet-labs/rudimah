@@ -31,7 +31,7 @@ class DashboardController
 
         $savingsMinor = (int) FinanceSavings::where('status', 'active')->sum('current_amount_minor');
 
-        $recentTransactions = FinanceTransaction::with(['account', 'category'])
+        $recentTransactions = FinanceTransaction::with(['category'])
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at')
             ->limit(5)
@@ -39,8 +39,6 @@ class DashboardController
             ->map(function ($tx) {
                 return [
                     'id' => $tx->id,
-                    'account_id' => $tx->account_id,
-                    'account_name' => $tx->account?->name ?? 'Kas Utama',
                     'category_name' => $tx->category?->name ?? 'Umum',
                     'type' => $tx->type,
                     'amount_minor' => $tx->amount_minor,
