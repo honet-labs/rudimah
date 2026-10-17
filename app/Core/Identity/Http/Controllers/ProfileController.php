@@ -5,6 +5,7 @@ namespace App\Core\Identity\Http\Controllers;
 use App\Core\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -23,6 +24,8 @@ class ProfileController
                 'has_mfa' => (bool) $user->mfaMethods()->where('is_verified', true)->exists(),
             ],
             'tenant' => $tenant,
+            'status' => session('status'),
+            'error' => session('error'),
         ]);
     }
 
@@ -37,5 +40,26 @@ class ProfileController
         ]);
 
         return back()->with('status', 'Profil berhasil diperbarui.');
+    }
+
+    public function updatePassword(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($validated['current_password'], $user->password)) {
+            return back()->withErrors([
+                'current_password' => 'Kata sandi saat ini yang Anda masukkan tidak cocok.',
+            ]);
+        }
+
+        $user->password = $validated['password'];
+        $user->save();
+
+        return back()->with('status', 'Kata sandi Anda berhasil diperbarui.');
     }
 }

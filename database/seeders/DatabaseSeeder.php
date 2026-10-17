@@ -24,11 +24,11 @@ class DatabaseSeeder extends Seeder
         if (!$admin->exists) {
             $admin->id = $adminId;
             $admin->full_name = 'Administrator RUDIMAH';
+            $admin->password = $adminPassword;
             $admin->is_active = true;
             $admin->is_super_admin = true;
+            $admin->save();
         }
-        $admin->password = Hash::make($adminPassword);
-        $admin->save();
 
         // 2. Buat Tenant Default
         $tenantId = (string) Str::uuid();

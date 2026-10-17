@@ -34,6 +34,8 @@ class AuthController
             'password' => 'required|string',
         ]);
 
+        $credentials['email'] = strtolower(trim($credentials['email']));
+
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
             $user = Auth::user();
@@ -62,12 +64,13 @@ class AuthController
             'password' => 'required|string|min:8|confirmed',
         ]);
 
+        $email = strtolower(trim($validated['email']));
         $userId = (string) Str::uuid();
         $user = User::create([
             'id' => $userId,
-            'email' => $validated['email'],
+            'email' => $email,
             'full_name' => $validated['name'],
-            'password' => Hash::make($validated['password']),
+            'password' => $validated['password'],
             'is_active' => true,
         ]);
 
@@ -220,12 +223,18 @@ class AuthController
             return back()->with('error', 'Pengguna dengan email tersebut tidak ditemukan.');
         }
 
-        $user->password = Hash::make($validated['password']);
+        $user->password = $validated['password'];
+        $user->setRememberToken(Str::random(60));
         $user->save();
 
         DB::connection('platform')
             ->table('password_reset_tokens')
             ->where('email', $email)
+            ->delete();
+
+        DB::connection('platform')
+            ->table('auth_sessions')
+            ->where('user_id', $user->id)
             ->delete();
 
         return redirect('/login')->with('status', 'Kata sandi berhasil diperbarui. Silakan masuk menggunakan kata sandi baru Anda.');

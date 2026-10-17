@@ -43,13 +43,33 @@ class User extends Authenticatable
         return $this->full_name ?? '';
     }
 
+    /**
+     * Mutator password aman: memastikan plain text selalu di-hash tepat satu kali,
+     * dan tidak melakukan hashing ulang jika nilai sudah berupa string hash yang valid.
+     */
+    public function setPasswordAttribute($value): void
+    {
+        if (empty($value)) {
+            return;
+        }
+
+        // Cek apakah nilai sudah berupa hash bcrypt ($2y$, $2a$, $2b$) atau argon ($argon2)
+        $isAlreadyHashed = is_string($value) && (
+            str_starts_with($value, '$2y$') ||
+            str_starts_with($value, '$2a$') ||
+            str_starts_with($value, '$2b$') ||
+            str_starts_with($value, '$argon2')
+        );
+
+        $this->attributes['password'] = $isAlreadyHashed ? $value : \Illuminate\Support\Facades\Hash::make($value);
+    }
+
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
             'is_super_admin' => 'boolean',
             'last_login_at' => 'datetime',
-            'password' => 'hashed',
         ];
     }
 

@@ -49,6 +49,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::get('/admin', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     Route::post('/admin/notifications', [AdminController::class, 'updateNotifications'])->name('admin.notifications.update');
     Route::post('/admin/notifications/test', [AdminController::class, 'testNotification'])->name('admin.notifications.test');

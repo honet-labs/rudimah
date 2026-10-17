@@ -8,11 +8,14 @@ import RdButton from '../design-system/RdButton.vue';
 import RdInput from '../design-system/RdInput.vue';
 import RdBadge from '../design-system/RdBadge.vue';
 import RdThemeToggle from '../design-system/RdThemeToggle.vue';
+import RdAlert from '../design-system/RdAlert.vue';
 import type { User, Tenant } from '../types/core';
 
 const props = defineProps<{
   user: User;
   tenant: Tenant;
+  status?: string;
+  error?: string;
 }>();
 
 const form = useForm({
@@ -22,15 +25,42 @@ const form = useForm({
 function submitProfile() {
   form.post('/profile');
 }
+
+const passwordForm = useForm({
+  current_password: '',
+  password: '',
+  password_confirmation: '',
+});
+
+function submitPassword() {
+  passwordForm.put('/profile/password', {
+    preserveScroll: true,
+    onSuccess: () => {
+      passwordForm.reset();
+    },
+  });
+}
 </script>
 
 <template>
   <RudimahAppShell :user="user" :tenant="tenant">
     <RdPageHeader
       title="Pengaturan Profil dan Keamanan"
-      description="Kelola informasi pribadi, sesi login, dan autentikasi multi-faktor (MFA)"
+      description="Kelola informasi pribadi, sesi login, pembaruan kata sandi, dan autentikasi multi-faktor (MFA)"
       :breadcrumbs="[{ label: 'Beranda', href: '/' }, { label: 'Profil' }]"
     />
+
+    <!-- Feedback Banner Notifikasi Sukses / Gagal -->
+    <div v-if="status" class="mb-6">
+      <RdAlert variant="success" title="Operasi Berhasil">
+        {{ status }}
+      </RdAlert>
+    </div>
+    <div v-if="error" class="mb-6">
+      <RdAlert variant="error" title="Perhatian / Kendala Sistem">
+        {{ error }}
+      </RdAlert>
+    </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- Informasi Akun -->
@@ -58,6 +88,50 @@ function submitProfile() {
           <div class="pt-2">
             <RdButton type="submit" variant="primary" size="sm" :loading="form.processing">
               Simpan Profil
+            </RdButton>
+          </div>
+        </form>
+      </RdCard>
+
+      <!-- Pembaruan Kata Sandi Akun -->
+      <RdCard title="Pembaruan Kata Sandi" description="Pastikan akun Anda menggunakan kata sandi yang kuat dan aman">
+        <form @submit.prevent="submitPassword" class="space-y-4">
+          <RdInput
+            id="current_password"
+            name="current_password"
+            v-model="passwordForm.current_password"
+            type="password"
+            label="Kata Sandi Saat Ini"
+            placeholder="Masukkan kata sandi lama"
+            :error="passwordForm.errors.current_password"
+            required
+          />
+
+          <RdInput
+            id="new_password"
+            name="password"
+            v-model="passwordForm.password"
+            type="password"
+            label="Kata Sandi Baru"
+            placeholder="Minimal 8 karakter"
+            :error="passwordForm.errors.password"
+            required
+          />
+
+          <RdInput
+            id="new_password_confirmation"
+            name="password_confirmation"
+            v-model="passwordForm.password_confirmation"
+            type="password"
+            label="Konfirmasi Kata Sandi Baru"
+            placeholder="Ulangi kata sandi baru"
+            :error="passwordForm.errors.password_confirmation"
+            required
+          />
+
+          <div class="pt-2">
+            <RdButton type="submit" variant="primary" size="sm" :loading="passwordForm.processing">
+              Perbarui Kata Sandi
             </RdButton>
           </div>
         </form>
