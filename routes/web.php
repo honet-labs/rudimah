@@ -22,6 +22,13 @@ use App\Modules\Pekan\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
 // Rute Publik & Tamu
+Route::get('/up', function () {
+    return response('OK', 200)->header('Content-Type', 'text/plain');
+});
+Route::get('/health', function () {
+    return response('OK', 200)->header('Content-Type', 'text/plain');
+});
+
 Route::get('/', function () {
     return auth()->check() ? redirect('/workspaces') : redirect('/login');
 });

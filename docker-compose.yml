@@ -80,10 +80,10 @@ services:
       - ./docker/mariadb/custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
       - ./docker/mariadb/init-dual-db.sh:/docker-entrypoint-initdb.d/init-dual-db.sh:ro
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "--silent"]
-      interval: 5s
+      test: ["CMD-SHELL", "mariadb-admin ping -p\"$${MYSQL_ROOT_PASSWORD:-mariadb_root_pass}\" --silent || mariadb-admin ping --silent"]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
     networks:
       - rudimah_network
 
