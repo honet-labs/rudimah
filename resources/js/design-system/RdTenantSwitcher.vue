@@ -28,9 +28,22 @@ function selectTenant(tenant: Tenant) {
 
 <template>
   <div class="relative inline-block text-left" v-if="currentTenant">
+    <!-- Backdrop untuk menutup dropdown saat klik di luar area -->
+    <div
+      v-if="isOpen"
+      class="fixed inset-0 z-40"
+      @click="isOpen = false"
+      aria-hidden="true"
+    ></div>
+
     <button
       type="button"
-      class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-700 cursor-pointer transition-colors"
+      :class="[
+        'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-all border relative',
+        isOpen
+          ? 'z-50 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white border-slate-400 dark:border-slate-600 ring-2 ring-teal-500/20 shadow-xs'
+          : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-700'
+      ]"
       @click="toggle"
       aria-haspopup="true"
       :aria-expanded="isOpen"
