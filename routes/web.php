@@ -6,6 +6,7 @@ use App\Core\Identity\Http\Controllers\AuthController;
 use App\Core\Identity\Http\Controllers\ProfileController;
 use App\Core\Identity\Http\Controllers\WorkspaceController;
 use App\Core\MFA\Http\Controllers\MfaController;
+use App\Core\MFA\Http\Middleware\EnsureMfaVerified;
 use App\Core\Tenancy\ResolveTenantMiddleware;
 use App\Modules\App1\Http\Controllers\App1Controller;
 use App\Modules\App2\Http\Controllers\App2Controller;
@@ -43,8 +44,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/mfa/verify', [MfaController::class, 'verify'])->name('mfa.verify');
 });
 
-// Rute Portal Utama RUDIMAH (Telah Login)
-Route::middleware('auth')->group(function () {
+// Rute Portal Utama RUDIMAH (Telah Login & Lolos Verifikasi MFA)
+Route::middleware(['auth', EnsureMfaVerified::class])->group(function () {
     Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');
     Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
@@ -60,7 +61,7 @@ Route::middleware('auth')->group(function () {
 });
 
 // Rute Terikat Ruang Kerja (Tenant Scoped: Asisten AI & Modul Aplikasi)
-Route::prefix('t/{tenantSlug}')->middleware(['auth', ResolveTenantMiddleware::class])->group(function () {
+Route::prefix('t/{tenantSlug}')->middleware(['auth', EnsureMfaVerified::class, ResolveTenantMiddleware::class])->group(function () {
     // Pengalihan cerdas jika pengguna mengakses akar URL ruang kerja
     Route::get('/', function (string $tenantSlug) {
         return redirect("/t/{$tenantSlug}/apps/pekan/dashboard");

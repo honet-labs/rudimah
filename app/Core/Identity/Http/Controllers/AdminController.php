@@ -116,7 +116,7 @@ class AdminController
             'mail.username' => 'nullable|string|max:255',
             'mail.password' => 'nullable|string|max:255',
             'mail.encryption' => 'nullable|string|in:tls,ssl,none',
-            'mail.from_address' => 'nullable|string|max:255',
+            'mail.from_address' => 'nullable|email|max:255',
             'mail.from_name' => 'nullable|string|max:255',
 
             'telegram' => 'nullable|array',
@@ -127,7 +127,7 @@ class AdminController
 
             'whatsapp' => 'nullable|array',
             'whatsapp.enabled' => 'nullable|boolean',
-            'whatsapp.waha_api_url' => 'nullable|string|max:255',
+            'whatsapp.waha_api_url' => 'nullable|url|max:255',
             'whatsapp.waha_api_key' => 'nullable|string|max:255',
             'whatsapp.waha_session' => 'nullable|string|max:100',
             'whatsapp.default_group' => 'nullable|string|max:255',

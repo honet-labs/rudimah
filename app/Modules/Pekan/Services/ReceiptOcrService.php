@@ -32,7 +32,8 @@ class ReceiptOcrService
         }
 
         $allowedMimes = config('rudimah.ocr.allowed_mimes', ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
-        if (!in_array($file->getClientMimeType(), $allowedMimes, true)) {
+        $mimeType = $file->getMimeType() ?: $file->getClientMimeType();
+        if (!in_array($mimeType, $allowedMimes, true)) {
             throw new \InvalidArgumentException('Tipe berkas tidak didukung untuk pemindaian OCR.');
         }
 
@@ -42,7 +43,6 @@ class ReceiptOcrService
 
         // Ekstraksi via AI Vision Provider
         $fileBase64 = base64_encode($file->getContent());
-        $mimeType = $file->getClientMimeType();
 
         try {
             $extractedDraft = $provider->extractReceipt($fileBase64, $mimeType, [

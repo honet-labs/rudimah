@@ -15,12 +15,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
         $middleware->redirectGuestsTo('/login');
         $middleware->redirectUsersTo('/workspaces');
-        $middleware->validateCsrfTokens(except: [
-            'login',
-            'forgot-password',
-            'reset-password',
-            'reset-password/*',
-        ]);
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);

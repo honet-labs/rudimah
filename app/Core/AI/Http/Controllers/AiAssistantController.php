@@ -237,7 +237,7 @@ class AiAssistantController
         $validated = $request->validate([
             'provider' => 'required|string|in:gemini,openai,hermes,openclaw,mock',
             'model' => 'required|string|max:100',
-            'api_endpoint' => 'nullable|string|max:255',
+            'api_endpoint' => 'nullable|url|max:255',
             'api_key' => 'nullable|string|max:255',
             'system_instructions' => 'nullable|string|max:2000',
             'is_enabled' => 'required|boolean',

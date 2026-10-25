@@ -42,8 +42,17 @@ class AuthController
 
             // Cek apakah user wajib MFA
             if ($user->mfaMethods()->where('is_verified', true)->exists()) {
+                $request->session()->forget('mfa_verified');
+                $request->session()->put('mfa_required', true);
+
+                $firstMethod = $user->mfaMethods()->where('is_verified', true)->first();
+                $request->session()->put('mfa_challenge_type', $firstMethod?->method_type ?: 'totp');
+
                 return redirect()->route('mfa.challenge');
             }
+
+            $request->session()->put('mfa_verified', true);
+            $request->session()->forget('mfa_required');
 
             return redirect()->intended('/workspaces');
         }
@@ -96,6 +105,7 @@ class AuthController
         ]);
 
         Auth::login($user);
+        $request->session()->put('mfa_verified', true);
 
         return redirect("/t/{$tenant->slug}/apps/pekan/dashboard");
     }
@@ -158,7 +168,11 @@ class AuthController
 
             $resetUrl = url("/reset-password/{$token}?email=" . urlencode($email));
 
-            Log::info("[RUDIMAH] Tautan pemulihan kata sandi untuk {$email}: {$resetUrl}");
+            if (app()->environment('local', 'testing')) {
+                Log::info("[RUDIMAH] [DEV ONLY] Tautan pemulihan kata sandi untuk {$email}: {$resetUrl}");
+            } else {
+                Log::info("[RUDIMAH] Permintaan tautan pemulihan kata sandi dibuat untuk {$email}.");
+            }
 
             try {
                 Mail::raw(
