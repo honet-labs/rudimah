@@ -5,7 +5,6 @@ namespace App\Modules\Pekan\Http\Controllers;
 use App\Core\Applications\AppRegistry;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Services\ReceiptOcrService;
-use App\Modules\Pekan\Services\TransactionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,8 +13,7 @@ use Inertia\Response;
 class ReceiptScanController
 {
     public function __construct(
-        protected ReceiptOcrService $ocrService,
-        protected TransactionService $transactionService
+        protected ReceiptOcrService $ocrService
     ) {}
 
     public function index(Request $request): Response

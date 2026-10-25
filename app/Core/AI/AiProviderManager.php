@@ -14,11 +14,6 @@ use App\Core\Tenancy\TenantContext;
 class AiProviderManager
 {
     /**
-     * @var array<string, AiProviderInterface>
-     */
-    protected array $providers = [];
-
-    /**
      * Resolves an AI Provider based on tenant setting or explicit name.
      */
     public function resolve(?string $providerName = null, ?TenantAiSetting $tenantSetting = null): AiProviderInterface

@@ -4,7 +4,6 @@ namespace App\Core\MFA;
 
 use App\Core\Identity\Models\User;
 use App\Core\MFA\Models\MfaChallenge;
-use App\Core\MFA\Models\MfaMethod;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
 

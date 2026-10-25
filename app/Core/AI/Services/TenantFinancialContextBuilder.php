@@ -36,8 +36,9 @@ class TenantFinancialContextBuilder
 
         $budgetsSummary = [];
         foreach ($budgets as $b) {
-            $pct = $b->limit_amount_minor > 0 ? round(($b->spent_amount_minor / $b->limit_amount_minor) * 100) : 0;
-            $budgetsSummary[] = "- Kategori ID {$b->category_id}: limit " . MoneyHelper::formatIdr($b->limit_amount_minor) . ", terpakai " . MoneyHelper::formatIdr($b->spent_amount_minor) . " ({$pct}%)";
+            $pct = $b->amount_limit_minor > 0 ? round(($b->spent_amount_minor / $b->amount_limit_minor) * 100) : 0;
+            $budgetName = $b->name ?: "Kategori ID {$b->category_id}";
+            $budgetsSummary[] = "- {$budgetName}: limit " . MoneyHelper::formatIdr($b->amount_limit_minor) . ", terpakai " . MoneyHelper::formatIdr($b->spent_amount_minor) . " ({$pct}%)";
         }
 
         // 3. Tabungan Aktif
