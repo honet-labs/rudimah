@@ -29,7 +29,10 @@ Route::get('/health', function () {
     return response('OK', 200)->header('Content-Type', 'text/plain');
 });
 
-Route::get('/', function () {
+Route::match(['get', 'head'], '/', function (\Illuminate\Http\Request $request) {
+    if ($request->isMethod('head')) {
+        return response('', 200);
+    }
     return auth()->check() ? redirect('/workspaces') : redirect('/login');
 });
 
