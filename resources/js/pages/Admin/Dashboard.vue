@@ -65,6 +65,26 @@ interface NotificationSettingsProp {
   };
 }
 
+interface AiProviderDetail {
+  name: string;
+  api_key?: string;
+  has_api_key: boolean;
+  api_endpoint: string;
+  model: string;
+  is_configured: boolean;
+}
+
+interface AiSettingsProp {
+  active_provider: string;
+  is_enabled: boolean;
+  providers: {
+    gemini: AiProviderDetail;
+    openai: AiProviderDetail;
+    claude: AiProviderDetail;
+    '9router': AiProviderDetail;
+  };
+}
+
 const props = defineProps<{
   user: User;
   tenant?: Tenant | null;
@@ -77,6 +97,7 @@ const props = defineProps<{
     redisConnected: boolean;
     appVersion: string;
   };
+  aiSettings?: AiSettingsProp;
   notificationSettings?: NotificationSettingsProp;
   tenantsList?: AdminTenantItem[];
   usersList?: AdminUserItem[];
@@ -170,6 +191,81 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       if (channel === 'mail') showTestEmailModal.value = false;
       if (channel === 'whatsapp') showTestWaModal.value = false;
       if (channel === 'telegram') showTestTelegramModal.value = false;
+    },
+  });
+}
+
+// Manajemen Konfigurasi AI Platform
+const activeAiTab = ref<'gemini' | 'openai' | 'claude' | '9router'>(
+  (props.aiSettings?.active_provider as 'gemini' | 'openai' | 'claude' | '9router') || 'gemini'
+);
+const isAiSaving = ref(false);
+const isAiTesting = ref(false);
+const showTestAiModal = ref(false);
+const testAiProvider = ref<'gemini' | 'openai' | 'claude' | '9router'>(activeAiTab.value);
+
+const aiProviderOptions = [
+  { label: 'Google Gemini (Direkomendasikan)', value: 'gemini' },
+  { label: 'OpenAI ChatGPT (GPT-4o / GPT-4o-mini)', value: 'openai' },
+  { label: 'Anthropic Claude (Claude 3.5 Sonnet / Haiku)', value: 'claude' },
+  { label: '9Router AI Gateway (Multi-Model Gateway)', value: '9router' },
+];
+
+const aiForm = ref({
+  active_provider: props.aiSettings?.active_provider || 'gemini',
+  is_enabled: props.aiSettings?.is_enabled ?? true,
+  gemini: {
+    api_endpoint: props.aiSettings?.providers?.gemini?.api_endpoint || 'https://generativelanguage.googleapis.com',
+    api_key: '',
+    model: props.aiSettings?.providers?.gemini?.model || 'gemini-1.5-flash',
+  },
+  openai: {
+    api_endpoint: props.aiSettings?.providers?.openai?.api_endpoint || 'https://api.openai.com/v1',
+    api_key: '',
+    model: props.aiSettings?.providers?.openai?.model || 'gpt-4o-mini',
+  },
+  claude: {
+    api_endpoint: props.aiSettings?.providers?.claude?.api_endpoint || 'https://api.anthropic.com/v1',
+    api_key: '',
+    model: props.aiSettings?.providers?.claude?.model || 'claude-3-5-sonnet-20241022',
+  },
+  '9router': {
+    api_endpoint: props.aiSettings?.providers?.['9router']?.api_endpoint || 'https://api.9router.com/v1',
+    api_key: '',
+    model: props.aiSettings?.providers?.['9router']?.model || 'gpt-4o-mini',
+  },
+});
+
+function saveAiSettings() {
+  isAiSaving.value = true;
+  router.post('/admin/ai', aiForm.value, {
+    preserveScroll: true,
+    onFinish: () => {
+      isAiSaving.value = false;
+    },
+  });
+}
+
+function openAiTestModal(provider: 'gemini' | 'openai' | 'claude' | '9router') {
+  testAiProvider.value = provider;
+  showTestAiModal.value = true;
+}
+
+function runAiTest() {
+  isAiTesting.value = true;
+  const target = testAiProvider.value;
+  const cfg = aiForm.value[target];
+
+  router.post('/admin/ai/test', {
+    provider: target,
+    api_endpoint: cfg.api_endpoint,
+    api_key: cfg.api_key || undefined,
+    model: cfg.model,
+  }, {
+    preserveScroll: true,
+    onFinish: () => {
+      isAiTesting.value = false;
+      showTestAiModal.value = false;
     },
   });
 }
@@ -355,7 +451,348 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
       </RdCard>
     </div>
 
-    <!-- Seksi 4: Panel Konfigurasi Notifikasi Seluruh Ruang Kerja -->
+    <!-- Seksi 4: Konfigurasi Penyedia AI Platform (Gemini, OpenAI, Claude, 9Router) -->
+    <div id="ai-settings" class="mb-6">
+      <RdCard
+        title="Pusat Konfigurasi Penyedia AI Platform"
+        description="Atur kecerdasan buatan terpusat untuk Asisten Keuangan, Ekstraksi Struk OCR, dan Analisis Cerdas di seluruh ruang kerja RUDIMAH (Google Gemini, OpenAI, Anthropic Claude, 9Router Gateway)"
+      >
+        <!-- Ringkasan Status Penyedia AI -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <div
+            v-for="(prov, provKey) in props.aiSettings?.providers"
+            :key="provKey"
+            :class="[
+              'p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer',
+              aiForm.active_provider === provKey
+                ? 'border-teal-600 bg-teal-50/50 dark:bg-teal-950/20 shadow-sm'
+                : 'border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 hover:border-slate-300'
+            ]"
+            @click="activeAiTab = provKey as any"
+          >
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white truncate">
+                {{ prov.name }}
+              </span>
+              <RdBadge v-if="aiForm.active_provider === provKey" variant="info" class="shrink-0 text-[10px]">
+                Aktif
+              </RdBadge>
+            </div>
+            <p class="text-[11px] text-slate-500 font-mono truncate mb-2">
+              {{ prov.model || '-' }}
+            </p>
+            <div class="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-800">
+              <span class="text-[10px] text-slate-400">Status Kunci:</span>
+              <RdBadge :variant="prov.is_configured ? 'success' : 'neutral'" class="text-[10px]">
+                {{ prov.is_configured ? 'Tersedia' : 'Belum Ada' }}
+              </RdBadge>
+            </div>
+          </div>
+        </div>
+
+        <form @submit.prevent="saveAiSettings">
+          <!-- Opsi Global AI Platform -->
+          <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 mb-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <RdCheckbox
+                v-model="aiForm.is_enabled"
+                label="Aktifkan Layanan Kecerdasan Buatan (AI) Global"
+                description="Izinkan fitur asisten chat cerdas dan ekstraksi bukti transaksi otomatis di seluruh ruang kerja"
+              />
+              <RdButton
+                type="button"
+                variant="outline"
+                size="sm"
+                class="w-full sm:w-auto shrink-0"
+                :disabled="isAiTesting"
+                @click="openAiTestModal(aiForm.active_provider as any)"
+              >
+                <span v-if="isAiTesting">Menguji Koneksi...</span>
+                <span v-else>Uji Koneksi AI Aktif</span>
+              </RdButton>
+            </div>
+
+            <div class="max-w-md pt-2">
+              <RdSelect
+                v-model="aiForm.active_provider"
+                label="Penyedia AI Default Platform"
+                :options="aiProviderOptions"
+                hint="Penyedia default yang otomatis digunakan oleh asisten jika ruang kerja tidak menentukan kunci mandiri"
+              />
+            </div>
+          </div>
+
+          <!-- Navigasi Tab Pengaturan Tiap Penyedia AI -->
+          <div class="border-b border-slate-200 dark:border-slate-800 mb-6 flex gap-1 sm:gap-2 overflow-x-auto pb-1 -mb-px">
+            <button
+              type="button"
+              :class="[
+                'px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 sm:gap-2 shrink-0 cursor-pointer',
+                activeAiTab === 'gemini'
+                  ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ]"
+              @click="activeAiTab = 'gemini'"
+            >
+              <span>Google Gemini</span>
+              <span v-if="props.aiSettings?.providers?.gemini?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+            </button>
+
+            <button
+              type="button"
+              :class="[
+                'px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 sm:gap-2 shrink-0 cursor-pointer',
+                activeAiTab === 'openai'
+                  ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ]"
+              @click="activeAiTab = 'openai'"
+            >
+              <span>OpenAI ChatGPT</span>
+              <span v-if="props.aiSettings?.providers?.openai?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+            </button>
+
+            <button
+              type="button"
+              :class="[
+                'px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 sm:gap-2 shrink-0 cursor-pointer',
+                activeAiTab === 'claude'
+                  ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ]"
+              @click="activeAiTab = 'claude'"
+            >
+              <span>Anthropic Claude</span>
+              <span v-if="props.aiSettings?.providers?.claude?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+            </button>
+
+            <button
+              type="button"
+              :class="[
+                'px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 sm:gap-2 shrink-0 cursor-pointer',
+                activeAiTab === '9router'
+                  ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ]"
+              @click="activeAiTab = '9router'"
+            >
+              <span>9Router AI Gateway</span>
+              <span v-if="props.aiSettings?.providers?.['9router']?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+            </button>
+          </div>
+
+          <!-- TAB 1: GOOGLE GEMINI -->
+          <div v-show="activeAiTab === 'gemini'" class="space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan Google Gemini</h4>
+                <p class="text-xs text-slate-500">Integrasi resmi model Gemini Flash & Gemini Pro dari Google AI Studio</p>
+              </div>
+              <RdButton
+                type="button"
+                variant="outline"
+                size="sm"
+                class="w-full sm:w-auto"
+                :disabled="isAiTesting || (!aiForm.gemini.api_key && !props.aiSettings?.providers?.gemini?.has_api_key)"
+                @click="openAiTestModal('gemini')"
+              >
+                Uji Koneksi Gemini
+              </RdButton>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div class="md:col-span-2">
+                <RdInput
+                  v-model="aiForm.gemini.api_endpoint"
+                  label="URL Endpoint API Google Gemini"
+                  placeholder="https://generativelanguage.googleapis.com"
+                  hint="Endpoint REST API resmi Google Gemini atau reverse proxy"
+                  required
+                />
+              </div>
+
+              <RdInput
+                v-model="aiForm.gemini.api_key"
+                label="API Key Google Gemini"
+                type="password"
+                :placeholder="props.aiSettings?.providers?.gemini?.has_api_key ? '•••••••• (Tersimpan - isi hanya jika ingin mengganti)' : 'Contoh: AIzaSy...'"
+                :hint="props.aiSettings?.providers?.gemini?.has_api_key ? 'Kunci tersimpan aman dan terenkripsi di basis data platform.' : 'Dapatkan token otentikasi dari Google AI Studio (aistudio.google.com)'"
+              />
+
+              <RdInput
+                v-model="aiForm.gemini.model"
+                label="Model Default Gemini"
+                placeholder="gemini-1.5-flash"
+                hint="Nama model Gemini (contoh: gemini-1.5-flash, gemini-1.5-pro)"
+                required
+              />
+            </div>
+          </div>
+
+          <!-- TAB 2: OPENAI CHATGPT -->
+          <div v-show="activeAiTab === 'openai'" class="space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan OpenAI ChatGPT</h4>
+                <p class="text-xs text-slate-500">Integrasi model OpenAI GPT-4o, GPT-4o-mini, atau gateway kompatibel</p>
+              </div>
+              <RdButton
+                type="button"
+                variant="outline"
+                size="sm"
+                class="w-full sm:w-auto"
+                :disabled="isAiTesting || (!aiForm.openai.api_key && !props.aiSettings?.providers?.openai?.has_api_key)"
+                @click="openAiTestModal('openai')"
+              >
+                Uji Koneksi OpenAI
+              </RdButton>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div class="md:col-span-2">
+                <RdInput
+                  v-model="aiForm.openai.api_endpoint"
+                  label="URL Endpoint API OpenAI"
+                  placeholder="https://api.openai.com/v1"
+                  hint="Endpoint REST API OpenAI v1 atau proxy gateway yang kompatibel"
+                  required
+                />
+              </div>
+
+              <RdInput
+                v-model="aiForm.openai.api_key"
+                label="API Key / Token OpenAI"
+                type="password"
+                :placeholder="props.aiSettings?.providers?.openai?.has_api_key ? '•••••••• (Tersimpan - isi hanya jika ingin mengganti)' : 'Contoh: sk-proj-...'"
+                :hint="props.aiSettings?.providers?.openai?.has_api_key ? 'Kunci tersimpan aman dan terenkripsi di basis data platform.' : 'Dapatkan API key dari platform.openai.com/api-keys'"
+              />
+
+              <RdInput
+                v-model="aiForm.openai.model"
+                label="Model Default OpenAI"
+                placeholder="gpt-4o-mini"
+                hint="Nama model OpenAI (contoh: gpt-4o-mini, gpt-4o, gpt-3.5-turbo)"
+                required
+              />
+            </div>
+          </div>
+
+          <!-- TAB 3: ANTHROPIC CLAUDE -->
+          <div v-show="activeAiTab === 'claude'" class="space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan Anthropic Claude</h4>
+                <p class="text-xs text-slate-500">Integrasi model Claude 3.5 Sonnet, Claude 3 Opus, dan Claude 3.5 Haiku</p>
+              </div>
+              <RdButton
+                type="button"
+                variant="outline"
+                size="sm"
+                class="w-full sm:w-auto"
+                :disabled="isAiTesting || (!aiForm.claude.api_key && !props.aiSettings?.providers?.claude?.has_api_key)"
+                @click="openAiTestModal('claude')"
+              >
+                Uji Koneksi Claude
+              </RdButton>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div class="md:col-span-2">
+                <RdInput
+                  v-model="aiForm.claude.api_endpoint"
+                  label="URL Endpoint API Claude"
+                  placeholder="https://api.anthropic.com/v1"
+                  hint="Endpoint REST API Anthropic Claude v1"
+                  required
+                />
+              </div>
+
+              <RdInput
+                v-model="aiForm.claude.api_key"
+                label="API Key / Token Anthropic"
+                type="password"
+                :placeholder="props.aiSettings?.providers?.claude?.has_api_key ? '•••••••• (Tersimpan - isi hanya jika ingin mengganti)' : 'Contoh: sk-ant-api03-...'"
+                :hint="props.aiSettings?.providers?.claude?.has_api_key ? 'Kunci tersimpan aman dan terenkripsi di basis data platform.' : 'Dapatkan token otentikasi dari console.anthropic.com'"
+              />
+
+              <RdInput
+                v-model="aiForm.claude.model"
+                label="Model Default Claude"
+                placeholder="claude-3-5-sonnet-20241022"
+                hint="Nama model Claude (contoh: claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022)"
+                required
+              />
+            </div>
+          </div>
+
+          <!-- TAB 4: 9ROUTER AI GATEWAY -->
+          <div v-show="activeAiTab === '9router'" class="space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan 9Router AI Gateway</h4>
+                <p class="text-xs text-slate-500">Integrasi gateway terpadu multi-penyedia AI dengan protokol kompatibel OpenAI</p>
+              </div>
+              <RdButton
+                type="button"
+                variant="outline"
+                size="sm"
+                class="w-full sm:w-auto"
+                :disabled="isAiTesting || (!aiForm['9router'].api_key && !props.aiSettings?.providers?.['9router']?.has_api_key)"
+                @click="openAiTestModal('9router')"
+              >
+                Uji Koneksi 9Router
+              </RdButton>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div class="md:col-span-2">
+                <RdInput
+                  v-model="aiForm['9router'].api_endpoint"
+                  label="URL Endpoint API 9Router Gateway"
+                  placeholder="https://api.9router.com/v1"
+                  hint="Endpoint REST API server 9Router Gateway (misal: https://api.9router.com/v1 atau server mandiri)"
+                  required
+                />
+              </div>
+
+              <RdInput
+                v-model="aiForm['9router'].api_key"
+                label="Token Akses / API Key 9Router"
+                type="password"
+                :placeholder="props.aiSettings?.providers?.['9router']?.has_api_key ? '•••••••• (Tersimpan - isi hanya jika ingin mengganti)' : 'Masukkan token akses 9Router'"
+                :hint="props.aiSettings?.providers?.['9router']?.has_api_key ? 'Token tersimpan aman dan terenkripsi di basis data platform.' : 'Dapatkan token otentikasi dari panel 9Router'"
+              />
+
+              <RdInput
+                v-model="aiForm['9router'].model"
+                label="Model Default 9Router"
+                placeholder="gpt-4o-mini"
+                hint="Nama model tujuan di 9Router (misal: gpt-4o-mini, claude-3-5-sonnet, gemini-1.5-flash)"
+                required
+              />
+            </div>
+          </div>
+
+          <!-- Aksi Simpan AI Platform -->
+          <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p class="text-xs text-slate-500 text-center sm:text-left">
+              Konfigurasi ini berlaku instan ke seluruh modul PEKAN dan asisten AI tanpa perlu restart kontainer.
+            </p>
+            <RdButton
+              type="submit"
+              variant="primary"
+              :disabled="isAiSaving"
+              class="w-full sm:w-auto shrink-0"
+            >
+              <span v-if="isAiSaving">Menyimpan Konfigurasi AI...</span>
+              <span v-else>Simpan Konfigurasi AI Platform</span>
+            </RdButton>
+          </div>
+        </form>
+      </RdCard>
+    </div>
+
+    <!-- Seksi 5: Panel Konfigurasi Notifikasi Seluruh Ruang Kerja -->
     <div id="notifications" class="mb-8">
       <RdCard
         title="Pusat Konfigurasi Saluran Notifikasi & Push Grup (Platform-Wide)"
@@ -808,6 +1245,51 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
           >
             <span v-if="isTesting">Menguji Telegram...</span>
             <span v-else>Jalankan Pengujian</span>
+          </RdButton>
+        </div>
+      </template>
+    </RdModal>
+
+    <!-- MODAL: UJI KONEKSI AI PLATFORM -->
+    <RdModal
+      v-model="showTestAiModal"
+      title="Uji Konektivitas Penyedia AI"
+      description="Lakukan permintaan ping verifikasi ke endpoint dan token otentikasi penyedia AI terpilih"
+      max-width="md"
+    >
+      <div class="space-y-3 py-2">
+        <div class="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-xs text-slate-600 dark:text-slate-300">
+          <div class="font-semibold text-slate-900 dark:text-white mb-1">
+            Penyedia yang Diuji: {{ testAiProvider.toUpperCase() }}
+          </div>
+          <div>Endpoint: <span class="font-mono text-[11px]">{{ aiForm[testAiProvider]?.api_endpoint }}</span></div>
+          <div>Model: <span class="font-mono text-[11px]">{{ aiForm[testAiProvider]?.model }}</span></div>
+        </div>
+        <p class="text-xs text-slate-500">
+          Sistem akan mengirimkan permintaan verifikasi ke endpoint AI di atas untuk memastikan otentikasi kunci API dan keterjangkauan layanan berfungsi dengan baik.
+        </p>
+      </div>
+
+      <template #footer>
+        <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 w-full">
+          <RdButton
+            variant="outline"
+            size="sm"
+            class="w-full sm:w-auto"
+            :disabled="isAiTesting"
+            @click="showTestAiModal = false"
+          >
+            Batal
+          </RdButton>
+          <RdButton
+            variant="primary"
+            size="sm"
+            class="w-full sm:w-auto"
+            :disabled="isAiTesting"
+            @click="runAiTest"
+          >
+            <span v-if="isAiTesting">Menguji Koneksi...</span>
+            <span v-else>Jalankan Uji Koneksi</span>
           </RdButton>
         </div>
       </template>

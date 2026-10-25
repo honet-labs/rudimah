@@ -159,8 +159,7 @@ if [ "$NON_INTERACTIVE" = false ] && [ -z "$CONFIG_FILE" ]; then
     read -rp "Email administrator utama [default: ${DEFAULT_ADMIN_EMAIL}]: " input_admin_email
     ADMIN_EMAIL="${input_admin_email:-$DEFAULT_ADMIN_EMAIL}"
 
-    read -rp "Penyedia AI default (gemini/openai/hermes/openclaw/mock) [default: ${DEFAULT_AI}]: " input_ai
-    AI_PROVIDER="${input_ai:-$DEFAULT_AI}"
+    AI_PROVIDER="${EXISTING_AI:-gemini}"
 else
     APP_PORT="${APP_PORT:-$DEFAULT_HTTP}"
     HTTPS_PORT="${HTTPS_PORT:-$DEFAULT_HTTPS}"
@@ -204,7 +203,6 @@ echo "    - Platform Database   : $DB_PLATFORM_NAME"
 echo "    - PEKAN Database      : $DB_PEKAN_NAME"
 echo "    - Database User       : $DB_USER"
 echo "    - Akun Administrator  : $ADMIN_EMAIL"
-echo "    - Default AI Provider : $AI_PROVIDER"
 echo ""
 
 if [ "$DRY_RUN" = true ]; then

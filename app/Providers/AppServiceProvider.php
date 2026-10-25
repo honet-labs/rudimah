@@ -32,5 +32,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Terapkan konfigurasi notifikasi global dari basis data sistem
         \App\Core\Notifications\Services\PlatformNotificationService::applyRuntimeConfig();
+
+        // Terapkan konfigurasi penyedia AI platform global dari basis data sistem
+        \App\Core\AI\Services\PlatformAiService::applyRuntimeConfig();
     }
 }

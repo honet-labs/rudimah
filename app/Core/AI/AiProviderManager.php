@@ -4,9 +4,11 @@ namespace App\Core\AI;
 
 use App\Core\AI\Contracts\AiProviderInterface;
 use App\Core\AI\Models\TenantAiSetting;
+use App\Core\AI\Providers\ClaudeProvider;
 use App\Core\AI\Providers\GeminiProvider;
 use App\Core\AI\Providers\HermesProvider;
 use App\Core\AI\Providers\LocalMockProvider;
+use App\Core\AI\Providers\NineRouterProvider;
 use App\Core\AI\Providers\OpenAiProvider;
 use App\Core\AI\Providers\OpenClawProvider;
 use App\Core\Tenancy\TenantContext;
@@ -34,6 +36,8 @@ class AiProviderManager
         return match (strtolower($provider)) {
             'gemini' => new GeminiProvider($apiKey, $defaultModel ?: 'gemini-1.5-flash'),
             'openai' => new OpenAiProvider($apiKey, $defaultModel ?: 'gpt-4o-mini', $endpoint),
+            'claude' => new ClaudeProvider($apiKey, $defaultModel ?: 'claude-3-5-sonnet-20241022', $endpoint),
+            '9router', 'ninerouter' => new NineRouterProvider($apiKey, $defaultModel ?: 'gpt-4o-mini', $endpoint),
             'hermes' => new HermesProvider($apiKey, $defaultModel ?: 'hermes-3-llama-3.1-8b', $endpoint),
             'openclaw' => new OpenClawProvider($apiKey, $defaultModel ?: 'openclaw-agent-v1', $endpoint),
             'mock', 'local' => new LocalMockProvider(),

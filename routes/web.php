@@ -54,6 +54,8 @@ Route::middleware(['auth', EnsureMfaVerified::class])->group(function () {
     Route::get('/admin', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     Route::post('/admin/notifications', [AdminController::class, 'updateNotifications'])->name('admin.notifications.update');
     Route::post('/admin/notifications/test', [AdminController::class, 'testNotification'])->name('admin.notifications.test');
+    Route::post('/admin/ai', [AdminController::class, 'updateAi'])->name('admin.ai.update');
+    Route::post('/admin/ai/test', [AdminController::class, 'testAi'])->name('admin.ai.test');
 
     // Peluncur Cerdas Aplikasi Global (Mencegah 404 ketika diakses tanpa slug tenant spesifik)
     Route::get('/apps', [WorkspaceController::class, 'launchApp'])->name('apps.index');

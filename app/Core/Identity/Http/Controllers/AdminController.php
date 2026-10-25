@@ -2,6 +2,7 @@
 
 namespace App\Core\Identity\Http\Controllers;
 
+use App\Core\AI\Services\PlatformAiService;
 use App\Core\Applications\AppRegistry;
 use App\Core\Identity\Models\User;
 use App\Core\Notifications\Services\PlatformNotificationService;
@@ -47,6 +48,7 @@ class AdminController
 
         $appsList = AppRegistry::all();
         $notificationSettings = PlatformNotificationService::getSettings();
+        $aiSettings = PlatformAiService::getSettings();
 
         // Resolve ruang kerja aktif/default bagi admin untuk navigasi aplikasi yang valid
         $defaultTenant = null;
@@ -92,6 +94,7 @@ class AdminController
                 'appVersion' => '1.0.0-rudimah',
             ],
             'notificationSettings' => $notificationSettings,
+            'aiSettings' => $aiSettings,
             'tenantsList' => $tenantsList,
             'usersList' => $usersList,
             'appsList' => $appsList,
@@ -164,6 +167,76 @@ class AdminController
         } else {
             $res = PlatformNotificationService::testWhatsApp($target);
         }
+
+        if ($res['success']) {
+            return back()->with('status', $res['message']);
+        }
+
+        return back()->with('error', $res['message']);
+    }
+
+    /**
+     * Simpan konfigurasi penyedia AI terpusat platform (Gemini, OpenAI, Claude, 9Router).
+     */
+    public function updateAi(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (!$user->is_super_admin) {
+            abort(403, 'Hanya Administrator Platform yang memiliki izin mengubah konfigurasi AI.');
+        }
+
+        $validated = $request->validate([
+            'active_provider' => 'required|string|in:gemini,openai,claude,9router',
+            'is_enabled' => 'nullable|boolean',
+            'gemini' => 'nullable|array',
+            'gemini.api_key' => 'nullable|string|max:255',
+            'gemini.api_endpoint' => 'nullable|string|max:255',
+            'gemini.model' => 'nullable|string|max:100',
+
+            'openai' => 'nullable|array',
+            'openai.api_key' => 'nullable|string|max:255',
+            'openai.api_endpoint' => 'nullable|string|max:255',
+            'openai.model' => 'nullable|string|max:100',
+
+            'claude' => 'nullable|array',
+            'claude.api_key' => 'nullable|string|max:255',
+            'claude.api_endpoint' => 'nullable|string|max:255',
+            'claude.model' => 'nullable|string|max:100',
+
+            '9router' => 'nullable|array',
+            '9router.api_key' => 'nullable|string|max:255',
+            '9router.api_endpoint' => 'nullable|string|max:255',
+            '9router.model' => 'nullable|string|max:100',
+        ]);
+
+        PlatformAiService::saveSettings($validated);
+
+        return back()->with('status', 'Konfigurasi Penyedia AI Platform berhasil disimpan dan diterapkan untuk seluruh ruang kerja.');
+    }
+
+    /**
+     * Uji coba koneksi ke penyedia AI platform terpilih.
+     */
+    public function testAi(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (!$user->is_super_admin) {
+            abort(403, 'Hanya Administrator Platform yang memiliki izin menguji koneksi AI.');
+        }
+
+        $validated = $request->validate([
+            'provider' => 'required|string|in:gemini,openai,claude,9router',
+            'api_endpoint' => 'nullable|string|max:255',
+            'api_key' => 'nullable|string|max:255',
+            'model' => 'nullable|string|max:100',
+        ]);
+
+        $res = PlatformAiService::testConnection(
+            $validated['provider'],
+            $validated['api_endpoint'] ?? null,
+            $validated['api_key'] ?? null,
+            $validated['model'] ?? null
+        );
 
         if ($res['success']) {
             return back()->with('status', $res['message']);

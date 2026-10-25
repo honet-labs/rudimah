@@ -35,6 +35,15 @@ class TenantAiAssistantSecurityTest extends TestCase
 
         $mock = $manager->resolve('mock');
         $this->assertEquals('mock', $mock->getName());
+
+        $claude = $manager->resolve('claude');
+        $this->assertEquals('claude', $claude->getName());
+
+        $nineRouter = $manager->resolve('9router');
+        $this->assertEquals('9router', $nineRouter->getName());
+
+        $nineRouterAlias = $manager->resolve('ninerouter');
+        $this->assertEquals('9router', $nineRouterAlias->getName());
     }
 
     public function test_ai_financial_context_strictly_contains_only_current_tenant_data(): void
