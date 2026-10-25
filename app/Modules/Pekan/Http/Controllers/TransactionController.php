@@ -46,7 +46,7 @@ class TransactionController
                 'has_mfa' => (bool) $user->mfaMethods()->where('is_verified', true)->exists(),
             ] : null,
             'tenant' => $tenant,
-            'tenants' => $user ? $user->memberships()->with('tenant')->get()->pluck('tenant') : [],
+            'tenants' => $user ? $user->getActiveTenants() : [],
             'apps' => AppRegistry::all(),
             'transactions' => $transactions->items(),
             'totalCount' => $transactions->total(),
@@ -60,11 +60,7 @@ class TransactionController
 
         $categories = FinanceCategory::where('is_active', true)->get();
 
-        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
-            $t = $m->tenant;
-            if ($t) $t->role = $m->role;
-            return $t;
-        })->filter()->values() : [];
+        $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('Pekan/Transactions/Create', [
             'user' => $user ? [
@@ -117,11 +113,7 @@ class TransactionController
         $transaction = FinanceTransaction::with(['category', 'items', 'attachments'])
             ->findOrFail($id);
 
-        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
-            $t = $m->tenant;
-            if ($t) $t->role = $m->role;
-            return $t;
-        })->filter()->values() : [];
+        $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('Pekan/Transactions/Detail', [
             'user' => $user ? [

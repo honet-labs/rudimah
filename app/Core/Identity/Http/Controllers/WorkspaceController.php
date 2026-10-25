@@ -15,13 +15,7 @@ class WorkspaceController
     public function index(Request $request): Response
     {
         $user = $request->user();
-        $memberships = $user->memberships()->with('tenant')->get();
-
-        $tenants = $memberships->map(function ($m) {
-            $t = $m->tenant;
-            $t->role = $m->role;
-            return $t;
-        });
+        $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('WorkspaceSelector', [
             'user' => [
@@ -72,30 +66,41 @@ class WorkspaceController
 
     /**
      * Peluncur cerdas akses modul aplikasi.
-     * Mengarahkan pengguna ke ruang kerja aktif atau default tanpa menimbulkan error 404.
+     * Mengarahkan pengguna ke ruang kerja aktif yang sah miliknya tanpa membocorkan ruang kerja lain.
      */
     public function launchApp(Request $request, string $appSlug = 'pekan'): RedirectResponse
     {
         $user = $request->user();
         $targetSlug = $appSlug ?: 'pekan';
 
-        // 1. Cek riwayat tenant aktif di session
         $tenant = null;
         $sessionTenantSlug = session('current_tenant_slug');
-        if ($sessionTenantSlug) {
-            $tenant = Tenant::where('slug', $sessionTenantSlug)
+
+        // 1. Cek riwayat tenant aktif di session DENGAN verifikasi keanggotaan aktif pengguna
+        if ($sessionTenantSlug && $user) {
+            $isMember = $user->memberships()
                 ->where('status', 'active')
-                ->first();
+                ->whereHas('tenant', fn($q) => $q->where('slug', $sessionTenantSlug)->where('status', 'active'))
+                ->exists();
+
+            if ($isMember || $user->is_super_admin) {
+                $tenant = Tenant::where('slug', $sessionTenantSlug)
+                    ->where('status', 'active')
+                    ->first();
+            } else {
+                session()->forget('current_tenant_slug');
+            }
         }
 
-        // 2. Jika tidak ada di session, gunakan keanggotaan aktif pertama milik pengguna
+        // 2. Jika tidak ada atau tidak valid di session, gunakan keanggotaan aktif pertama milik pengguna
         if (!$tenant && $user) {
             $membership = $user->memberships()
                 ->where('status', 'active')
+                ->whereHas('tenant', fn($q) => $q->where('status', 'active'))
                 ->with('tenant')
                 ->first();
 
-            if ($membership && $membership->tenant && $membership->tenant->status === 'active') {
+            if ($membership && $membership->tenant) {
                 $tenant = $membership->tenant;
             }
         }

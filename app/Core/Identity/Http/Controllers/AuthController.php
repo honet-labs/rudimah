@@ -40,6 +40,13 @@ class AuthController
             $request->session()->regenerate();
             $user = Auth::user();
 
+            if (!$user->is_active) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                return back()->with('error', 'Akun Anda telah dinonaktifkan oleh Administrator.');
+            }
+
             // Cek apakah user wajib MFA
             if ($user->mfaMethods()->where('is_verified', true)->exists()) {
                 $request->session()->forget('mfa_verified');

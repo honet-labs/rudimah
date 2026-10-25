@@ -20,11 +20,7 @@ class SavingsController
 
         $savings = FinanceSavings::where('status', 'active')->get();
 
-        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
-            $t = $m->tenant;
-            if ($t) $t->role = $m->role;
-            return $t;
-        })->filter()->values() : [];
+        $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('Pekan/Savings/Index', [
             'user' => $user ? [
@@ -45,11 +41,7 @@ class SavingsController
         $tenant = TenantContext::get();
         $user = $request->user();
 
-        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
-            $t = $m->tenant;
-            if ($t) $t->role = $m->role;
-            return $t;
-        })->filter()->values() : [];
+        $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('Pekan/Savings/Create', [
             'user' => $user ? [

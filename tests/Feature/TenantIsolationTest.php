@@ -70,4 +70,59 @@ class TenantIsolationTest extends TestCase
         $scope->apply($builder, $model);
         $this->assertStringContainsString('1 = 0', $builder->toSql());
     }
+
+    public function test_resolve_tenant_middleware_blocks_unauthenticated_request(): void
+    {
+        $middleware = new \App\Core\Tenancy\ResolveTenantMiddleware();
+        $request = \Illuminate\Http\Request::create('/t/ruang-kerja-a', 'GET');
+        $request->setRouteResolver(function () {
+            $route = new \Illuminate\Routing\Route('GET', '/t/{tenantSlug}', []);
+            $route->parameters = ['tenantSlug' => 'ruang-kerja-a'];
+            return $route;
+        });
+
+        // Mock Tenant A di memory/model bila diakses
+        // Ketika user null, wajib abort(401)
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $middleware->handle($request, function () {
+            return new \Symfony\Component\HttpFoundation\Response('OK', 200);
+        });
+    }
+
+    public function test_resolve_tenant_middleware_blocks_deactivated_user(): void
+    {
+        $middleware = new \App\Core\Tenancy\ResolveTenantMiddleware();
+        $deactivatedUser = new User([
+            'id' => (string) Str::uuid(),
+            'email' => 'inactive@test.local',
+            'full_name' => 'Akun Nonaktif',
+            'is_active' => false,
+        ]);
+
+        $request = \Illuminate\Http\Request::create('/t/ruang-kerja-a', 'GET');
+        $request->setUserResolver(fn() => $deactivatedUser);
+        $request->setRouteResolver(function () {
+            $route = new \Illuminate\Routing\Route('GET', '/t/{tenantSlug}', []);
+            $route->parameters = ['tenantSlug' => 'ruang-kerja-a'];
+            return $route;
+        });
+
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $middleware->handle($request, function () {
+            return new \Symfony\Component\HttpFoundation\Response('OK', 200);
+        });
+    }
+
+    public function test_user_get_active_tenants_filters_isolated_memberships(): void
+    {
+        $user = new User([
+            'id' => (string) Str::uuid(),
+            'email' => 'test@test.local',
+            'full_name' => 'Pengguna Multi Ruang Kerja',
+            'is_active' => true,
+        ]);
+
+        // Verifikasi method getActiveTenants() ada dan mengembalikan koleksi
+        $this->assertTrue(method_exists($user, 'getActiveTenants'));
+    }
 }

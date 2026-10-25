@@ -24,22 +24,26 @@ class ResolveTenantMiddleware
                 abort(404, 'Ruang kerja tidak ditemukan atau telah dinonaktifkan.');
             }
 
-            // Jika ada sesi pengguna, verifikasi keanggotaan tenant
+            // Verifikasi otentikasi dan keanggotaan pengguna pada ruang kerja (fail-closed)
             $user = $request->user();
-            if ($user) {
-                $membership = TenantMembership::where('tenant_id', $tenant->id)
-                    ->where('user_id', $user->id)
-                    ->where('status', 'active')
-                    ->first();
-
-                if (!$membership && !$user->is_super_admin) {
-                    abort(403, 'Anda bukan anggota aktif dari ruang kerja ini.');
-                }
-
-                $tenant->role = $membership ? $membership->role : ($user->is_super_admin ? 'admin' : 'member');
-            } else {
-                $tenant->role = 'viewer';
+            if (!$user) {
+                abort(401, 'Silakan masuk terlebih dahulu untuk mengakses ruang kerja ini.');
             }
+
+            if (!$user->is_active) {
+                abort(403, 'Akun pengguna Anda telah dinonaktifkan oleh Administrator.');
+            }
+
+            $membership = TenantMembership::where('tenant_id', $tenant->id)
+                ->where('user_id', $user->id)
+                ->where('status', 'active')
+                ->first();
+
+            if (!$membership && !$user->is_super_admin) {
+                abort(403, 'Akses ditolak. Anda bukan anggota aktif dari ruang kerja ini.');
+            }
+
+            $tenant->role = $membership ? $membership->role : ($user->is_super_admin ? 'admin' : 'member');
 
             TenantContext::set($tenant);
             session(['current_tenant_slug' => $tenant->slug]);

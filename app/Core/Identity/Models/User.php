@@ -87,4 +87,26 @@ class User extends Authenticatable
     {
         return $this->hasMany(MfaMethod::class, 'user_id');
     }
+
+    /**
+     * Dapatkan daftar seluruh ruang kerja aktif di mana pengguna memiliki keanggotaan aktif.
+     * Menjamin isolasi mutlak dan mencegah kebocoran data ruang kerja lain / keanggotaan non-aktif.
+     */
+    public function getActiveTenants()
+    {
+        return $this->memberships()
+            ->where('status', 'active')
+            ->whereHas('tenant', fn($q) => $q->where('status', 'active'))
+            ->with('tenant')
+            ->get()
+            ->map(function ($membership) {
+                $tenant = $membership->tenant;
+                if ($tenant) {
+                    $tenant->role = $membership->role;
+                }
+                return $tenant;
+            })
+            ->filter()
+            ->values();
+    }
 }

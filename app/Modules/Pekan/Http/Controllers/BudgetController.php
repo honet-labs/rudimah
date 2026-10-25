@@ -21,11 +21,7 @@ class BudgetController
 
         $budgets = FinanceBudget::with('category')->get();
 
-        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
-            $t = $m->tenant;
-            if ($t) $t->role = $m->role;
-            return $t;
-        })->filter()->values() : [];
+        $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('Pekan/Budgets/Index', [
             'user' => $user ? [
@@ -50,11 +46,7 @@ class BudgetController
             ->where('is_active', true)
             ->get();
 
-        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
-            $t = $m->tenant;
-            if ($t) $t->role = $m->role;
-            return $t;
-        })->filter()->values() : [];
+        $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('Pekan/Budgets/Create', [
             'user' => $user ? [

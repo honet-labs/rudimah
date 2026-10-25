@@ -20,11 +20,7 @@ class ReminderController
 
         $reminders = FinanceReminder::orderBy('due_date')->get();
 
-        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
-            $t = $m->tenant;
-            if ($t) $t->role = $m->role;
-            return $t;
-        })->filter()->values() : [];
+        $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('Pekan/Reminders/Index', [
             'user' => $user ? [
@@ -45,11 +41,7 @@ class ReminderController
         $tenant = TenantContext::get();
         $user = $request->user();
 
-        $tenants = $user ? $user->memberships()->with('tenant')->get()->map(function ($m) {
-            $t = $m->tenant;
-            if ($t) $t->role = $m->role;
-            return $t;
-        })->filter()->values() : [];
+        $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('Pekan/Reminders/Create', [
             'user' => $user ? [

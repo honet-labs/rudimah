@@ -22,7 +22,7 @@ class ReportController
                 'email' => $user->email,
             ] : null,
             'tenant' => $tenant,
-            'tenants' => $user ? $user->memberships()->with('tenant')->get()->pluck('tenant') : [],
+            'tenants' => $user ? $user->getActiveTenants() : [],
             'apps' => AppRegistry::all(),
         ]);
     }
