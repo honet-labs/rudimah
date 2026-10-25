@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../design-system/RdPageHeader.vue';
@@ -250,6 +250,11 @@ function openAiTestModal(provider: 'gemini' | 'openai' | 'claude' | '9router') {
   testAiProvider.value = provider;
   showTestAiModal.value = true;
 }
+
+const currentTestingConfig = computed(() => {
+  const provider = testAiProvider.value;
+  return aiForm.value[provider];
+});
 
 function runAiTest() {
   isAiTesting.value = true;
@@ -1262,8 +1267,8 @@ function runAiTest() {
           <div class="font-semibold text-slate-900 dark:text-white mb-1">
             Penyedia yang Diuji: {{ testAiProvider.toUpperCase() }}
           </div>
-          <div>Endpoint: <span class="font-mono text-[11px]">{{ aiForm[testAiProvider]?.api_endpoint }}</span></div>
-          <div>Model: <span class="font-mono text-[11px]">{{ aiForm[testAiProvider]?.model }}</span></div>
+          <div>Endpoint: <span class="font-mono text-[11px]">{{ currentTestingConfig?.api_endpoint }}</span></div>
+          <div>Model: <span class="font-mono text-[11px]">{{ currentTestingConfig?.model }}</span></div>
         </div>
         <p class="text-xs text-slate-500">
           Sistem akan mengirimkan permintaan verifikasi ke endpoint AI di atas untuk memastikan otentikasi kunci API dan keterjangkauan layanan berfungsi dengan baik.
