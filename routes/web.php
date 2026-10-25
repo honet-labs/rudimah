@@ -11,6 +11,7 @@ use App\Core\Tenancy\ResolveTenantMiddleware;
 use App\Modules\App1\Http\Controllers\App1Controller;
 use App\Modules\App2\Http\Controllers\App2Controller;
 use App\Modules\Pekan\Http\Controllers\BudgetController;
+use App\Modules\Pekan\Http\Controllers\CategoryController;
 use App\Modules\Pekan\Http\Controllers\DashboardController;
 use App\Modules\Pekan\Http\Controllers\ReceiptScanController;
 use App\Modules\Pekan\Http\Controllers\ReminderController;
@@ -120,6 +121,11 @@ Route::prefix('t/{tenantSlug}')->middleware(['auth', EnsureMfaVerified::class, R
             // Laporan & Pengaturan
             Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
             Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+
+            // Manajemen Kategori Transaksi
+            Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
+            Route::put('/categories/{id}', [CategoryController::class, 'update'])->name('categories.update');
+            Route::delete('/categories/{id}', [CategoryController::class, 'destroy'])->name('categories.destroy');
         });
 
         // Modul Skeleton App1

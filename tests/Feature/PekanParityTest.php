@@ -26,4 +26,19 @@ class PekanParityTest extends TestCase
         $this->assertNotNull($app2, 'Modul App2 harus terdaftar sebagai skeleton.');
         $this->assertFalse($app2->enabled, 'Modul App2 belum boleh diaktifkan sebelum spesifikasi fungsional tersedia.');
     }
+
+    public function test_finance_category_model_has_tenant_scope_and_attributes(): void
+    {
+        $category = new \App\Modules\Pekan\Models\FinanceCategory([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'tenant_id' => (string) \Illuminate\Support\Str::uuid(),
+            'name' => 'Belanja Rumah Tangga',
+            'category_type' => 'expense',
+            'is_active' => true,
+        ]);
+
+        $this->assertEquals('Belanja Rumah Tangga', $category->name);
+        $this->assertEquals('expense', $category->category_type);
+        $this->assertTrue($category->is_active);
+    }
 }
