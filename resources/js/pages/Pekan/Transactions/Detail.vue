@@ -56,7 +56,7 @@ const itemColumns = [
       <!-- Rincian Inti & Item Belanja (2 Kolom) -->
       <div class="lg:col-span-2 space-y-6">
         <RdCard title="Informasi Faktur & Pembayaran">
-          <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-xs">
             <div>
               <dt class="text-slate-500 font-medium">Tanggal Transaksi</dt>
               <dd class="text-slate-800 dark:text-slate-100 font-semibold mt-0.5">

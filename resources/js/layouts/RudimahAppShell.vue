@@ -116,9 +116,9 @@ function isCurrentRoute(path: string): boolean {
         </button>
 
         <!-- Platform Brand -->
-        <a href="/" class="flex items-center gap-2 font-bold tracking-tight text-slate-900 dark:text-white">
+        <a href="/" class="flex items-center gap-2 font-bold tracking-tight text-slate-900 dark:text-white" title="RUDIMAH">
           <span class="w-6 h-6 rounded bg-teal-800 text-white flex items-center justify-center text-xs font-black">R</span>
-          <span class="text-sm font-extrabold tracking-wide uppercase">RUDIMAH</span>
+          <span class="text-sm font-extrabold tracking-wide uppercase hidden sm:inline">RUDIMAH</span>
         </a>
 
         <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>

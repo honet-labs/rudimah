@@ -50,7 +50,7 @@ function submit() {
 </script>
 
 <template>
-  <div class="relative min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+  <div class="relative min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="absolute top-4 right-4">
       <RdThemeToggle />
     </div>
