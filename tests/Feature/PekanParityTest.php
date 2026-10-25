@@ -41,4 +41,19 @@ class PekanParityTest extends TestCase
         $this->assertEquals('expense', $category->category_type);
         $this->assertTrue($category->is_active);
     }
+
+    public function test_pekan_edit_routes_are_registered(): void
+    {
+        $routes = \Illuminate\Support\Facades\Route::getRoutes();
+
+        $this->assertNotNull($routes->getByName('pekan.categories.update'));
+        $this->assertNotNull($routes->getByName('pekan.transactions.edit'));
+        $this->assertNotNull($routes->getByName('pekan.transactions.update'));
+        $this->assertNotNull($routes->getByName('pekan.budgets.edit'));
+        $this->assertNotNull($routes->getByName('pekan.budgets.update'));
+        $this->assertNotNull($routes->getByName('pekan.savings.edit'));
+        $this->assertNotNull($routes->getByName('pekan.savings.update'));
+        $this->assertNotNull($routes->getByName('pekan.reminders.edit'));
+        $this->assertNotNull($routes->getByName('pekan.reminders.update'));
+    }
 }

@@ -1,0 +1,160 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+import { router } from '@inertiajs/vue3';
+import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
+import RdPageHeader from '../../../design-system/RdPageHeader.vue';
+import RdCard from '../../../design-system/RdCard.vue';
+import RdButton from '../../../design-system/RdButton.vue';
+import RdInput from '../../../design-system/RdInput.vue';
+import RdSelect from '../../../design-system/RdSelect.vue';
+import RdTextarea from '../../../design-system/RdTextarea.vue';
+import type { User, Tenant, AppManifest } from '../../../types/core';
+import type { FinanceReminder } from '../../../types/pekan';
+
+const props = defineProps<{
+  user: User;
+  tenant: Tenant;
+  tenants?: Tenant[];
+  apps?: AppManifest[];
+  reminder: FinanceReminder;
+}>();
+
+const isSubmitting = ref(false);
+const title = ref(props.reminder.title || '');
+const amountMinor = ref(props.reminder.amount_minor || 100000);
+const dueDate = ref(props.reminder.due_date ? props.reminder.due_date.substring(0, 10) : new Date().toISOString().substring(0, 10));
+const repeatInterval = ref(props.reminder.repeat_interval || 'monthly');
+const totalTenor = ref(props.reminder.total_tenor || '');
+const currentTenor = ref(props.reminder.current_tenor || 1);
+const description = ref(props.reminder.description || '');
+
+const repeatOptions = [
+  { label: 'Satu Kali (Once)', value: 'once' },
+  { label: 'Harian (Daily)', value: 'daily' },
+  { label: 'Mingguan (Weekly)', value: 'weekly' },
+  { label: 'Bulanan (Monthly)', value: 'monthly' },
+  { label: 'Tahunan (Yearly)', value: 'yearly' },
+];
+
+function handleSubmit() {
+  if (isSubmitting.value) return;
+  isSubmitting.value = true;
+
+  router.put(`/t/${props.tenant.slug}/apps/pekan/reminders/${props.reminder.id}`, {
+    title: title.value,
+    amount_minor: Number(amountMinor.value),
+    due_date: dueDate.value,
+    repeat_interval: repeatInterval.value,
+    total_tenor: totalTenor.value ? Number(totalTenor.value) : null,
+    current_tenor: currentTenor.value ? Number(currentTenor.value) : 1,
+    description: description.value,
+  }, {
+    onFinish: () => {
+      isSubmitting.value = false;
+    }
+  });
+}
+</script>
+
+<template>
+  <RudimahAppShell :user="user" :tenant="tenant" app-key="pekan" app-name="PEKAN">
+    <RdPageHeader
+      title="Ubah Pengingat Tagihan"
+      description="Perbarui tanggal jatuh tempo, nominal, siklus berulang, atau tenor tagihan"
+      :breadcrumbs="[
+        { label: 'PEKAN', href: `/t/${tenant.slug}/apps/pekan/dashboard` },
+        { label: 'Pengingat', href: `/t/${tenant.slug}/apps/pekan/reminders` },
+        { label: 'Ubah' }
+      ]"
+    />
+
+    <form @submit.prevent="handleSubmit" class="max-w-2xl">
+      <RdCard title="Informasi Tagihan / Kewajiban">
+        <div class="space-y-4">
+          <RdInput
+            id="title"
+            v-model="title"
+            label="Nama Tagihan / Kewajiban"
+            placeholder="Contoh: Tagihan Listrik PLN Pasca Bayar"
+            required
+          />
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <RdInput
+              id="amount_minor"
+              v-model.number="amountMinor"
+              type="number"
+              min="1000"
+              label="Nominal Tagihan (Rp)"
+              required
+            />
+
+            <RdInput
+              id="due_date"
+              v-model="dueDate"
+              type="date"
+              label="Tanggal Jatuh Tempo"
+              required
+            />
+          </div>
+
+          <RdSelect
+            id="repeat_interval"
+            v-model="repeatInterval"
+            label="Frekuensi Berulang"
+            :options="repeatOptions"
+            required
+          />
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <RdInput
+              id="current_tenor"
+              v-model.number="currentTenor"
+              type="number"
+              min="1"
+              label="Tenor Berjalan Saat Ini"
+              placeholder="Contoh: 1"
+            />
+
+            <RdInput
+              id="total_tenor"
+              v-model.number="totalTenor"
+              type="number"
+              min="1"
+              label="Total Tenor (Opsional)"
+              placeholder="Contoh: 12 (kosongkan jika rutin tanpa batas)"
+            />
+          </div>
+
+          <RdTextarea
+            id="description"
+            v-model="description"
+            label="Keterangan / Nomor Pelanggan"
+            placeholder="Contoh: ID Pelanggan PLN 531234567890..."
+            :rows="3"
+          />
+
+          <div class="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <RdButton
+              type="submit"
+              variant="primary"
+              size="md"
+              :loading="isSubmitting"
+            >
+              Simpan Perubahan
+            </RdButton>
+            <a :href="`/t/${tenant.slug}/apps/pekan/reminders`">
+              <RdButton
+                type="button"
+                variant="outline"
+                size="md"
+              >
+                Batal
+              </RdButton>
+            </a>
+          </div>
+        </div>
+      </RdCard>
+    </form>
+  </RudimahAppShell>
+</template>

@@ -128,6 +128,54 @@ class TransactionController
         ]);
     }
 
+    public function edit(Request $request, string $tenantSlug, string $id): Response
+    {
+        $tenant = TenantContext::get();
+        $user = $request->user();
+        $transaction = FinanceTransaction::with(['category', 'items'])->findOrFail($id);
+
+        $categories = FinanceCategory::where('is_active', true)->get();
+        $tenants = $user ? $user->getActiveTenants() : [];
+
+        return Inertia::render('Pekan/Transactions/Edit', [
+            'user' => $user ? [
+                'id' => $user->id,
+                'name' => $user->full_name,
+                'email' => $user->email,
+            ] : null,
+            'tenant' => $tenant,
+            'tenants' => $tenants,
+            'apps' => AppRegistry::all(),
+            'categories' => $categories,
+            'transaction' => $transaction,
+        ]);
+    }
+
+    public function update(Request $request, string $tenantSlug, string $id): RedirectResponse
+    {
+        $transaction = FinanceTransaction::findOrFail($id);
+
+        $validated = $request->validate([
+            'category_id' => 'nullable|string',
+            'type' => 'required|in:income,expense,transfer',
+            'amount_minor' => 'required|integer|min:1',
+            'transaction_date' => 'required|date',
+            'description' => 'required|string|max:255',
+            'merchant_name' => 'nullable|string|max:200',
+            'receipt_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string',
+            'items' => 'nullable|array',
+        ]);
+
+        $items = $request->input('items', []);
+        $this->transactionService->updateTransaction($transaction, $validated, $items);
+
+        $tenant = TenantContext::get();
+        $slug = $tenant?->slug ?: $tenantSlug;
+        return redirect("/t/{$slug}/apps/pekan/transactions/{$transaction->id}")
+            ->with('status', 'Transaksi berhasil diperbarui.');
+    }
+
     public function destroy(Request $request, string $tenantSlug, string $id): RedirectResponse
     {
         $transaction = FinanceTransaction::findOrFail($id);
@@ -139,3 +187,4 @@ class TransactionController
             ->with('status', 'Transaksi berhasil dihapus.');
     }
 }
+

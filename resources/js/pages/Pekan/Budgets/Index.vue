@@ -121,12 +121,14 @@ withDefaults(
 
         <div class="border-t border-slate-100 dark:border-slate-800 pt-3 flex items-center justify-between text-[11px] text-slate-400">
           <span>Periode: {{ b.period === 'monthly' ? 'Bulanan' : 'Mingguan' }}</span>
-          <span v-if="b.progress_percent >= b.alert_threshold_pct" class="font-medium text-amber-800 dark:text-amber-400">
-            Mendekati batas limit
-          </span>
-          <span v-else class="text-slate-500">
-            Dalam batas aman
-          </span>
+          <div class="flex items-center gap-2">
+            <span v-if="b.progress_percent >= b.alert_threshold_pct" class="font-medium text-amber-800 dark:text-amber-400">
+              Mendekati limit
+            </span>
+            <a :href="`/t/${tenant.slug}/apps/pekan/budgets/${b.id}/edit`" class="text-xs text-teal-700 dark:text-teal-400 hover:underline font-semibold ml-2">
+              Ubah
+            </a>
+          </div>
         </div>
       </RdCard>
     </div>

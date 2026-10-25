@@ -96,4 +96,75 @@ class BudgetController
         return redirect("/t/{$slug}/apps/pekan/budgets")
             ->with('status', 'Anggaran belanja berhasil dibuat.');
     }
+
+    public function edit(Request $request, string $tenantSlug, string $id): Response
+    {
+        $tenant = TenantContext::get();
+        $user = $request->user();
+        $budgetId = $request->route('id') ?: $id;
+        $budget = FinanceBudget::findOrFail($budgetId);
+
+        $categories = FinanceCategory::where('category_type', 'expense')
+            ->where('is_active', true)
+            ->get();
+
+        $tenants = $user ? $user->getActiveTenants() : [];
+
+        return Inertia::render('Pekan/Budgets/Edit', [
+            'user' => $user ? [
+                'id' => $user->id,
+                'name' => $user->full_name,
+                'email' => $user->email,
+            ] : null,
+            'tenant' => $tenant,
+            'tenants' => $tenants,
+            'apps' => AppRegistry::all(),
+            'categories' => $categories,
+            'budget' => $budget,
+        ]);
+    }
+
+    public function update(Request $request, string $tenantSlug, string $id): RedirectResponse
+    {
+        $budgetId = $request->route('id') ?: $id;
+        $budget = FinanceBudget::findOrFail($budgetId);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:150',
+            'category_id' => 'required|string',
+            'amount_limit_minor' => 'required|integer|min:1',
+            'period' => 'required|in:weekly,monthly,yearly',
+            'start_date' => 'required|date',
+            'alert_threshold_pct' => 'required|integer|min:1|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $budget->update([
+            'name' => $validated['name'],
+            'category_id' => $validated['category_id'],
+            'amount_limit_minor' => $validated['amount_limit_minor'],
+            'period' => $validated['period'],
+            'start_date' => $validated['start_date'],
+            'alert_threshold_pct' => $validated['alert_threshold_pct'],
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        $tenant = TenantContext::get();
+        $slug = $tenant?->slug ?: $tenantSlug;
+        return redirect("/t/{$slug}/apps/pekan/budgets")
+            ->with('status', 'Anggaran belanja berhasil diperbarui.');
+    }
+
+    public function destroy(Request $request, string $tenantSlug, string $id): RedirectResponse
+    {
+        $budgetId = $request->route('id') ?: $id;
+        $budget = FinanceBudget::findOrFail($budgetId);
+        $budget->delete();
+
+        $tenant = TenantContext::get();
+        $slug = $tenant?->slug ?: $tenantSlug;
+        return redirect("/t/{$slug}/apps/pekan/budgets")
+            ->with('status', 'Anggaran belanja berhasil dihapus.');
+    }
 }
+

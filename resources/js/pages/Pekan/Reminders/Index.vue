@@ -95,10 +95,14 @@ const columns = [
             {{ value === 'paid' ? 'Sudah Lunas' : value === 'overdue' ? 'Lewat Tempo' : 'Menunggu Bayar' }}
           </RdBadge>
         </template>
-        <template #actions>
-          <RdButton variant="outline" size="sm">
-            Tandai Lunas
-          </RdButton>
+        <template #actions="{ item }">
+          <div class="flex items-center justify-center gap-2">
+            <a :href="`/t/${tenant.slug}/apps/pekan/reminders/${item.id}/edit`">
+              <RdButton variant="outline" size="sm">
+                Ubah
+              </RdButton>
+            </a>
+          </div>
         </template>
       </RdTable>
     </RdCard>

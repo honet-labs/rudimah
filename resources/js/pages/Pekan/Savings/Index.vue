@@ -104,9 +104,9 @@ withDefaults(
 
         <div class="border-t border-slate-100 dark:border-slate-800 pt-3 flex items-center justify-between">
           <span class="text-[11px] text-slate-400 uppercase font-medium">Status: Aktif</span>
-          <a :href="`/t/${tenant.slug}/apps/pekan/savings/${s.id}`">
+          <a :href="`/t/${tenant.slug}/apps/pekan/savings/${s.id}/edit`">
             <RdButton variant="outline" size="sm">
-              Kelola Pos
+              Ubah Pos
             </RdButton>
           </a>
         </div>

@@ -79,4 +79,70 @@ class TransactionService
             return $transaction;
         });
     }
+
+    public function updateTransaction(FinanceTransaction $transaction, array $data, array $items = []): FinanceTransaction
+    {
+        $tenantId = TenantContext::id();
+
+        return DB::connection('pekan')->transaction(function () use ($transaction, $data, $items, $tenantId) {
+            $oldAmount = $transaction->amount_minor;
+            $oldType = $transaction->type;
+            $account = FinanceAccount::find($transaction->account_id);
+
+            // Batalkan efek saldo lama
+            if ($account) {
+                if ($oldType === 'income') {
+                    $account->decrement('current_balance_minor', (int) $oldAmount);
+                } elseif ($oldType === 'expense') {
+                    $account->increment('current_balance_minor', (int) $oldAmount);
+                }
+            }
+
+            $transaction->update([
+                'category_id' => $data['category_id'] ?? $transaction->category_id,
+                'type' => $data['type'] ?? $transaction->type,
+                'amount_minor' => (int) ($data['amount_minor'] ?? $transaction->amount_minor),
+                'transaction_date' => $data['transaction_date'] ?? $transaction->transaction_date,
+                'description' => $data['description'] ?? $transaction->description,
+                'merchant_name' => $data['merchant_name'] ?? $transaction->merchant_name,
+                'receipt_number' => $data['receipt_number'] ?? $transaction->receipt_number,
+                'notes' => $data['notes'] ?? $transaction->notes,
+                'updated_by' => auth()->id() ?? 'system',
+            ]);
+
+            // Perbarui item jika disertakan
+            if (!empty($items)) {
+                FinanceTransactionItem::where('transaction_id', $transaction->id)->delete();
+                foreach ($items as $item) {
+                    FinanceTransactionItem::create([
+                        'id' => (string) Str::uuid(),
+                        'tenant_id' => $tenantId,
+                        'transaction_id' => $transaction->id,
+                        'item_name' => $item['item_name'],
+                        'quantity' => $item['quantity'] ?? 1,
+                        'price_minor' => (int) $item['price_minor'],
+                        'discount_minor' => (int) ($item['discount_minor'] ?? 0),
+                        'total_minor' => (int) $item['total_minor'],
+                        'notes' => $item['notes'] ?? null,
+                        'created_by' => auth()->id() ?? 'system',
+                        'updated_by' => auth()->id() ?? 'system',
+                    ]);
+                }
+            }
+
+            // Terapkan efek saldo baru
+            if ($account) {
+                if ($transaction->type === 'income') {
+                    $account->increment('current_balance_minor', (int) $transaction->amount_minor);
+                } elseif ($transaction->type === 'expense') {
+                    $account->decrement('current_balance_minor', (int) $transaction->amount_minor);
+                }
+            }
+
+            AuditLogger::log('update_transaction', 'finance_transactions', $transaction->id, null, $transaction->toArray());
+
+            return $transaction;
+        });
+    }
 }
+

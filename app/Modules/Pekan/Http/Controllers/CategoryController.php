@@ -14,7 +14,7 @@ class CategoryController
     /**
      * Simpan kategori transaksi baru untuk ruang kerja saat ini.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, ?string $tenantSlug = null): RedirectResponse
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
@@ -47,11 +47,16 @@ class CategoryController
     /**
      * Perbarui data kategori transaksi yang sudah ada.
      */
-    public function update(Request $request, string $id): RedirectResponse
+    public function update(Request $request, string $tenantSlug, ?string $id = null): RedirectResponse
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
             abort(403, 'Konteks ruang kerja tidak valid.');
+        }
+
+        $categoryId = $request->route('id') ?: $id;
+        if (!$categoryId) {
+            abort(404, 'Kategori tidak ditemukan.');
         }
 
         $validated = $request->validate([
@@ -63,7 +68,7 @@ class CategoryController
             'is_active' => 'nullable|boolean',
         ]);
 
-        $category = FinanceCategory::findOrFail($id);
+        $category = FinanceCategory::findOrFail($categoryId);
 
         $category->update([
             'name' => trim($validated['name']),
@@ -80,14 +85,19 @@ class CategoryController
     /**
      * Hapus kategori transaksi atau nonaktifkan bila sudah terdapat riwayat mutasi kas.
      */
-    public function destroy(string $id): RedirectResponse
+    public function destroy(Request $request, string $tenantSlug, ?string $id = null): RedirectResponse
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
             abort(403, 'Konteks ruang kerja tidak valid.');
         }
 
-        $category = FinanceCategory::findOrFail($id);
+        $categoryId = $request->route('id') ?: $id;
+        if (!$categoryId) {
+            abort(404, 'Kategori tidak ditemukan.');
+        }
+
+        $category = FinanceCategory::findOrFail($categoryId);
         $name = $category->name;
 
         // Periksa integritas keuangan: bila sudah digunakan pada transaksi kas, jangan hapus fisik

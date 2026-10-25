@@ -86,4 +86,66 @@ class SavingsController
         return redirect("/t/{$slug}/apps/pekan/savings")
             ->with('status', 'Pos tabungan impian berhasil dibuat.');
     }
+
+    public function edit(Request $request, string $tenantSlug, string $id): Response
+    {
+        $tenant = TenantContext::get();
+        $user = $request->user();
+        $savingsId = $request->route('id') ?: $id;
+        $saving = FinanceSavings::findOrFail($savingsId);
+
+        $tenants = $user ? $user->getActiveTenants() : [];
+
+        return Inertia::render('Pekan/Savings/Edit', [
+            'user' => $user ? [
+                'id' => $user->id,
+                'name' => $user->full_name,
+                'email' => $user->email,
+            ] : null,
+            'tenant' => $tenant,
+            'tenants' => $tenants,
+            'apps' => AppRegistry::all(),
+            'saving' => $saving,
+        ]);
+    }
+
+    public function update(Request $request, string $tenantSlug, string $id): RedirectResponse
+    {
+        $savingsId = $request->route('id') ?: $id;
+        $saving = FinanceSavings::findOrFail($savingsId);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:150',
+            'target_amount_minor' => 'required|integer|min:1',
+            'current_amount_minor' => 'nullable|integer|min:0',
+            'target_date' => 'nullable|date',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $saving->update([
+            'name' => $validated['name'],
+            'target_amount_minor' => $validated['target_amount_minor'],
+            'current_amount_minor' => $validated['current_amount_minor'] ?? 0,
+            'target_date' => $validated['target_date'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        $tenant = TenantContext::get();
+        $slug = $tenant?->slug ?: $tenantSlug;
+        return redirect("/t/{$slug}/apps/pekan/savings")
+            ->with('status', 'Pos tabungan berhasil diperbarui.');
+    }
+
+    public function destroy(Request $request, string $tenantSlug, string $id): RedirectResponse
+    {
+        $savingsId = $request->route('id') ?: $id;
+        $saving = FinanceSavings::findOrFail($savingsId);
+        $saving->delete();
+
+        $tenant = TenantContext::get();
+        $slug = $tenant?->slug ?: $tenantSlug;
+        return redirect("/t/{$slug}/apps/pekan/savings")
+            ->with('status', 'Pos tabungan berhasil dihapus.');
+    }
 }
+

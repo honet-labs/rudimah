@@ -106,23 +106,34 @@ Route::prefix('t/{tenantSlug}')->middleware(['auth', EnsureMfaVerified::class, R
             Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
             Route::get('/transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
             Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
-            Route::get('/transactions/{id}', [TransactionController::class, 'show'])->name('transactions.show')->where('id', '[0-9a-zA-Z\-]{10,}');
-            Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('transactions.destroy')->where('id', '[0-9a-zA-Z\-]{10,}');
+            Route::get('/transactions/{id}/edit', [TransactionController::class, 'edit'])->name('transactions.edit');
+            Route::put('/transactions/{id}', [TransactionController::class, 'update'])->name('transactions.update');
+            Route::get('/transactions/{id}', [TransactionController::class, 'show'])->name('transactions.show');
+            Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
 
             // Anggaran
             Route::get('/budgets', [BudgetController::class, 'index'])->name('budgets.index');
             Route::get('/budgets/create', [BudgetController::class, 'create'])->name('budgets.create');
             Route::post('/budgets', [BudgetController::class, 'store'])->name('budgets.store');
+            Route::get('/budgets/{id}/edit', [BudgetController::class, 'edit'])->name('budgets.edit');
+            Route::put('/budgets/{id}', [BudgetController::class, 'update'])->name('budgets.update');
+            Route::delete('/budgets/{id}', [BudgetController::class, 'destroy'])->name('budgets.destroy');
 
             // Tabungan
             Route::get('/savings', [SavingsController::class, 'index'])->name('savings.index');
             Route::get('/savings/create', [SavingsController::class, 'create'])->name('savings.create');
             Route::post('/savings', [SavingsController::class, 'store'])->name('savings.store');
+            Route::get('/savings/{id}/edit', [SavingsController::class, 'edit'])->name('savings.edit');
+            Route::put('/savings/{id}', [SavingsController::class, 'update'])->name('savings.update');
+            Route::delete('/savings/{id}', [SavingsController::class, 'destroy'])->name('savings.destroy');
 
             // Pengingat Tagihan
             Route::get('/reminders', [ReminderController::class, 'index'])->name('reminders.index');
             Route::get('/reminders/create', [ReminderController::class, 'create'])->name('reminders.create');
             Route::post('/reminders', [ReminderController::class, 'store'])->name('reminders.store');
+            Route::get('/reminders/{id}/edit', [ReminderController::class, 'edit'])->name('reminders.edit');
+            Route::put('/reminders/{id}', [ReminderController::class, 'update'])->name('reminders.update');
+            Route::delete('/reminders/{id}', [ReminderController::class, 'destroy'])->name('reminders.destroy');
 
             // Pindai Struk OCR
             Route::get('/receipt-scan', [ReceiptScanController::class, 'index'])->name('receiptscan.index');

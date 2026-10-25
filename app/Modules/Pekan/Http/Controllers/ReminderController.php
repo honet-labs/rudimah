@@ -89,4 +89,70 @@ class ReminderController
         return redirect("/t/{$slug}/apps/pekan/reminders")
             ->with('status', 'Pengingat tagihan berhasil dijadwalkan.');
     }
+
+    public function edit(Request $request, string $tenantSlug, string $id): Response
+    {
+        $tenant = TenantContext::get();
+        $user = $request->user();
+        $reminderId = $request->route('id') ?: $id;
+        $reminder = FinanceReminder::findOrFail($reminderId);
+
+        $tenants = $user ? $user->getActiveTenants() : [];
+
+        return Inertia::render('Pekan/Reminders/Edit', [
+            'user' => $user ? [
+                'id' => $user->id,
+                'name' => $user->full_name,
+                'email' => $user->email,
+            ] : null,
+            'tenant' => $tenant,
+            'tenants' => $tenants,
+            'apps' => AppRegistry::all(),
+            'reminder' => $reminder,
+        ]);
+    }
+
+    public function update(Request $request, string $tenantSlug, string $id): RedirectResponse
+    {
+        $reminderId = $request->route('id') ?: $id;
+        $reminder = FinanceReminder::findOrFail($reminderId);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:150',
+            'amount_minor' => 'required|integer|min:1',
+            'due_date' => 'required|date',
+            'repeat_interval' => 'required|in:once,daily,weekly,monthly,yearly',
+            'total_tenor' => 'nullable|integer|min:1',
+            'current_tenor' => 'nullable|integer|min:1',
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        $reminder->update([
+            'title' => $validated['title'],
+            'amount_minor' => $validated['amount_minor'],
+            'due_date' => $validated['due_date'],
+            'repeat_interval' => $validated['repeat_interval'],
+            'total_tenor' => $validated['total_tenor'] ?? null,
+            'current_tenor' => $validated['current_tenor'] ?? 1,
+            'description' => $validated['description'] ?? null,
+        ]);
+
+        $tenant = TenantContext::get();
+        $slug = $tenant?->slug ?: $tenantSlug;
+        return redirect("/t/{$slug}/apps/pekan/reminders")
+            ->with('status', 'Pengingat tagihan berhasil diperbarui.');
+    }
+
+    public function destroy(Request $request, string $tenantSlug, string $id): RedirectResponse
+    {
+        $reminderId = $request->route('id') ?: $id;
+        $reminder = FinanceReminder::findOrFail($reminderId);
+        $reminder->delete();
+
+        $tenant = TenantContext::get();
+        $slug = $tenant?->slug ?: $tenantSlug;
+        return redirect("/t/{$slug}/apps/pekan/reminders")
+            ->with('status', 'Pengingat tagihan berhasil dihapus.');
+    }
 }
+
