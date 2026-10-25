@@ -25,9 +25,10 @@ echo ""
 echo "Pilih parameter yang ingin Anda ubah:"
 echo "1) Ubah Port HTTP / HTTPS"
 echo "2) Ubah Pengaturan Kredensial Basis Data"
-echo "3) Batal"
+echo "3) Deteksi Ulang Spesifikasi Server & Re-Tuning Performa (OS/CPU/RAM)"
+echo "4) Batal"
 
-read -rp "Pilihan Anda [1-3]: " choice
+read -rp "Pilihan Anda [1-4]: " choice
 
 case "$choice" in
     1)
@@ -48,6 +49,13 @@ case "$choice" in
             sed -i "s/^DB_PEKAN_HOST=.*/DB_PEKAN_HOST=$new_db_host/" .env
         fi
         echo "[OK] Host basis data berhasil diperbarui."
+        ;;
+    3)
+        echo "[*] Menjalankan deteksi hardware dan kalkulasi profil tuning baru..."
+        if [ -f "scripts/tune-system.sh" ]; then
+            bash scripts/tune-system.sh
+        fi
+        echo "[OK] Profil tuning performa berhasil disesuaikan dengan hardware terkini."
         ;;
     *)
         echo "[*] Rekonfigurasi dibatalkan."

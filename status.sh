@@ -46,4 +46,20 @@ else
 fi
 
 echo ""
+echo "[*] Profil Tuning Performa Sistem Host:"
+if [ -f "docker/mariadb/custom.cnf" ]; then
+    BUFFER_POOL=$(grep -E '^innodb_buffer_pool_size' docker/mariadb/custom.cnf | awk '{print $3}' || echo "N/A")
+    MAX_CONN=$(grep -E '^max_connections' docker/mariadb/custom.cnf | awk '{print $3}' || echo "N/A")
+    echo "  - MariaDB Buffer Pool  : $BUFFER_POOL (Max Connections: $MAX_CONN)"
+fi
+if [ -f "docker/php/zz-docker.conf" ]; then
+    MAX_CHILDREN=$(grep -E '^pm.max_children' docker/php/zz-docker.conf | awk '{print $3}' || echo "N/A")
+    echo "  - PHP-FPM Max Workers  : $MAX_CHILDREN worker"
+fi
+if [ -f "docker/redis/redis.conf" ]; then
+    REDIS_MEM=$(grep -E '^maxmemory' docker/redis/redis.conf | head -n1 | awk '{print $2}' || echo "N/A")
+    echo "  - Redis Max Memory     : $REDIS_MEM"
+fi
+
+echo ""
 echo "[OK] Pemeriksaan status operasional selesai."

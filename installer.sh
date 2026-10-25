@@ -87,7 +87,16 @@ else
     echo "  [OK] Docker Compose terdeteksi: $(docker compose version --short 2>/dev/null || echo 'v2')"
 fi
 
-# 2. Muat Konfigurasi Sebelumnya dari .env jika Ada
+# 2. Deteksi Perangkat Keras & Auto-Tuning Performa Sistem
+echo ""
+echo "[*] Mendeteksi spesifikasi sistem host (OS, CPU, RAM) & menerapkan tuning performa..."
+if [ -f "scripts/tune-system.sh" ]; then
+    bash scripts/tune-system.sh
+else
+    echo "  [INFO] Skrip scripts/tune-system.sh tidak ditemukan, menggunakan nilai bawaan."
+fi
+
+# 3. Muat Konfigurasi Sebelumnya dari .env jika Ada
 DEFAULT_HTTP="80"
 DEFAULT_HTTPS="443"
 DEFAULT_P_DB="rudimah_platform"
