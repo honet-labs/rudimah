@@ -5,14 +5,24 @@ namespace App\Modules\Pekan\Http\Controllers;
 use App\Core\Applications\AppRegistry;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Models\FinanceSavings;
+use App\Modules\Pekan\Services\AttachmentUploadService;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class SavingsController
 {
+    protected AttachmentUploadService $uploadService;
+
+    public function __construct(?AttachmentUploadService $uploadService = null)
+    {
+        $this->uploadService = $uploadService ?: new AttachmentUploadService();
+    }
+
     public function index(Request $request): Response
     {
         $tenant = TenantContext::get();
@@ -66,7 +76,14 @@ class SavingsController
             'current_amount_minor' => 'nullable|integer|min:0',
             'target_date' => 'nullable|date',
             'notes' => 'nullable|string|max:500',
+            'images' => 'nullable|array',
+            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
+
+        $uploadedImages = [];
+        if ($request->hasFile('images')) {
+            $uploadedImages = $this->uploadService->uploadMultiple($request->file('images'), 'savings');
+        }
 
         $savings = new FinanceSavings();
         $savings->id = (string) Str::uuid();
@@ -78,9 +95,22 @@ class SavingsController
         $savings->start_date = now()->toDateString();
         $savings->target_date = $validated['target_date'] ?? null;
         $savings->notes = $validated['notes'] ?? null;
+        $savings->images = $uploadedImages;
         $savings->status = 'active';
         $savings->created_by = auth()->id();
-        $savings->save();
+
+        try {
+            $savings->save();
+        } catch (\Throwable $e) {
+            if (str_contains($e->getMessage(), "Unknown column 'images'")) {
+                Schema::connection('pekan')->table('finance_savings', function (Blueprint $table) {
+                    $table->json('images')->nullable()->after('notes');
+                });
+                $savings->save();
+            } else {
+                throw $e;
+            }
+        }
 
         $slug = $tenant?->slug ?: $tenantSlug;
         return redirect("/t/{$slug}/apps/pekan/savings")
@@ -120,15 +150,47 @@ class SavingsController
             'current_amount_minor' => 'nullable|integer|min:0',
             'target_date' => 'nullable|date',
             'notes' => 'nullable|string|max:500',
+            'images' => 'nullable|array',
+            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'existing_images' => 'nullable|string',
         ]);
 
-        $saving->update([
+        $existingImages = [];
+        if ($request->filled('existing_images')) {
+            $decoded = json_decode($request->input('existing_images'), true);
+            if (is_array($decoded)) {
+                $existingImages = $decoded;
+            }
+        }
+
+        $newImages = [];
+        if ($request->hasFile('images')) {
+            $newImages = $this->uploadService->uploadMultiple($request->file('images'), 'savings');
+        }
+
+        $allImages = array_merge($existingImages, $newImages);
+
+        $savingData = [
             'name' => $validated['name'],
             'target_amount_minor' => $validated['target_amount_minor'],
             'current_amount_minor' => $validated['current_amount_minor'] ?? 0,
             'target_date' => $validated['target_date'] ?? null,
             'notes' => $validated['notes'] ?? null,
-        ]);
+            'images' => $allImages,
+        ];
+
+        try {
+            $saving->update($savingData);
+        } catch (\Throwable $e) {
+            if (str_contains($e->getMessage(), "Unknown column 'images'")) {
+                Schema::connection('pekan')->table('finance_savings', function (Blueprint $table) {
+                    $table->json('images')->nullable()->after('notes');
+                });
+                $saving->update($savingData);
+            } else {
+                throw $e;
+            }
+        }
 
         $tenant = TenantContext::get();
         $slug = $tenant?->slug ?: $tenantSlug;
@@ -140,6 +202,15 @@ class SavingsController
     {
         $savingsId = $request->route('id') ?: $id;
         $saving = FinanceSavings::findOrFail($savingsId);
+
+        if (is_array($saving->images)) {
+            foreach ($saving->images as $img) {
+                if (isset($img['url'])) {
+                    $this->uploadService->deleteFile($img['url']);
+                }
+            }
+        }
+
         $saving->delete();
 
         $tenant = TenantContext::get();

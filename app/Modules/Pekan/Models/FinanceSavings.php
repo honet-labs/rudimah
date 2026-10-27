@@ -27,6 +27,7 @@ class FinanceSavings extends Model
         'start_date',
         'target_date',
         'notes',
+        'images',
         'status',
         'created_by',
         'updated_by',
@@ -37,6 +38,7 @@ class FinanceSavings extends Model
         'current_amount_minor' => 'integer',
         'start_date' => 'date',
         'target_date' => 'date',
+        'images' => 'array',
     ];
 
     protected $appends = [

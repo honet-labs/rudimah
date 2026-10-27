@@ -57,6 +57,14 @@ export interface FinanceBudget {
   period_label?: string;
 }
 
+export interface AttachmentImage {
+  id: string;
+  name: string;
+  url: string;
+  size?: number;
+  created_at?: string;
+}
+
 export interface FinanceSavings {
   id: string;
   name: string;
@@ -64,18 +72,22 @@ export interface FinanceSavings {
   current_amount_minor: number;
   progress_percent: number;
   target_date?: string;
+  notes?: string;
+  images?: AttachmentImage[];
   status: 'active' | 'completed' | 'cancelled';
 }
 
 export interface FinanceReminder {
   id: string;
   title: string;
+  description?: string;
   amount_minor: number;
   due_date: string;
   repeat_interval: string;
   status: 'pending' | 'paid' | 'overdue';
   total_tenor?: number;
   current_tenor?: number;
+  images?: AttachmentImage[];
 }
 
 export interface ReceiptExtraction {

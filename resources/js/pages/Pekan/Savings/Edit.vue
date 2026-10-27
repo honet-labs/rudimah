@@ -7,6 +7,7 @@ import RdCard from '../../../design-system/RdCard.vue';
 import RdButton from '../../../design-system/RdButton.vue';
 import RdInput from '../../../design-system/RdInput.vue';
 import RdTextarea from '../../../design-system/RdTextarea.vue';
+import RdImageUploadMultiple from '../../../design-system/RdImageUploadMultiple.vue';
 import type { User, Tenant, AppManifest } from '../../../types/core';
 import type { FinanceSavings } from '../../../types/pekan';
 
@@ -24,18 +25,24 @@ const targetAmountMinor = ref(props.saving.target_amount_minor || 10000000);
 const currentAmountMinor = ref(props.saving.current_amount_minor || 0);
 const targetDate = ref(props.saving.target_date ? props.saving.target_date.substring(0, 10) : '');
 const notes = ref(props.saving.notes || '');
+const existingImages = ref<any[]>(props.saving.images || []);
+const newFiles = ref<File[]>([]);
 
 function handleSubmit() {
   if (isSubmitting.value) return;
   isSubmitting.value = true;
 
-  router.put(`/t/${props.tenant.slug}/apps/pekan/savings/${props.saving.id}`, {
+  router.post(`/t/${props.tenant.slug}/apps/pekan/savings/${props.saving.id}`, {
+    _method: 'PUT',
     name: name.value,
     target_amount_minor: Number(targetAmountMinor.value),
     current_amount_minor: Number(currentAmountMinor.value),
     target_date: targetDate.value || null,
     notes: notes.value,
+    existing_images: JSON.stringify(existingImages.value),
+    images: newFiles.value,
   }, {
+    forceFormData: true,
     onFinish: () => {
       isSubmitting.value = false;
     }
@@ -100,6 +107,16 @@ function handleSubmit() {
             placeholder="Informasi rekening simpanan atau strategi alokasi..."
             :rows="3"
           />
+
+          <!-- Upload / Kelola Foto Target Impian / Bukti (Multiple Images) -->
+          <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <RdImageUploadMultiple
+              v-model="newFiles"
+              v-model:existing-images="existingImages"
+              label="Foto Target Impian / Bukti Simpanan (Bisa Banyak Foto)"
+              description="Perbarui atau tambahkan gambar barang impian, tujuan wisata, atau dokumen tabungan (JPG, PNG, WEBP maks 5MB)"
+            />
+          </div>
 
           <div class="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <RdButton

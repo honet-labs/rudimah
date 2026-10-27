@@ -8,6 +8,7 @@ import RdButton from '../../../design-system/RdButton.vue';
 import RdInput from '../../../design-system/RdInput.vue';
 import RdSelect from '../../../design-system/RdSelect.vue';
 import RdTextarea from '../../../design-system/RdTextarea.vue';
+import RdImageUploadMultiple from '../../../design-system/RdImageUploadMultiple.vue';
 import type { User, Tenant, AppManifest } from '../../../types/core';
 import type { FinanceReminder } from '../../../types/pekan';
 
@@ -27,6 +28,8 @@ const repeatInterval = ref(props.reminder.repeat_interval || 'monthly');
 const totalTenor = ref(props.reminder.total_tenor || '');
 const currentTenor = ref(props.reminder.current_tenor || 1);
 const description = ref(props.reminder.description || '');
+const existingImages = ref<any[]>(props.reminder.images || []);
+const newFiles = ref<File[]>([]);
 
 const repeatOptions = [
   { label: 'Satu Kali (Once)', value: 'once' },
@@ -40,7 +43,8 @@ function handleSubmit() {
   if (isSubmitting.value) return;
   isSubmitting.value = true;
 
-  router.put(`/t/${props.tenant.slug}/apps/pekan/reminders/${props.reminder.id}`, {
+  router.post(`/t/${props.tenant.slug}/apps/pekan/reminders/${props.reminder.id}`, {
+    _method: 'PUT',
     title: title.value,
     amount_minor: Number(amountMinor.value),
     due_date: dueDate.value,
@@ -48,7 +52,10 @@ function handleSubmit() {
     total_tenor: totalTenor.value ? Number(totalTenor.value) : null,
     current_tenor: currentTenor.value ? Number(currentTenor.value) : 1,
     description: description.value,
+    existing_images: JSON.stringify(existingImages.value),
+    images: newFiles.value,
   }, {
+    forceFormData: true,
     onFinish: () => {
       isSubmitting.value = false;
     }
@@ -133,6 +140,16 @@ function handleSubmit() {
             placeholder="Contoh: ID Pelanggan PLN 531234567890..."
             :rows="3"
           />
+
+          <!-- Unggah / Kelola Bukti Tagihan (Multiple Images) -->
+          <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <RdImageUploadMultiple
+              v-model="newFiles"
+              v-model:existing-images="existingImages"
+              label="Bukti Tagihan / Berkas Invoice (Bisa Banyak Foto)"
+              description="Perbarui atau tambahkan foto tagihan, invoice, atau struk pembayaran (JPG, PNG, WEBP maks 5MB)"
+            />
+          </div>
 
           <div class="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <RdButton

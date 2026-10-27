@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
 import RdCard from '../../../design-system/RdCard.vue';
@@ -6,6 +7,8 @@ import RdButton from '../../../design-system/RdButton.vue';
 import RdMoney from '../../../design-system/RdMoney.vue';
 import RdBadge from '../../../design-system/RdBadge.vue';
 import RdDateTime from '../../../design-system/RdDateTime.vue';
+import RdEmptyState from '../../../design-system/RdEmptyState.vue';
+import RdModal from '../../../design-system/RdModal.vue';
 import type { User, Tenant } from '../../../types/core';
 import type { FinanceSavings } from '../../../types/pekan';
 
@@ -16,37 +19,17 @@ withDefaults(
     savings?: FinanceSavings[];
   }>(),
   {
-    savings: () => [
-      {
-        id: 'sv-1',
-        name: 'Dana Darurat 6 Bulan',
-        target_amount_minor: 30000000,
-        current_amount_minor: 18500000,
-        progress_percent: 61.6,
-        target_date: '2027-04-01',
-        status: 'active',
-      },
-      {
-        id: 'sv-2',
-        name: 'Renovasi Rumah',
-        target_amount_minor: 15000000,
-        current_amount_minor: 6200000,
-        progress_percent: 41.3,
-        target_date: '2026-12-31',
-        status: 'active',
-      },
-      {
-        id: 'sv-3',
-        name: 'Pendidikan Anak',
-        target_amount_minor: 50000000,
-        current_amount_minor: 12000000,
-        progress_percent: 24.0,
-        target_date: '2028-06-30',
-        status: 'active',
-      },
-    ],
+    savings: () => [],
   }
 );
+
+const previewModalOpen = ref(false);
+const previewImage = ref<{ url: string; title: string }>({ url: '', title: '' });
+
+function openPreview(url: string, title: string) {
+  previewImage.value = { url, title };
+  previewModalOpen.value = true;
+}
 </script>
 
 <template>
@@ -65,7 +48,8 @@ withDefaults(
       </template>
     </RdPageHeader>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Konten Daftar Tabungan -->
+    <div v-if="savings && savings.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <RdCard
         v-for="s in savings"
         :key="s.id"
@@ -78,6 +62,25 @@ withDefaults(
           <RdBadge variant="neutral">
             {{ Math.round(s.progress_percent) }}%
           </RdBadge>
+        </div>
+
+        <!-- Galeri Foto Impian / Berkas Lampiran -->
+        <div v-if="s.images && s.images.length > 0" class="my-2.5">
+          <div class="flex items-center gap-2 overflow-x-auto pb-1">
+            <button
+              v-for="(img, idx) in s.images"
+              :key="idx"
+              type="button"
+              @click="openPreview(img.url, `${s.name} - Foto ${idx + 1}`)"
+              class="relative rounded border border-slate-200 dark:border-slate-700 overflow-hidden w-12 h-12 bg-slate-100 dark:bg-slate-800 shrink-0 group hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-teal-500"
+              :title="img.name || `Foto impian ${idx + 1}`"
+            >
+              <img :src="img.url" :alt="img.name || 'Foto impian'" class="w-full h-full object-cover" />
+            </button>
+          </div>
+          <span class="text-[10px] text-slate-400">
+            {{ s.images.length }} foto impian / berkas terlampir
+          </span>
         </div>
 
         <div class="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden my-3">
@@ -112,5 +115,51 @@ withDefaults(
         </div>
       </RdCard>
     </div>
+
+    <!-- Empty State Bersih Bila Belum Ada Pos Tabungan -->
+    <RdEmptyState
+      v-else
+      title="Belum Ada Pos Tabungan"
+      description="Rencanakan dan pantau impian keuangan masa depan Anda seperti dana darurat, liburan, atau pembelian aset impian."
+    >
+      <template #actions>
+        <a :href="`/t/${tenant.slug}/apps/pekan/savings/create`">
+          <RdButton variant="primary" size="sm">
+            + Buat Pos Tabungan Baru
+          </RdButton>
+        </a>
+      </template>
+    </RdEmptyState>
+
+    <!-- Modal Lightbox Pratinjau Foto Impian / Bukti Simpanan -->
+    <RdModal
+      v-model="previewModalOpen"
+      :title="previewImage.title"
+      max-width="lg"
+    >
+      <div class="space-y-4">
+        <div class="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-black/5 dark:bg-black/30 flex items-center justify-center min-h-[220px]">
+          <img
+            :src="previewImage.url"
+            :alt="previewImage.title"
+            class="max-h-[65vh] w-auto max-w-full object-contain mx-auto rounded"
+          />
+        </div>
+        <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <span>Pratinjau Foto Impian</span>
+          <a
+            :href="previewImage.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 dark:text-teal-400 font-medium hover:underline"
+          >
+            <span>Buka Gambar Penuh</span>
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </RdModal>
   </RudimahAppShell>
 </template>

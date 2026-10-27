@@ -21,6 +21,7 @@ class FinanceReminder extends Model
         'tenant_id',
         'title',
         'description',
+        'images',
         'amount_minor',
         'currency',
         'due_date',
@@ -37,6 +38,7 @@ class FinanceReminder extends Model
         'due_date' => 'date',
         'total_tenor' => 'integer',
         'current_tenor' => 'integer',
+        'images' => 'array',
     ];
 
     protected static function booted(): void

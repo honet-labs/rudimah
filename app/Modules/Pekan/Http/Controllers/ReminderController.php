@@ -5,14 +5,24 @@ namespace App\Modules\Pekan\Http\Controllers;
 use App\Core\Applications\AppRegistry;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Models\FinanceReminder;
+use App\Modules\Pekan\Services\AttachmentUploadService;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ReminderController
 {
+    protected AttachmentUploadService $uploadService;
+
+    public function __construct(?AttachmentUploadService $uploadService = null)
+    {
+        $this->uploadService = $uploadService ?: new AttachmentUploadService();
+    }
+
     public function index(Request $request): Response
     {
         $tenant = TenantContext::get();
@@ -68,7 +78,14 @@ class ReminderController
             'total_tenor' => 'nullable|integer|min:1',
             'current_tenor' => 'nullable|integer|min:1',
             'description' => 'nullable|string|max:500',
+            'images' => 'nullable|array',
+            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
+
+        $uploadedImages = [];
+        if ($request->hasFile('images')) {
+            $uploadedImages = $this->uploadService->uploadMultiple($request->file('images'), 'reminders');
+        }
 
         $reminder = new FinanceReminder();
         $reminder->id = (string) Str::uuid();
@@ -81,9 +98,22 @@ class ReminderController
         $reminder->total_tenor = $validated['total_tenor'] ?? null;
         $reminder->current_tenor = $validated['current_tenor'] ?? 1;
         $reminder->description = $validated['description'] ?? null;
+        $reminder->images = $uploadedImages;
         $reminder->status = 'pending';
         $reminder->created_by = auth()->id();
-        $reminder->save();
+
+        try {
+            $reminder->save();
+        } catch (\Throwable $e) {
+            if (str_contains($e->getMessage(), "Unknown column 'images'")) {
+                Schema::connection('pekan')->table('finance_reminders', function (Blueprint $table) {
+                    $table->json('images')->nullable()->after('description');
+                });
+                $reminder->save();
+            } else {
+                throw $e;
+            }
+        }
 
         $slug = $tenant?->slug ?: $tenantSlug;
         return redirect("/t/{$slug}/apps/pekan/reminders")
@@ -125,9 +155,27 @@ class ReminderController
             'total_tenor' => 'nullable|integer|min:1',
             'current_tenor' => 'nullable|integer|min:1',
             'description' => 'nullable|string|max:500',
+            'images' => 'nullable|array',
+            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'existing_images' => 'nullable|string',
         ]);
 
-        $reminder->update([
+        $existingImages = [];
+        if ($request->filled('existing_images')) {
+            $decoded = json_decode($request->input('existing_images'), true);
+            if (is_array($decoded)) {
+                $existingImages = $decoded;
+            }
+        }
+
+        $newImages = [];
+        if ($request->hasFile('images')) {
+            $newImages = $this->uploadService->uploadMultiple($request->file('images'), 'reminders');
+        }
+
+        $allImages = array_merge($existingImages, $newImages);
+
+        $reminderData = [
             'title' => $validated['title'],
             'amount_minor' => $validated['amount_minor'],
             'due_date' => $validated['due_date'],
@@ -135,7 +183,21 @@ class ReminderController
             'total_tenor' => $validated['total_tenor'] ?? null,
             'current_tenor' => $validated['current_tenor'] ?? 1,
             'description' => $validated['description'] ?? null,
-        ]);
+            'images' => $allImages,
+        ];
+
+        try {
+            $reminder->update($reminderData);
+        } catch (\Throwable $e) {
+            if (str_contains($e->getMessage(), "Unknown column 'images'")) {
+                Schema::connection('pekan')->table('finance_reminders', function (Blueprint $table) {
+                    $table->json('images')->nullable()->after('description');
+                });
+                $reminder->update($reminderData);
+            } else {
+                throw $e;
+            }
+        }
 
         $tenant = TenantContext::get();
         $slug = $tenant?->slug ?: $tenantSlug;
@@ -147,6 +209,15 @@ class ReminderController
     {
         $reminderId = $request->route('id') ?: $id;
         $reminder = FinanceReminder::findOrFail($reminderId);
+
+        if (is_array($reminder->images)) {
+            foreach ($reminder->images as $img) {
+                if (isset($img['url'])) {
+                    $this->uploadService->deleteFile($img['url']);
+                }
+            }
+        }
+
         $reminder->delete();
 
         $tenant = TenantContext::get();

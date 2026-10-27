@@ -7,6 +7,7 @@ import RdButton from '../../../design-system/RdButton.vue';
 import RdInput from '../../../design-system/RdInput.vue';
 import RdSelect from '../../../design-system/RdSelect.vue';
 import RdTextarea from '../../../design-system/RdTextarea.vue';
+import RdImageUploadMultiple from '../../../design-system/RdImageUploadMultiple.vue';
 import type { User, Tenant, AppManifest } from '../../../types/core';
 
 const props = defineProps<{
@@ -25,6 +26,7 @@ const form = useForm({
   total_tenor: 12,
   current_tenor: 1,
   description: '',
+  images: [] as File[],
 });
 
 const repeatOptions = [
@@ -158,6 +160,15 @@ function submit() {
               v-model="form.description"
               rows="2"
               placeholder="Contoh: No. ID Pelanggan PLN 5234xxx atau VA pembayaran..."
+            />
+          </div>
+
+          <!-- Unggah Bukti Tagihan / Invoice (Multiple Images) -->
+          <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <RdImageUploadMultiple
+              v-model="form.images"
+              label="Bukti Tagihan / Berkas Invoice (Bisa Banyak Foto)"
+              description="Lampirkan foto fisik surat tagihan, lembar tagihan listrik/air, atau tangkapan layar invoice (JPG, PNG, WEBP maks 5MB)"
             />
           </div>
         </div>

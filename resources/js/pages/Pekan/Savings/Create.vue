@@ -6,6 +6,7 @@ import RdCard from '../../../design-system/RdCard.vue';
 import RdButton from '../../../design-system/RdButton.vue';
 import RdInput from '../../../design-system/RdInput.vue';
 import RdTextarea from '../../../design-system/RdTextarea.vue';
+import RdImageUploadMultiple from '../../../design-system/RdImageUploadMultiple.vue';
 import type { User, Tenant, AppManifest } from '../../../types/core';
 
 const props = defineProps<{
@@ -21,6 +22,7 @@ const form = useForm({
   current_amount_minor: 0,
   target_date: '',
   notes: '',
+  images: [] as File[],
 });
 
 function submit() {
@@ -109,6 +111,15 @@ function submit() {
               v-model="form.notes"
               rows="3"
               placeholder="Tuliskan catatan atau motivasi untuk pos tabungan ini..."
+            />
+          </div>
+
+          <!-- Unggah Foto Target Impian / Bukti Tabungan (Multiple Images) -->
+          <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <RdImageUploadMultiple
+              v-model="form.images"
+              label="Foto Target Impian / Bukti Tabungan (Bisa Banyak Foto)"
+              description="Lampirkan foto impian (rumah, mobil, tiket liburan), tangkapan layar buku tabungan, atau bukti transfer (JPG, PNG, WEBP maks 5MB)"
             />
           </div>
         </div>
