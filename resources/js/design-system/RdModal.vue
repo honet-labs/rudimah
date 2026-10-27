@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
+import RdInfoTooltip from './RdInfoTooltip.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -74,12 +75,17 @@ onUnmounted(() => {
           >
             <div v-if="title || $slots.header" class="mb-4 flex items-start justify-between">
               <div>
-                <h3 v-if="title" id="rd-modal-title" class="text-base font-semibold text-slate-900 dark:text-slate-100">
-                  {{ title }}
-                </h3>
-                <p v-if="description" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {{ description }}
-                </p>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 v-if="title" id="rd-modal-title" class="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    {{ title }}
+                  </h3>
+                  <RdInfoTooltip
+                    v-if="description"
+                    :text="description"
+                    size="sm"
+                    title="Informasi"
+                  />
+                </div>
                 <slot name="header" />
               </div>
               <button

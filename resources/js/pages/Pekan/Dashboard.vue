@@ -7,6 +7,7 @@ import RdMoney from '../../design-system/RdMoney.vue';
 import RdDateTime from '../../design-system/RdDateTime.vue';
 import RdBadge from '../../design-system/RdBadge.vue';
 import RdTable from '../../design-system/RdTable.vue';
+import RdInfoTooltip from '../../design-system/RdInfoTooltip.vue';
 import type { User, Tenant } from '../../types/core';
 import type { Transaction, FinanceBudget, FinanceSavings } from '../../types/pekan';
 
@@ -155,35 +156,43 @@ const txColumns = [
     <!-- Kartu Metrik Utama -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <RdCard padding>
-        <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Pemasukan Bulan Ini</span>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Pemasukan Bulan Ini</span>
+          <RdInfoTooltip text="Total seluruh mutasi kas masuk bulan berjalan" size="sm" title="Pemasukan" />
+        </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
           <RdMoney :amount-minor="summary.incomeMinor" />
         </div>
-        <p class="text-[11px] text-slate-500 mt-1">Total mutasi kas masuk</p>
       </RdCard>
 
       <RdCard padding>
-        <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Pengeluaran Bulan Ini</span>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Pengeluaran Bulan Ini</span>
+          <RdInfoTooltip text="Total mutasi belanja dan biaya bulan berjalan" size="sm" title="Pengeluaran" />
+        </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
           <RdMoney :amount-minor="summary.expenseMinor" />
         </div>
-        <p class="text-[11px] text-slate-500 mt-1">Total mutasi belanja</p>
       </RdCard>
 
       <RdCard padding>
-        <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Saldo Kas Bersih</span>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Saldo Kas Bersih</span>
+          <RdInfoTooltip text="Surplus atau selisih antara pemasukan dan pengeluaran bulan berjalan" size="sm" title="Saldo Kas" />
+        </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
           <RdMoney :amount-minor="summary.netMinor" />
         </div>
-        <p class="text-[11px] text-slate-500 mt-1">Surplus bulan berjalan</p>
       </RdCard>
 
       <RdCard padding>
-        <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Akumulasi Tabungan</span>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Akumulasi Tabungan</span>
+          <RdInfoTooltip text="Total akumulasi saldo dari seluruh pos simpanan aktif" size="sm" title="Tabungan" />
+        </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
           <RdMoney :amount-minor="summary.savingsMinor" />
         </div>
-        <p class="text-[11px] text-slate-500 mt-1">Total seluruh pos simpanan</p>
       </RdCard>
     </div>
 

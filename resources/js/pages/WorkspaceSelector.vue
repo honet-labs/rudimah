@@ -5,6 +5,7 @@ import RdButton from '../design-system/RdButton.vue';
 import RdCard from '../design-system/RdCard.vue';
 import RdModal from '../design-system/RdModal.vue';
 import RdInput from '../design-system/RdInput.vue';
+import RdInfoTooltip from '../design-system/RdInfoTooltip.vue';
 import RdThemeToggle from '../design-system/RdThemeToggle.vue';
 import type { Tenant, User } from '../types/core';
 
@@ -138,12 +139,15 @@ function logout() {
         <div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-teal-800 text-white font-black text-lg mb-2">
           R
         </div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
-          Pilih Ruang Kerja RUDIMAH
-        </h1>
-        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Pilih ruang kerja yang ingin Anda buka atau buat ruang kerja baru untuk keluarga atau tim Anda
-        </p>
+        <div class="flex items-center justify-center gap-2">
+          <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
+            Pilih Ruang Kerja RUDIMAH
+          </h1>
+          <RdInfoTooltip
+            text="Pilih ruang kerja yang ingin Anda buka atau buat ruang kerja baru untuk keluarga atau tim Anda"
+            title="Informasi Ruang Kerja"
+          />
+        </div>
       </div>
 
       <RdCard padding class="mb-6">

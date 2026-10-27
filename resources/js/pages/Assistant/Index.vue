@@ -7,6 +7,7 @@ import RdCard from '../../design-system/RdCard.vue';
 import RdBadge from '../../design-system/RdBadge.vue';
 import RdModal from '../../design-system/RdModal.vue';
 import RdAlert from '../../design-system/RdAlert.vue';
+import RdInfoTooltip from '../../design-system/RdInfoTooltip.vue';
 import type { Tenant, AppManifest, User } from '../../types/core';
 
 interface Conversation {
@@ -304,6 +305,11 @@ onMounted(() => {
 
           <h1 class="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 truncate flex items-center gap-2">
             <span>Asisten Cerdas Ruang Kerja</span>
+            <RdInfoTooltip
+              text="Konsultasi finansial interaktif, ringkasan arus kas, dan analisis keuangan cerdas terisolasi khusus ruang kerja ini"
+              size="sm"
+              title="Informasi Asisten AI"
+            />
           </h1>
           <RdBadge variant="neutral" size="sm" class="hidden sm:inline-flex shrink-0">
             Konteks Aman: {{ tenant.name }}

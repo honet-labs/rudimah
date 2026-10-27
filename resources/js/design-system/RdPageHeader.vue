@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RdInfoTooltip from './RdInfoTooltip.vue';
+
 interface BreadcrumbItem {
   label: string;
   href?: string;
@@ -34,12 +36,16 @@ withDefaults(
           </span>
         </template>
       </nav>
-      <h1 class="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-        {{ title }}
-      </h1>
-      <p v-if="description" class="text-xs md:text-sm text-slate-600 dark:text-slate-400 mt-1">
-        {{ description }}
-      </p>
+      <div class="flex items-center gap-2 flex-wrap">
+        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+          {{ title }}
+        </h1>
+        <RdInfoTooltip
+          v-if="description"
+          :text="description"
+          title="Informasi Menu"
+        />
+      </div>
     </div>
     <div v-if="$slots.actions" class="flex items-center gap-2 self-start md:self-auto">
       <slot name="actions" />
