@@ -24,23 +24,34 @@ class ReceiptScanController
         protected TransactionService $transactionService
     ) {}
 
-    public function index(Request $request): Response
+    public function index(Request $request, ?string $tenantSlug = null): Response
     {
         $tenant = TenantContext::get();
         $user = $request->user();
 
-        $categories = FinanceCategory::where('is_active', true)
-            ->where('type', 'expense')
-            ->orderBy('name')
-            ->get();
+        try {
+            $categories = FinanceCategory::where('is_active', true)
+                ->where('category_type', 'expense')
+                ->orderBy('name')
+                ->get();
+        } catch (\Throwable) {
+            $categories = collect();
+        }
 
-        $accounts = FinanceAccount::orderBy('name')->get();
+        try {
+            $accounts = FinanceAccount::where('is_active', true)
+                ->orderBy('name')
+                ->get();
+        } catch (\Throwable) {
+            $accounts = collect();
+        }
 
         return Inertia::render('Pekan/ReceiptScan/Index', [
             'user' => $user ? [
                 'id' => $user->id,
                 'name' => $user->full_name,
                 'email' => $user->email,
+                'has_mfa' => (bool) $user->mfaMethods()->where('is_verified', true)->exists(),
             ] : null,
             'tenant' => $tenant,
             'tenants' => $user ? $user->getActiveTenants() : [],
@@ -50,7 +61,7 @@ class ReceiptScanController
         ]);
     }
 
-    public function upload(Request $request): JsonResponse|RedirectResponse
+    public function upload(Request $request, ?string $tenantSlug = null): JsonResponse|RedirectResponse
     {
         $request->validate([
             'receipt_file' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:10240',
@@ -68,7 +79,8 @@ class ReceiptScanController
             }
 
             $tenant = TenantContext::get();
-            return redirect("/t/{$tenant->slug}/apps/pekan/receipt-scan")
+            $slug = $tenant?->slug ?: $tenantSlug;
+            return redirect("/t/{$slug}/apps/pekan/receipt-scan")
                 ->with('status', 'Struk berhasil diproses untuk ditinjau.');
         } catch (\Throwable $e) {
             if ($request->wantsJson() || $request->ajax()) {
@@ -82,7 +94,7 @@ class ReceiptScanController
         }
     }
 
-    public function confirm(Request $request): JsonResponse|RedirectResponse
+    public function confirm(Request $request, ?string $tenantSlug = null): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
             'scan_id' => 'nullable|string',
@@ -106,18 +118,21 @@ class ReceiptScanController
         ]);
 
         $tenant = TenantContext::get();
+        $slug = $tenant?->slug ?: $tenantSlug;
 
         // 1. Resolve Rekening Akun
         $accountId = $validated['account_id'] ?? null;
         if (empty($accountId)) {
-            $defaultAccount = FinanceAccount::first();
+            $defaultAccount = FinanceAccount::where('is_active', true)->first();
             $accountId = $defaultAccount ? $defaultAccount->id : 'default-account';
         }
 
         // 2. Resolve Kategori
         $categoryId = $validated['category_id'] ?? null;
         if (empty($categoryId)) {
-            $defaultCategory = FinanceCategory::where('type', 'expense')->first();
+            $defaultCategory = FinanceCategory::where('is_active', true)
+                ->where('category_type', 'expense')
+                ->first();
             $categoryId = $defaultCategory?->id;
         }
 
@@ -169,11 +184,12 @@ class ReceiptScanController
                 'success' => true,
                 'message' => $successMsg,
                 'transaction_id' => $transaction->id,
-                'redirect_url' => "/t/{$tenant->slug}/apps/pekan/transactions",
+                'redirect_url' => "/t/{$slug}/apps/pekan/transactions",
             ]);
         }
 
-        return redirect("/t/{$tenant->slug}/apps/pekan/transactions")
+        return redirect("/t/{$slug}/apps/pekan/transactions")
             ->with('status', $successMsg);
     }
 }
+
