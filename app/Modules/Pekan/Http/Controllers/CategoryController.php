@@ -23,7 +23,7 @@ class CategoryController
 
         $validated = $request->validate([
             'name' => 'required|string|max:150',
-            'category_type' => 'required|string|in:expense,income',
+            'category_type' => 'required|string|in:expense,income,savings',
             'parent_id' => 'nullable|string|max:36',
             'icon' => 'nullable|string|max:50',
             'color' => 'nullable|string|max:20',
@@ -61,7 +61,7 @@ class CategoryController
 
         $validated = $request->validate([
             'name' => 'required|string|max:150',
-            'category_type' => 'required|string|in:expense,income',
+            'category_type' => 'required|string|in:expense,income,savings',
             'parent_id' => 'nullable|string|max:36',
             'icon' => 'nullable|string|max:50',
             'color' => 'nullable|string|max:20',

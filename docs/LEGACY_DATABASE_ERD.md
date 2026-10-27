@@ -49,7 +49,7 @@ erDiagram
 * `id`: VARCHAR(36) Kunci Utama (UUID)
 * `tenant_id`: VARCHAR(36) Kunci Asing ke tenants
 * `name`: VARCHAR(150) Nama kategori
-* `category_type`: VARCHAR(20) Jenis pos (income atau expense)
+* `category_type`: VARCHAR(20) Jenis pos (income, expense, atau savings)
 * `parent_id`: VARCHAR(36) Nullable, relasi hirarki ke kategori induk
 * `icon`: VARCHAR(50) Pengenal ikon netral
 * `color`: VARCHAR(20) Pengenal token warna

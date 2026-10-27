@@ -81,7 +81,7 @@ class TransactionController
         $validated = $request->validate([
             'account_id' => 'nullable|string',
             'category_id' => 'nullable|string',
-            'type' => 'required|in:income,expense,transfer',
+            'type' => 'required|in:income,expense,transfer,savings',
             'amount_minor' => 'required|integer|min:1',
             'transaction_date' => 'required|date',
             'description' => 'required|string|max:255',
@@ -157,7 +157,7 @@ class TransactionController
 
         $validated = $request->validate([
             'category_id' => 'nullable|string',
-            'type' => 'required|in:income,expense,transfer',
+            'type' => 'required|in:income,expense,transfer,savings',
             'amount_minor' => 'required|integer|min:1',
             'transaction_date' => 'required|date',
             'description' => 'required|string|max:255',

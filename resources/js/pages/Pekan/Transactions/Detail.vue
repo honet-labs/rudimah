@@ -66,8 +66,8 @@ const itemColumns = [
             <div>
               <dt class="text-slate-500 font-medium">Jenis Mutasi</dt>
               <dd class="mt-0.5">
-                <RdBadge variant="neutral">
-                  {{ transaction.type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}
+                <RdBadge :variant="transaction.type === 'income' ? 'success' : (transaction.type === 'savings' ? 'info' : 'neutral')">
+                  {{ transaction.type === 'income' ? 'Pemasukan' : (transaction.type === 'savings' ? 'Tabungan' : 'Pengeluaran') }}
                 </RdBadge>
               </dd>
             </div>

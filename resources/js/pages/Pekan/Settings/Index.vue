@@ -18,7 +18,7 @@ import type { User, Tenant } from '../../../types/core';
 interface CategoryItem {
   id: string;
   name: string;
-  category_type: 'expense' | 'income';
+  category_type: 'expense' | 'income' | 'savings';
   parent_id?: string | null;
   icon?: string | null;
   color?: string | null;
@@ -41,10 +41,11 @@ const categoryColumns = [
   { key: 'actions', label: 'Aksi', width: '150px', align: 'center' as const },
 ];
 
-const categoryTab = ref<'all' | 'expense' | 'income'>('all');
+const categoryTab = ref<'all' | 'expense' | 'income' | 'savings'>('all');
 
 const expenseCount = computed(() => (props.categories || []).filter(c => c.category_type === 'expense').length);
 const incomeCount = computed(() => (props.categories || []).filter(c => c.category_type === 'income').length);
+const savingsCount = computed(() => (props.categories || []).filter(c => c.category_type === 'savings').length);
 
 const filteredCategories = computed(() => {
   const list = props.categories || [];
@@ -60,21 +61,23 @@ const isSubmitting = ref(false);
 
 const categoryForm = ref({
   name: '',
-  category_type: 'expense' as 'expense' | 'income',
+  category_type: 'expense' as 'expense' | 'income' | 'savings',
   is_active: true,
 });
 
 const categoryTypeOptions = [
   { label: 'Pengeluaran (Expense)', value: 'expense' },
   { label: 'Pemasukan (Income)', value: 'income' },
+  { label: 'Tabungan (Savings)', value: 'savings' },
 ];
 
 function openCreateModal() {
   isEditing.value = false;
   editingId.value = null;
+  const defaultType = categoryTab.value === 'income' ? 'income' : (categoryTab.value === 'savings' ? 'savings' : 'expense');
   categoryForm.value = {
     name: '',
-    category_type: categoryTab.value === 'income' ? 'income' : 'expense',
+    category_type: defaultType,
     is_active: true,
   };
   showCategoryModal.value = true;
@@ -165,7 +168,7 @@ function deleteCategory() {
     <div class="mb-6">
       <RdCard
         title="Kategori Transaksi Keuangan"
-        description="Kelola pos pengeluaran dan pemasukan kas untuk pencatatan transaksi, anggaran bulanan, dan ekstraksi struk OCR"
+        description="Kelola pos pengeluaran, pemasukan, dan tabungan kas untuk pencatatan transaksi, anggaran bulanan, dan ekstraksi struk OCR"
       >
         <template #actions>
           <RdButton variant="primary" size="sm" @click="openCreateModal">
@@ -222,6 +225,22 @@ function deleteCategory() {
               {{ incomeCount }}
             </span>
           </button>
+
+          <button
+            type="button"
+            :class="[
+              'px-3 sm:px-4 py-2 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 shrink-0 cursor-pointer',
+              categoryTab === 'savings'
+                ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
+                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            ]"
+            @click="categoryTab = 'savings'"
+          >
+            <span>Tabungan</span>
+            <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+              {{ savingsCount }}
+            </span>
+          </button>
         </div>
 
         <!-- Tabel Kategori Transaksi -->
@@ -232,8 +251,11 @@ function deleteCategory() {
             </template>
 
             <template #category_type="{ value }">
-              <RdBadge :variant="value === 'income' ? 'success' : 'neutral'" class="whitespace-nowrap">
-                {{ value === 'income' ? 'Pemasukan' : 'Pengeluaran' }}
+              <RdBadge
+                :variant="value === 'income' ? 'success' : (value === 'savings' ? 'info' : 'neutral')"
+                class="whitespace-nowrap"
+              >
+                {{ value === 'income' ? 'Pemasukan' : (value === 'savings' ? 'Tabungan' : 'Pengeluaran') }}
               </RdBadge>
             </template>
 
@@ -259,7 +281,7 @@ function deleteCategory() {
         <RdEmptyState
           v-else
           title="Belum Ada Kategori Transaksi"
-          description="Tambahkan kategori pengeluaran atau pemasukan baru agar dapat dipilih saat mencatat transaksi."
+          description="Tambahkan kategori pengeluaran, pemasukan, atau tabungan baru agar dapat dipilih saat mencatat transaksi."
         >
           <template #actions>
             <RdButton variant="primary" size="sm" @click="openCreateModal">
@@ -317,14 +339,14 @@ function deleteCategory() {
     <RdModal
       v-model="showCategoryModal"
       :title="isEditing ? 'Ubah Kategori Transaksi' : 'Tambah Kategori Transaksi'"
-      :description="isEditing ? 'Perbarui informasi pos kategori keuangan' : 'Buat pos kategori baru untuk pengeluaran atau pemasukan ruang kerja'"
+      :description="isEditing ? 'Perbarui informasi pos kategori keuangan' : 'Buat pos kategori baru untuk pengeluaran, pemasukan, atau tabungan ruang kerja'"
       max-width="md"
     >
       <form @submit.prevent="submitCategory" class="space-y-4 py-2">
         <RdInput
           v-model="categoryForm.name"
           label="Nama Kategori"
-          placeholder="Contoh: Belanja Bulanan, Gaji, Transportasi"
+          placeholder="Contoh: Belanja Bulanan, Gaji, Transportasi, Tabungan Impian"
           hint="Nama pos yang mudah dipahami saat input transaksi"
           required
         />
@@ -333,7 +355,7 @@ function deleteCategory() {
           v-model="categoryForm.category_type"
           label="Jenis Transaksi"
           :options="categoryTypeOptions"
-          hint="Pilih apakah kategori ini diperuntukkan bagi pengeluaran atau pemasukan"
+          hint="Pilih apakah kategori ini diperuntukkan bagi pengeluaran, pemasukan, atau tabungan"
           required
         />
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
@@ -27,7 +27,9 @@ const props = withDefaults(
 );
 
 const isSubmitting = ref(false);
-const transactionType = ref<'income' | 'expense'>(props.transaction.type === 'income' ? 'income' : 'expense');
+const transactionType = ref<'income' | 'expense' | 'savings'>(
+  props.transaction.type === 'income' ? 'income' : (props.transaction.type === 'savings' ? 'savings' : 'expense')
+);
 const categoryId = ref(props.transaction.category_id || (props.categories[0]?.id || ''));
 const transactionDate = ref(props.transaction.transaction_date ? props.transaction.transaction_date.substring(0, 10) : new Date().toISOString().substring(0, 10));
 const description = ref(props.transaction.description || '');
@@ -60,6 +62,14 @@ const categoryOptions = computed(() =>
     .filter(c => c.category_type === transactionType.value)
     .map(c => ({ label: c.name, value: c.id }))
 );
+
+watch(transactionType, (newType) => {
+  const currentCategory = props.categories.find(c => c.id === categoryId.value);
+  if (!currentCategory || currentCategory.category_type !== newType) {
+    const match = props.categories.find(c => c.category_type === newType);
+    categoryId.value = match ? match.id : '';
+  }
+});
 
 function addItem() {
   items.value.push({
@@ -143,7 +153,7 @@ function handleSubmit() {
                 <button
                   type="button"
                   :class="[
-                    'px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors',
+                    'px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors cursor-pointer',
                     transactionType === 'income'
                       ? 'bg-teal-700 text-white border-teal-700'
                       : 'border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400'
@@ -151,6 +161,18 @@ function handleSubmit() {
                   @click="transactionType = 'income'"
                 >
                   Pemasukan
+                </button>
+                <button
+                  type="button"
+                  :class="[
+                    'px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors cursor-pointer',
+                    transactionType === 'savings'
+                      ? 'bg-sky-700 text-white border-sky-700'
+                      : 'border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400'
+                  ]"
+                  @click="transactionType = 'savings'"
+                >
+                  Tabungan
                 </button>
               </div>
             </div>

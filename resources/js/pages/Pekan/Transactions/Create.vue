@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
@@ -27,8 +27,8 @@ const props = withDefaults(
 );
 
 const isSubmitting = ref(false);
-const transactionType = ref<'income' | 'expense'>('expense');
-const categoryId = ref(props.categories[0]?.id || '');
+const transactionType = ref<'income' | 'expense' | 'savings'>('expense');
+const categoryId = ref(props.categories.find(c => c.category_type === 'expense')?.id || props.categories[0]?.id || '');
 const transactionDate = ref(new Date().toISOString().substring(0, 10));
 const description = ref('');
 const merchantName = ref('');
@@ -44,6 +44,11 @@ const categoryOptions = computed(() =>
     .filter(c => c.category_type === transactionType.value)
     .map(c => ({ label: c.name, value: c.id }))
 );
+
+watch(transactionType, (newType) => {
+  const match = props.categories.find(c => c.category_type === newType);
+  categoryId.value = match ? match.id : '';
+});
 
 function addItem() {
   items.value.push({
@@ -121,6 +126,7 @@ function handleSubmit() {
             :options="[
               { label: 'Pengeluaran (Belanja)', value: 'expense' },
               { label: 'Pemasukan (Pendapatan)', value: 'income' },
+              { label: 'Tabungan (Simpanan)', value: 'savings' },
             ]"
             required
           />

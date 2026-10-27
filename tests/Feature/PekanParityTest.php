@@ -42,6 +42,21 @@ class PekanParityTest extends TestCase
         $this->assertTrue($category->is_active);
     }
 
+    public function test_finance_category_supports_savings_type(): void
+    {
+        $category = new \App\Modules\Pekan\Models\FinanceCategory([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'tenant_id' => (string) \Illuminate\Support\Str::uuid(),
+            'name' => 'Dana Darurat',
+            'category_type' => 'savings',
+            'is_active' => true,
+        ]);
+
+        $this->assertEquals('Dana Darurat', $category->name);
+        $this->assertEquals('savings', $category->category_type);
+        $this->assertTrue($category->is_active);
+    }
+
     public function test_pekan_edit_routes_are_registered(): void
     {
         $routes = \Illuminate\Support\Facades\Route::getRoutes();

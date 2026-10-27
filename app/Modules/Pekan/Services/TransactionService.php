@@ -69,7 +69,7 @@ class TransactionService
             if ($account) {
                 if ($data['type'] === 'income') {
                     $account->increment('current_balance_minor', (int) $data['amount_minor']);
-                } elseif ($data['type'] === 'expense') {
+                } elseif ($data['type'] === 'expense' || $data['type'] === 'savings') {
                     $account->decrement('current_balance_minor', (int) $data['amount_minor']);
                 }
             }
@@ -93,7 +93,7 @@ class TransactionService
             if ($account) {
                 if ($oldType === 'income') {
                     $account->decrement('current_balance_minor', (int) $oldAmount);
-                } elseif ($oldType === 'expense') {
+                } elseif ($oldType === 'expense' || $oldType === 'savings') {
                     $account->increment('current_balance_minor', (int) $oldAmount);
                 }
             }
@@ -134,7 +134,7 @@ class TransactionService
             if ($account) {
                 if ($transaction->type === 'income') {
                     $account->increment('current_balance_minor', (int) $transaction->amount_minor);
-                } elseif ($transaction->type === 'expense') {
+                } elseif ($transaction->type === 'expense' || $transaction->type === 'savings') {
                     $account->decrement('current_balance_minor', (int) $transaction->amount_minor);
                 }
             }

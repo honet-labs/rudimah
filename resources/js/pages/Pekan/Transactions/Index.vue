@@ -64,6 +64,7 @@ const typeOptions = [
   { label: 'Semua Jenis Mutasi', value: 'all' },
   { label: 'Pemasukan (Income)', value: 'income' },
   { label: 'Pengeluaran (Expense)', value: 'expense' },
+  { label: 'Tabungan (Savings)', value: 'savings' },
 ];
 
 const columns = [
@@ -131,7 +132,7 @@ const columns = [
       </template>
       <template #type="{ value }">
         <span class="text-xs uppercase font-medium text-slate-500">
-          {{ value === 'income' ? 'Pemasukan' : value === 'expense' ? 'Pengeluaran' : 'Transfer' }}
+          {{ value === 'income' ? 'Pemasukan' : value === 'expense' ? 'Pengeluaran' : value === 'savings' ? 'Tabungan' : 'Transfer' }}
         </span>
       </template>
       <template #amount_minor="{ item }">

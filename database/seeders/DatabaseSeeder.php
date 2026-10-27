@@ -85,6 +85,8 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Tagihan Listrik & Air', 'type' => 'expense'],
             ['name' => 'Pendidikan', 'type' => 'expense'],
             ['name' => 'Hiburan', 'type' => 'expense'],
+            ['name' => 'Dana Darurat', 'type' => 'savings'],
+            ['name' => 'Investasi & Tabungan Impian', 'type' => 'savings'],
         ];
 
         foreach ($categories as $cat) {

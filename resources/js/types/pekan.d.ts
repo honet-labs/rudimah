@@ -1,7 +1,7 @@
 export interface FinanceCategory {
   id: string;
   name: string;
-  category_type: 'income' | 'expense';
+  category_type: 'income' | 'expense' | 'savings';
   parent_id?: string | null;
   icon?: string;
   is_active: boolean;
