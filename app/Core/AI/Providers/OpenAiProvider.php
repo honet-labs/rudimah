@@ -44,6 +44,7 @@ class OpenAiProvider implements AiProviderInterface
             'model' => $model,
             'messages' => $formattedMessages,
             'temperature' => (float) ($options['temperature'] ?? 0.7),
+            'max_tokens' => (int) ($options['max_tokens'] ?? 2048),
             'stream' => false,
         ];
 

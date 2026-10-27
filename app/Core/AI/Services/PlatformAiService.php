@@ -231,6 +231,7 @@ class PlatformAiService
             $response = $instance->chat($messages, [
                 'model' => $activeModel,
                 'api_endpoint' => $activeEndpoint,
+                'max_tokens' => 2048,
             ]);
             $latencyMs = round((microtime(true) - $startTime) * 1000);
 
