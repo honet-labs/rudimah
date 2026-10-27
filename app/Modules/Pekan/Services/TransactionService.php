@@ -5,6 +5,7 @@ namespace App\Modules\Pekan\Services;
 use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Models\FinanceAccount;
+use App\Modules\Pekan\Models\FinanceCategory;
 use App\Modules\Pekan\Models\FinanceTransaction;
 use App\Modules\Pekan\Models\FinanceTransactionItem;
 use Illuminate\Support\Facades\DB;
@@ -22,18 +23,51 @@ class TransactionService
         return DB::connection('pekan')->transaction(function () use ($data, $items, $tenantId) {
             $accountId = $data['account_id'] ?? null;
             $account = $accountId ? FinanceAccount::find($accountId) : FinanceAccount::first();
-            $resolvedAccountId = $account ? $account->id : 'default-account';
+
+            // Jika belum ada akun kas di ruang kerja ini, buatkan akun default otomatis
+            if (!$account) {
+                $account = FinanceAccount::create([
+                    'id' => (string) Str::uuid(),
+                    'tenant_id' => $tenantId,
+                    'name' => 'Kas Utama',
+                    'account_type' => 'cash',
+                    'currency' => 'IDR',
+                    'opening_balance_minor' => 0,
+                    'current_balance_minor' => 0,
+                    'is_active' => true,
+                    'created_by' => auth()->id() ?? 'system',
+                ]);
+            }
+            $resolvedAccountId = $account->id;
+
+            // Resolusi Kategori: bila category_id kosong namun category string diberikan
+            $categoryId = $data['category_id'] ?? null;
+            if (!$categoryId && !empty($data['category'])) {
+                $categoryName = trim($data['category']);
+                $category = FinanceCategory::where('name', 'like', "%{$categoryName}%")->first();
+                if (!$category) {
+                    $category = FinanceCategory::create([
+                        'id' => (string) Str::uuid(),
+                        'tenant_id' => $tenantId,
+                        'name' => $categoryName,
+                        'category_type' => in_array($data['type'] ?? '', ['income', 'expense', 'savings']) ? $data['type'] : 'expense',
+                        'is_active' => true,
+                        'created_by' => auth()->id() ?? 'system',
+                    ]);
+                }
+                $categoryId = $category->id;
+            }
 
             $txId = (string) Str::uuid();
             $transaction = FinanceTransaction::create([
                 'id' => $txId,
                 'tenant_id' => $tenantId,
                 'account_id' => $resolvedAccountId,
-                'category_id' => $data['category_id'] ?? null,
+                'category_id' => $categoryId,
                 'type' => $data['type'],
                 'amount_minor' => (int) $data['amount_minor'],
-                'currency' => $data['currency'] ?? 'Rp',
-                'transaction_date' => $data['transaction_date'],
+                'currency' => $data['currency'] ?? 'IDR',
+                'transaction_date' => $data['transaction_date'] ?? now()->toDateString(),
                 'input_date' => now()->toDateString(),
                 'description' => $data['description'],
                 'merchant_name' => $data['merchant_name'] ?? null,

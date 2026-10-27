@@ -51,6 +51,15 @@ class FinanceTransaction extends Model
         'input_date' => 'date',
     ];
 
+    protected $appends = [
+        'category_name',
+    ];
+
+    public function getCategoryNameAttribute(): ?string
+    {
+        return $this->category?->name;
+    }
+
     protected static function booted(): void
     {
         static::addGlobalScope(new TenantScope);

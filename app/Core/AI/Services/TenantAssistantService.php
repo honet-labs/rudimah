@@ -8,6 +8,7 @@ use App\Core\AI\Models\AiMessage;
 use App\Core\AI\Models\TenantAiSetting;
 use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Pekan\Services\TransactionService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -15,13 +16,16 @@ class TenantAssistantService
 {
     protected AiProviderManager $providerManager;
     protected TenantFinancialContextBuilder $contextBuilder;
+    protected TransactionService $transactionService;
 
     public function __construct(
         AiProviderManager $providerManager,
-        TenantFinancialContextBuilder $contextBuilder
+        TenantFinancialContextBuilder $contextBuilder,
+        TransactionService $transactionService
     ) {
         $this->providerManager = $providerManager;
         $this->contextBuilder = $contextBuilder;
+        $this->transactionService = $transactionService;
     }
 
     /**
@@ -189,7 +193,58 @@ class TenantAssistantService
             ];
         }
 
-        // 6. Simpan respon asisten
+        // 6. Deteksi dan Eksekusi Pencatatan Transaksi Nyata ke Database
+        $recordedTransactions = [];
+        [$parsedActions, $cleanedReply] = $this->extractTransactionActions($replyContent, $userMessageText);
+
+        if (!empty($parsedActions)) {
+            foreach ($parsedActions as $action) {
+                try {
+                    $amountMinor = (int) ($action['amount_minor'] ?? 0);
+                    if ($amountMinor <= 0 && !empty($action['amount'])) {
+                        $amountMinor = (int) round((float) $action['amount']);
+                    }
+                    if ($amountMinor <= 0) {
+                        continue;
+                    }
+
+                    $type = strtolower($action['type'] ?? 'expense');
+                    if (!in_array($type, ['income', 'expense', 'savings', 'transfer'])) {
+                        $type = 'expense';
+                    }
+
+                    $tx = $this->transactionService->createTransaction([
+                        'type' => $type,
+                        'amount_minor' => $amountMinor,
+                        'description' => $action['description'] ?? 'Transaksi via Asisten AI',
+                        'category' => $action['category'] ?? null,
+                        'transaction_date' => $action['date'] ?? now()->toDateString(),
+                        'notes' => 'Dicatat secara otomatis melalui Asisten AI',
+                    ]);
+
+                    $recordedTransactions[] = [
+                        'id' => $tx->id,
+                        'type' => $tx->type,
+                        'description' => $tx->description,
+                        'amount_minor' => $tx->amount_minor,
+                        'date' => (string) $tx->transaction_date,
+                    ];
+                } catch (\Throwable $e) {
+                    Log::error('[TenantAssistantService] Gagal mencatat transaksi dari AI: ' . $e->getMessage());
+                }
+            }
+
+            if (!empty($recordedTransactions)) {
+                $meta['recorded_transactions'] = $recordedTransactions;
+                $replyContent = $cleanedReply;
+                if (empty(trim($replyContent))) {
+                    $count = count($recordedTransactions);
+                    $replyContent = "Transaksi berhasil dicatat ke dalam daftar mutasi ({$count} transaksi).";
+                }
+            }
+        }
+
+        // 7. Simpan respon asisten
         $assistantMessage = AiMessage::create([
             'id' => (string) Str::uuid(),
             'conversation_id' => $conversation->id,
@@ -202,6 +257,80 @@ class TenantAssistantService
         ]);
 
         return $assistantMessage;
+    }
+
+    /**
+     * Mengekstrak instruksi pencatatan transaksi baik dari blok JSON terstruktur
+     * maupun dari pola baris item balasan teks AI (sebagai fallback).
+     */
+    protected function extractTransactionActions(string $replyContent, string $userMessageText): array
+    {
+        // 1. Ekstraksi Primer: Blok ```json:transaction_action ... ``` atau ```json ... ```
+        if (preg_match('/```(?:json:transaction_action|json)?\s*(\[\s*\{.*?\}\s*\])\s*```/is', $replyContent, $matches)) {
+            $parsed = json_decode($matches[1], true);
+            if (is_array($parsed) && !empty($parsed)) {
+                $cleaned = trim(str_replace($matches[0], '', $replyContent));
+                return [$parsed, $cleaned];
+            }
+        }
+
+        // 2. Ekstraksi Sekunder: Blok objek tunggal ```json:transaction_action { ... } ```
+        if (preg_match('/```(?:json:transaction_action|json)?\s*(\{\s*"type"\s*:.*?\}\s*)\s*```/is', $replyContent, $matches)) {
+            $parsed = json_decode($matches[1], true);
+            if (is_array($parsed) && !empty($parsed)) {
+                $cleaned = trim(str_replace($matches[0], '', $replyContent));
+                return [[$parsed], $cleaned];
+            }
+        }
+
+        // 3. Ekstraksi Tertier: JSON array mentah tanpa markdown fence
+        if (preg_match('/(\[\s*\{\s*"type"\s*:.*?"amount_minor"\s*:.*?\}\s*\])/is', $replyContent, $matches)) {
+            $parsed = json_decode($matches[1], true);
+            if (is_array($parsed) && !empty($parsed)) {
+                $cleaned = trim(str_replace($matches[0], '', $replyContent));
+                return [$parsed, $cleaned];
+            }
+        }
+
+        // 4. Ekstraksi Kuartener (Fallback cerdas): Jika pengguna meminta pencatatan ("masukin/catat/simpan/input")
+        // dan balasan asisten merinci baris-baris "- Item: Rp XX.XXX"
+        $isUserAskingToRecord = (bool) preg_match('/(masuk(?:in|kan)?|catat(?:kan)?|tambah(?:kan)?|simpan|input|buatkan mutasi)\b/i', $userMessageText);
+        if ($isUserAskingToRecord) {
+            $transactions = [];
+            if (preg_match_all('/^[\s*•-]*([A-Za-z0-9\s\/\(\)]+?)\s*:\s*(?:Rp\.?|IDR)?\s*([\d\.,]+)/mi', $replyContent, $lineMatches, PREG_SET_ORDER)) {
+                $isIncome = (bool) preg_match('/(pemasukan|gaji|income|transfer masuk)\b/i', $userMessageText);
+                $type = $isIncome ? 'income' : 'expense';
+
+                foreach ($lineMatches as $match) {
+                    $itemDesc = trim($match[1]);
+                    $rawNominal = $match[2];
+
+                    $descLower = strtolower($itemDesc);
+                    if (in_array($descLower, ['total', 'subtotal', 'sisa', 'saldo', 'anggaran', 'total hari ini', 'total pengeluaran', 'total pemasukan', 'catatan'])) {
+                        continue;
+                    }
+
+                    $nominalDigits = preg_replace('/[^\d]/', '', $rawNominal);
+                    $amountMinor = (int) $nominalDigits;
+
+                    if ($amountMinor > 0 && strlen($itemDesc) >= 2) {
+                        $transactions[] = [
+                            'type' => $type,
+                            'description' => $itemDesc,
+                            'amount_minor' => $amountMinor,
+                            'date' => now()->toDateString(),
+                            'category' => 'Pengeluaran Harian',
+                        ];
+                    }
+                }
+
+                if (!empty($transactions)) {
+                    return [$transactions, $replyContent];
+                }
+            }
+        }
+
+        return [[], $replyContent];
     }
 }
 

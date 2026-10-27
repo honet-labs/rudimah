@@ -105,7 +105,7 @@ class TransactionController
 
         if (empty($validated['account_id'])) {
             $defaultAccount = FinanceAccount::first();
-            $validated['account_id'] = $defaultAccount ? $defaultAccount->id : 'acc-default';
+            $validated['account_id'] = $defaultAccount?->id;
         }
 
         $items = $request->input('items', []);
