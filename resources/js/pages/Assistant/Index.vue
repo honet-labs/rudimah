@@ -8,6 +8,7 @@ import RdBadge from '../../design-system/RdBadge.vue';
 import RdModal from '../../design-system/RdModal.vue';
 import RdAlert from '../../design-system/RdAlert.vue';
 import RdInfoTooltip from '../../design-system/RdInfoTooltip.vue';
+import { secureFetch } from '../../utils/csrf';
 import type { Tenant, AppManifest, User } from '../../types/core';
 
 interface Conversation {
@@ -97,7 +98,7 @@ async function loadConversation(id: string) {
   activeConversationId.value = id;
   isLoadingConversation.value = true;
   try {
-    const res = await fetch(`/t/${props.tenant.slug}/assistant/conversations/${id}`, {
+    const res = await secureFetch(`/t/${props.tenant.slug}/assistant/conversations/${id}`, {
       headers: {
         Accept: 'application/json',
       },
@@ -116,12 +117,11 @@ async function loadConversation(id: string) {
 
 async function startNewConversation() {
   try {
-    const res = await fetch(`/t/${props.tenant.slug}/assistant/conversations`, {
+    const res = await secureFetch(`/t/${props.tenant.slug}/assistant/conversations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        'X-CSRF-TOKEN': getCsrfToken(),
       },
       body: JSON.stringify({ title: 'Percakapan Baru' }),
     });
@@ -141,11 +141,10 @@ async function deleteConversation(id: string) {
   if (!confirm('Hapus percakapan ini secara permanen?')) return;
 
   try {
-    const res = await fetch(`/t/${props.tenant.slug}/assistant/conversations/${id}`, {
+    const res = await secureFetch(`/t/${props.tenant.slug}/assistant/conversations/${id}`, {
       method: 'DELETE',
       headers: {
         Accept: 'application/json',
-        'X-CSRF-TOKEN': getCsrfToken(),
       },
     });
 
@@ -191,12 +190,11 @@ async function handleSendMessage(promptText?: string) {
   scrollToBottom();
 
   try {
-    const res = await fetch(`/t/${props.tenant.slug}/assistant/conversations/${currentConvId}/messages`, {
+    const res = await secureFetch(`/t/${props.tenant.slug}/assistant/conversations/${currentConvId}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        'X-CSRF-TOKEN': getCsrfToken(),
       },
       body: JSON.stringify({ message: text }),
     });
@@ -238,12 +236,11 @@ async function saveSettings() {
   settingsAlert.value = null;
 
   try {
-    const res = await fetch(`/t/${props.tenant.slug}/assistant/settings`, {
+    const res = await secureFetch(`/t/${props.tenant.slug}/assistant/settings`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        'X-CSRF-TOKEN': getCsrfToken(),
       },
       body: JSON.stringify(formSettings.value),
     });
@@ -263,11 +260,6 @@ async function saveSettings() {
   } finally {
     isSavingSettings.value = false;
   }
-}
-
-function getCsrfToken(): string {
-  const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement;
-  return meta?.content || '';
 }
 
 onMounted(() => {

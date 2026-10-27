@@ -10,6 +10,7 @@ import RdInput from '../../../design-system/RdInput.vue';
 import RdSelect from '../../../design-system/RdSelect.vue';
 import RdMoney from '../../../design-system/RdMoney.vue';
 import RdAlert from '../../../design-system/RdAlert.vue';
+import { secureFetch } from '../../../utils/csrf';
 import type { User, Tenant, AppManifest } from '../../../types/core';
 import type { ReceiptExtraction } from '../../../types/pekan';
 
@@ -54,11 +55,6 @@ const extraction = ref<ReceiptExtraction>({
   items: [],
 });
 
-function getCsrfToken(): string {
-  const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement;
-  return meta?.content || '';
-}
-
 async function handleFileSelected(file: File) {
   isProcessing.value = true;
   errorMessage.value = null;
@@ -68,11 +64,10 @@ async function handleFileSelected(file: File) {
   formData.append('receipt_file', file);
 
   try {
-    const res = await fetch(`/t/${props.tenant.slug}/apps/pekan/receipt-scan/upload`, {
+    const res = await secureFetch(`/t/${props.tenant.slug}/apps/pekan/receipt-scan/upload`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        'X-CSRF-TOKEN': getCsrfToken(),
       },
       body: formData,
     });
@@ -167,12 +162,11 @@ async function saveConfirmedTransaction() {
   errorMessage.value = null;
 
   try {
-    const res = await fetch(`/t/${props.tenant.slug}/apps/pekan/receipt-scan/confirm`, {
+    const res = await secureFetch(`/t/${props.tenant.slug}/apps/pekan/receipt-scan/confirm`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        'X-CSRF-TOKEN': getCsrfToken(),
       },
       body: JSON.stringify({
         scan_id: scanId.value,

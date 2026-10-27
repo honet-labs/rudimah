@@ -12,6 +12,7 @@ import RdSelect from '../../design-system/RdSelect.vue';
 import RdCheckbox from '../../design-system/RdCheckbox.vue';
 import RdAlert from '../../design-system/RdAlert.vue';
 import RdModal from '../../design-system/RdModal.vue';
+import { secureFetch } from '../../utils/csrf';
 import type { User, AppManifest, Tenant } from '../../types/core';
 
 interface AdminUserItem {
@@ -246,11 +247,6 @@ function saveAiSettings() {
   });
 }
 
-function getCsrfToken(): string {
-  const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement;
-  return meta?.content || '';
-}
-
 const aiTestResult = ref<{
   loading: boolean;
   success?: boolean;
@@ -279,12 +275,11 @@ async function runAiTest() {
   aiTestResult.value = { loading: true };
 
   try {
-    const res = await fetch('/admin/ai/test', {
+    const res = await secureFetch('/admin/ai/test', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        'X-CSRF-TOKEN': getCsrfToken(),
       },
       body: JSON.stringify({
         provider: target,

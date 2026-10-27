@@ -36,6 +36,13 @@ Route::match(['get', 'head'], '/', function (\Illuminate\Http\Request $request) 
     return auth()->check() ? redirect('/workspaces') : redirect('/login');
 });
 
+// Endpoint ringan untuk refresh CSRF token sesi aktif secara dinamis
+Route::get('/csrf-token', function () {
+    return response()->json([
+        'csrf_token' => csrf_token(),
+    ]);
+});
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
