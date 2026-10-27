@@ -19,7 +19,6 @@ class FinanceBudget extends Model
 
     protected $fillable = [
         'id',
-        'ida',
         'tenant_id',
         'name',
         'category_id',
@@ -45,6 +44,7 @@ class FinanceBudget extends Model
     ];
 
     protected $appends = [
+        'category_name',
         'progress_percent',
         'is_past',
         'period_label',
@@ -58,6 +58,99 @@ class FinanceBudget extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(FinanceCategory::class, 'category_id');
+    }
+
+    public function getCategoryNameAttribute(): ?string
+    {
+        return $this->category?->name;
+    }
+
+    public function getDateRange(): array
+    {
+        $start = $this->start_date ? \Carbon\Carbon::parse($this->start_date) : now();
+        $period = $this->period ?: 'monthly';
+
+        if ($this->end_date) {
+            $startDate = $start->copy()->startOfDay();
+            $endDate = \Carbon\Carbon::parse($this->end_date)->endOfDay();
+        } elseif ($period === 'weekly') {
+            $startDate = $start->copy()->startOfWeek()->startOfDay();
+            $endDate = $start->copy()->endOfWeek()->endOfDay();
+        } elseif ($period === 'yearly') {
+            $startDate = $start->copy()->startOfYear()->startOfDay();
+            $endDate = $start->copy()->endOfYear()->endOfDay();
+        } else { // monthly
+            $startDate = $start->copy()->startOfMonth()->startOfDay();
+            $endDate = $start->copy()->endOfMonth()->endOfDay();
+        }
+
+        return [$startDate, $endDate];
+    }
+
+    public function recalculateSpentAmount(): int
+    {
+        [$startDate, $endDate] = $this->getDateRange();
+
+        $categoryIds = [];
+        $catWords = [];
+
+        if ($this->category_id) {
+            $categoryIds[] = $this->category_id;
+
+            // Masukkan ID subkategori jika ada
+            $subCatIds = FinanceCategory::where('tenant_id', $this->tenant_id)
+                ->where('parent_id', $this->category_id)
+                ->pluck('id')
+                ->all();
+            $categoryIds = array_merge($categoryIds, $subCatIds);
+
+            // Kata kunci dari nama pos anggaran atau kategori terkait
+            $catName = $this->category?->name ?: $this->name;
+            $words = array_filter(
+                explode(' ', strtolower(preg_replace('/[^a-zA-Z0-9\s]/', ' ', $catName))),
+                fn($w) => strlen($w) >= 3 && !in_array($w, ['dan', 'yang', 'atau', 'pos', 'anggaran'])
+            );
+            $catWords = array_values($words);
+
+            if (!empty($catWords)) {
+                $similarCats = FinanceCategory::where('tenant_id', $this->tenant_id)
+                    ->whereNotIn('id', $categoryIds)
+                    ->where(function ($q) use ($catWords) {
+                        foreach ($catWords as $word) {
+                            $q->orWhere('name', 'like', "%{$word}%");
+                        }
+                    })
+                    ->pluck('id')
+                    ->all();
+                $categoryIds = array_merge($categoryIds, $similarCats);
+            }
+        }
+
+        $query = FinanceTransaction::where('tenant_id', $this->tenant_id)
+            ->where('type', 'expense')
+            ->whereBetween('transaction_date', [$startDate->toDateString(), $endDate->toDateString()]);
+
+        if (!empty($categoryIds)) {
+            $query->where(function ($q) use ($categoryIds, $catWords) {
+                $q->whereIn('category_id', $categoryIds);
+                if (!empty($catWords)) {
+                    foreach ($catWords as $word) {
+                        $q->orWhere(function ($sub) use ($word) {
+                            $sub->whereNull('category_id')->where('description', 'like', "%{$word}%");
+                        });
+                    }
+                }
+            });
+        }
+
+        $spent = (int) $query->sum('amount_minor');
+
+        if ($this->spent_amount_minor !== $spent) {
+            $this->spent_amount_minor = $spent;
+            $this->saveQuietly();
+        }
+
+        return $spent;
     }
 
     public function getProgressPercentAttribute(): float

@@ -5,6 +5,7 @@ namespace App\Modules\Pekan\Services;
 use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Models\FinanceAccount;
+use App\Modules\Pekan\Models\FinanceBudget;
 use App\Modules\Pekan\Models\FinanceCategory;
 use App\Modules\Pekan\Models\FinanceTransaction;
 use App\Modules\Pekan\Models\FinanceTransactionItem;
@@ -40,23 +41,14 @@ class TransactionService
             }
             $resolvedAccountId = $account->id;
 
-            // Resolusi Kategori: bila category_id kosong namun category string diberikan
-            $categoryId = $data['category_id'] ?? null;
-            if (!$categoryId && !empty($data['category'])) {
-                $categoryName = trim($data['category']);
-                $category = FinanceCategory::where('name', 'like', "%{$categoryName}%")->first();
-                if (!$category) {
-                    $category = FinanceCategory::create([
-                        'id' => (string) Str::uuid(),
-                        'tenant_id' => $tenantId,
-                        'name' => $categoryName,
-                        'category_type' => in_array($data['type'] ?? '', ['income', 'expense', 'savings']) ? $data['type'] : 'expense',
-                        'is_active' => true,
-                        'created_by' => auth()->id() ?? 'system',
-                    ]);
-                }
-                $categoryId = $category->id;
-            }
+            // Resolusi Kategori cerdas (mencocokkan kategori dan pos anggaran aktif yang relevan)
+            $categoryId = $this->resolveCategoryId(
+                $tenantId,
+                $data['category_id'] ?? null,
+                $data['category'] ?? null,
+                $data['description'] ?? null,
+                $data['type'] ?? 'expense'
+            );
 
             $txId = (string) Str::uuid();
             $transaction = FinanceTransaction::create([
@@ -109,6 +101,11 @@ class TransactionService
             }
 
             AuditLogger::log('create_transaction', 'finance_transactions', $txId, null, $transaction->toArray());
+
+            // Sinkronkan realisasi anggaran aktif otomatis jika pengeluaran
+            if ($transaction->type === 'expense') {
+                $this->syncActiveBudgets($tenantId);
+            }
 
             return $transaction;
         });
@@ -175,8 +172,104 @@ class TransactionService
 
             AuditLogger::log('update_transaction', 'finance_transactions', $transaction->id, null, $transaction->toArray());
 
+            // Sinkronkan realisasi anggaran aktif otomatis
+            $this->syncActiveBudgets($tenantId);
+
             return $transaction;
         });
+    }
+
+    /**
+     * Resolusi kategori cerdas dengan prioritas menghubungkan ke pos anggaran aktif yang relevan.
+     */
+    protected function resolveCategoryId(string $tenantId, ?string $categoryId, ?string $categoryName, ?string $description, string $type): ?string
+    {
+        if ($categoryId && FinanceCategory::where('tenant_id', $tenantId)->where('id', $categoryId)->exists()) {
+            return $categoryId;
+        }
+
+        $categoryName = trim($categoryName ?? '');
+        $description = trim($description ?? '');
+
+        // 1. Cek pencocokan persis atau parsial nama kategori yang sudah ada
+        if (!empty($categoryName)) {
+            $cat = FinanceCategory::where('tenant_id', $tenantId)->where('name', $categoryName)->first()
+                ?: FinanceCategory::where('tenant_id', $tenantId)->where('name', 'like', "%{$categoryName}%")->first();
+            if ($cat) {
+                return $cat->id;
+            }
+        }
+
+        // 2. Cek kecocokan dengan pos anggaran aktif (prioritas tinggi agar transaksi memotong anggaran yang relevan)
+        $activeBudgets = FinanceBudget::with('category')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->get();
+
+        $textToMatch = strtolower($categoryName . ' ' . $description);
+        foreach ($activeBudgets as $b) {
+            $bCat = $b->category;
+            $words = array_filter(
+                explode(' ', strtolower(preg_replace('/[^a-zA-Z0-9\s]/', ' ', $b->name . ' ' . ($bCat?->name ?? '')))),
+                fn($w) => strlen($w) >= 3 && !in_array($w, ['dan', 'yang', 'atau', 'pos', 'anggaran'])
+            );
+
+            foreach ($words as $kw) {
+                if (str_contains($textToMatch, $kw)) {
+                    return $b->category_id;
+                }
+            }
+        }
+
+        // 3. Cek kata kunci pada deskripsi terhadap kategori yang sudah ada
+        if (!empty($description)) {
+            $descWords = array_filter(
+                explode(' ', strtolower(preg_replace('/[^a-zA-Z0-9\s]/', ' ', $description))),
+                fn($w) => strlen($w) >= 3 && !in_array($w, ['dan', 'yang', 'atau', 'ini', 'hari'])
+            );
+            foreach ($descWords as $w) {
+                $matchedCat = FinanceCategory::where('tenant_id', $tenantId)
+                    ->where('name', 'like', "%{$w}%")
+                    ->first();
+                if ($matchedCat) {
+                    return $matchedCat->id;
+                }
+            }
+        }
+
+        // 4. Jika nama kategori spesifik diusulkan namun belum ada di DB, buatkan kategori baru
+        if (!empty($categoryName)) {
+            $newCat = FinanceCategory::create([
+                'id' => (string) Str::uuid(),
+                'tenant_id' => $tenantId,
+                'name' => $categoryName,
+                'category_type' => in_array($type, ['income', 'expense', 'savings']) ? $type : 'expense',
+                'is_active' => true,
+                'created_by' => auth()->id() ?? 'system',
+            ]);
+            return $newCat->id;
+        }
+
+        return null;
+    }
+
+    /**
+     * Memperbarui kalkulasi spent_amount_minor seluruh pos anggaran aktif di ruang kerja.
+     */
+    public function syncActiveBudgets(string $tenantId): void
+    {
+        try {
+            $budgets = FinanceBudget::where('tenant_id', $tenantId)
+                ->where('status', 'active')
+                ->get();
+
+            foreach ($budgets as $b) {
+                $b->recalculateSpentAmount();
+            }
+        } catch (\Throwable $e) {
+            // fail-safe logging without breaking transaction flow
+            \Illuminate\Support\Facades\Log::warning('[TransactionService] Gagal sinkronisasi anggaran: ' . $e->getMessage());
+        }
     }
 }
 

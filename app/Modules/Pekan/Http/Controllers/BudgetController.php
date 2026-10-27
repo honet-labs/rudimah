@@ -20,6 +20,9 @@ class BudgetController
         $user = $request->user();
 
         $budgets = FinanceBudget::with('category')->get();
+        foreach ($budgets as $budget) {
+            $budget->recalculateSpentAmount();
+        }
 
         $tenants = $user ? $user->getActiveTenants() : [];
 

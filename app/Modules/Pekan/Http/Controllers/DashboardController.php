@@ -52,6 +52,9 @@ class DashboardController
         $activeBudgets = FinanceBudget::with('category')
             ->where('status', 'active')
             ->get();
+        foreach ($activeBudgets as $budget) {
+            $budget->recalculateSpentAmount();
+        }
 
         $activeSavings = FinanceSavings::where('status', 'active')->get();
 

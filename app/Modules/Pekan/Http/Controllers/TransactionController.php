@@ -191,7 +191,10 @@ class TransactionController
     public function destroy(Request $request, string $tenantSlug, string $id): RedirectResponse
     {
         $transaction = FinanceTransaction::findOrFail($id);
+        $tenantId = $transaction->tenant_id;
         $transaction->delete();
+
+        $this->transactionService->syncActiveBudgets($tenantId);
 
         $tenant = TenantContext::get();
         $slug = $tenant?->slug ?: $tenantSlug;

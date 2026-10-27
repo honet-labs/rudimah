@@ -31,15 +31,16 @@ class TenantFinancialContextBuilder
             $netCashFlowMinor = $totalIncomeMinor - $totalExpenseMinor;
 
             // 2. Anggaran Kategori Aktif
-            $budgets = FinanceBudget::where('tenant_id', $tenantId)
+            $budgets = FinanceBudget::with('category')->where('tenant_id', $tenantId)
                 ->where('status', 'active')
                 ->get();
 
             $budgetsSummary = [];
             foreach ($budgets as $b) {
+                $b->recalculateSpentAmount();
                 $pct = $b->amount_limit_minor > 0 ? round(($b->spent_amount_minor / $b->amount_limit_minor) * 100) : 0;
-                $budgetName = $b->name ?: "Kategori ID {$b->category_id}";
-                $budgetsSummary[] = "- {$budgetName}: limit " . MoneyHelper::formatIdr($b->amount_limit_minor) . ", terpakai " . MoneyHelper::formatIdr($b->spent_amount_minor) . " ({$pct}%)";
+                $catName = $b->category?->name ?: $b->name;
+                $budgetsSummary[] = "- {$b->name} (Kategori: '{$catName}'): limit " . MoneyHelper::formatIdr($b->amount_limit_minor) . ", terpakai " . MoneyHelper::formatIdr($b->spent_amount_minor) . " ({$pct}%)";
             }
 
             // 3. Tabungan Aktif
@@ -171,7 +172,7 @@ class TenantFinancialContextBuilder
         $prompt .= "- 'description': nama / keterangan singkat transaksi.\n";
         $prompt .= "- 'amount_minor': nominal dalam satuan Rupiah bulat angka tanpa titik koma (contoh: 24000 untuk Rp 24.000).\n";
         $prompt .= "- 'date': tanggal transaksi (format YYYY-MM-DD, gunakan tanggal hari ini jika disebutkan hari ini).\n";
-        $prompt .= "- 'category': nama kategori terdekat dari daftar kategori yang tersedia.\n";
+        $prompt .= "- 'category': nama kategori terdekat dari daftar kategori atau pos anggaran yang tersedia (sangat penting: utamakan memilih nama kategori yang memiliki pos anggaran aktif agar pengeluaran terhitung ke anggaran).\n";
         $prompt .= "PENTING: Blok ```json:transaction_action``` HANYA boleh disertakan jika pengguna secara eksplisit meminta memasukkan / mencatat transaksi. DILARANG menyertakannya jika pengguna hanya bertanya informasi, saldo, atau konsultasi.\n\n";
 
         if ($customInstructions) {

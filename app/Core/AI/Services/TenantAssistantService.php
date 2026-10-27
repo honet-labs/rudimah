@@ -319,7 +319,7 @@ class TenantAssistantService
                             'description' => $itemDesc,
                             'amount_minor' => $amountMinor,
                             'date' => now()->toDateString(),
-                            'category' => 'Pengeluaran Harian',
+                            'category' => null,
                         ];
                     }
                 }
