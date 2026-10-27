@@ -47,14 +47,17 @@ class NineRouterProvider implements AiProviderInterface
 
         $url = $this->buildChatCompletionsUrl($endpoint);
 
+        $payload = [
+            'model' => $model,
+            'messages' => $formattedMessages,
+            'temperature' => (float) ($options['temperature'] ?? 0.7),
+            'stream' => false,
+        ];
+
         try {
             $response = Http::withToken($this->apiKey)
-                ->timeout(45)
-                ->post($url, [
-                    'model' => $model,
-                    'messages' => $formattedMessages,
-                    'temperature' => (float) ($options['temperature'] ?? 0.7),
-                ]);
+                ->timeout(60)
+                ->post($url, $payload);
         } catch (\Throwable $e) {
             Log::error('9Router API connection exception', ['endpoint' => $url, 'error' => $e->getMessage()]);
             throw new \RuntimeException("Gagal menghubungi endpoint 9Router ({$url}): " . $e->getMessage());
@@ -62,11 +65,101 @@ class NineRouterProvider implements AiProviderInterface
 
         if ($response->successful()) {
             $data = $response->json();
-            $content = $data['choices'][0]['message']['content'] ?? '';
+
+            // 1. Cek jika API mengembalikan payload error dengan status HTTP 200
+            if (!empty($data['error'])) {
+                $errMsg = is_array($data['error'])
+                    ? ($data['error']['message'] ?? json_encode($data['error']))
+                    : (string) $data['error'];
+                throw new \RuntimeException("Layanan 9Router melaporkan kesalahan: {$errMsg}");
+            }
+
+            $content = '';
+
+            // 2. Format standar OpenAI choices[0].message.content
+            if (isset($data['choices'][0]['message']['content'])) {
+                $rawContent = $data['choices'][0]['message']['content'];
+                if (is_array($rawContent)) {
+                    $parts = [];
+                    foreach ($rawContent as $part) {
+                        if (is_string($part)) {
+                            $parts[] = $part;
+                        } elseif (is_array($part) && isset($part['text'])) {
+                            $parts[] = $part['text'];
+                        }
+                    }
+                    $content = implode("\n", $parts);
+                } else {
+                    $content = (string) $rawContent;
+                }
+            }
+
+            // 3. Format reasoning_content (DeepSeek-R1 / QwQ / thinking model pada 9Router)
+            if (empty(trim($content)) && !empty($data['choices'][0]['message']['reasoning_content'])) {
+                $content = (string) $data['choices'][0]['message']['reasoning_content'];
+            }
+
+            // 4. Format reasoning alternatif
+            if (empty(trim($content)) && !empty($data['choices'][0]['message']['reasoning'])) {
+                $content = (string) $data['choices'][0]['message']['reasoning'];
+            }
+
+            // 5. Format choices text (completions model)
+            if (empty(trim($content)) && !empty($data['choices'][0]['text'])) {
+                $content = (string) $data['choices'][0]['text'];
+            }
+
+            // 6. Format delta content
+            if (empty(trim($content)) && !empty($data['choices'][0]['delta']['content'])) {
+                $content = (string) $data['choices'][0]['delta']['content'];
+            }
+
+            // 7. Format tool calls arguments
+            if (empty(trim($content)) && !empty($data['choices'][0]['message']['tool_calls'][0]['function']['arguments'])) {
+                $content = (string) $data['choices'][0]['message']['tool_calls'][0]['function']['arguments'];
+            }
+
+            // 8. Format refusal
+            if (empty(trim($content)) && !empty($data['choices'][0]['message']['refusal'])) {
+                $content = (string) $data['choices'][0]['message']['refusal'];
+            }
+
+            // 9. Format response streaming SSE mentah jika endpoint mengembalikan chunk text
+            if (empty(trim($content))) {
+                $rawBody = $response->body();
+                if (str_contains($rawBody, 'data:')) {
+                    $lines = explode("\n", $rawBody);
+                    $streamText = '';
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if (str_starts_with($line, 'data:') && !str_contains($line, '[DONE]')) {
+                            $chunkJson = json_decode(trim(substr($line, 5)), true);
+                            if (!empty($chunkJson['choices'][0]['delta']['content'])) {
+                                $streamText .= $chunkJson['choices'][0]['delta']['content'];
+                            } elseif (!empty($chunkJson['choices'][0]['delta']['reasoning_content'])) {
+                                $streamText .= $chunkJson['choices'][0]['delta']['reasoning_content'];
+                            } elseif (!empty($chunkJson['choices'][0]['message']['content'])) {
+                                $streamText .= $chunkJson['choices'][0]['message']['content'];
+                            }
+                        }
+                    }
+                    if (!empty(trim($streamText))) {
+                        $content = $streamText;
+                    }
+                }
+            }
+
             $tokens = (int) ($data['usage']['total_tokens'] ?? 0);
 
             if (empty(trim($content))) {
-                throw new \RuntimeException("Model 9Router ({$model}) mengembalikan respon kosong.");
+                $finishReason = $data['choices'][0]['finish_reason'] ?? 'tidak diketahui';
+                $preview = mb_strimwidth($response->body(), 0, 300, '...');
+                Log::warning('9Router empty response body', [
+                    'endpoint' => $url,
+                    'finish_reason' => $finishReason,
+                    'body' => $preview,
+                ]);
+                throw new \RuntimeException("Model 9Router ({$model}) mengembalikan respon kosong (alasan berhenti: {$finishReason}). Respons mentah: {$preview}");
             }
 
             return [
@@ -76,6 +169,7 @@ class NineRouterProvider implements AiProviderInterface
                 'metadata' => [
                     'provider' => '9router',
                     'endpoint' => $endpoint,
+                    'finish_reason' => $data['choices'][0]['finish_reason'] ?? 'stop',
                 ],
             ];
         }

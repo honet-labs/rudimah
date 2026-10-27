@@ -40,14 +40,17 @@ class OpenAiProvider implements AiProviderInterface
             ];
         }
 
+        $payload = [
+            'model' => $model,
+            'messages' => $formattedMessages,
+            'temperature' => (float) ($options['temperature'] ?? 0.7),
+            'stream' => false,
+        ];
+
         try {
             $response = Http::withToken($this->apiKey)
-                ->timeout(45)
-                ->post("{$this->apiBaseUrl}/chat/completions", [
-                    'model' => $model,
-                    'messages' => $formattedMessages,
-                    'temperature' => (float) ($options['temperature'] ?? 0.7),
-                ]);
+                ->timeout(60)
+                ->post("{$this->apiBaseUrl}/chat/completions", $payload);
         } catch (\Throwable $e) {
             Log::error('OpenAI API exception', ['error' => $e->getMessage()]);
             throw new \RuntimeException("Gagal menghubungi layanan OpenAI ({$this->apiBaseUrl}): " . $e->getMessage());
@@ -55,11 +58,63 @@ class OpenAiProvider implements AiProviderInterface
 
         if ($response->successful()) {
             $data = $response->json();
-            $content = $data['choices'][0]['message']['content'] ?? '';
+
+            if (!empty($data['error'])) {
+                $errMsg = is_array($data['error'])
+                    ? ($data['error']['message'] ?? json_encode($data['error']))
+                    : (string) $data['error'];
+                throw new \RuntimeException("OpenAI melaporkan kesalahan: {$errMsg}");
+            }
+
+            $content = '';
+
+            if (isset($data['choices'][0]['message']['content'])) {
+                $rawContent = $data['choices'][0]['message']['content'];
+                if (is_array($rawContent)) {
+                    $parts = [];
+                    foreach ($rawContent as $part) {
+                        if (is_string($part)) {
+                            $parts[] = $part;
+                        } elseif (is_array($part) && isset($part['text'])) {
+                            $parts[] = $part['text'];
+                        }
+                    }
+                    $content = implode("\n", $parts);
+                } else {
+                    $content = (string) $rawContent;
+                }
+            }
+
+            if (empty(trim($content)) && !empty($data['choices'][0]['message']['reasoning_content'])) {
+                $content = (string) $data['choices'][0]['message']['reasoning_content'];
+            }
+
+            if (empty(trim($content)) && !empty($data['choices'][0]['message']['reasoning'])) {
+                $content = (string) $data['choices'][0]['message']['reasoning'];
+            }
+
+            if (empty(trim($content)) && !empty($data['choices'][0]['text'])) {
+                $content = (string) $data['choices'][0]['text'];
+            }
+
+            if (empty(trim($content)) && !empty($data['choices'][0]['delta']['content'])) {
+                $content = (string) $data['choices'][0]['delta']['content'];
+            }
+
+            if (empty(trim($content)) && !empty($data['choices'][0]['message']['refusal'])) {
+                $content = (string) $data['choices'][0]['message']['refusal'];
+            }
+
             $tokens = $data['usage']['total_tokens'] ?? 0;
 
             if (empty(trim($content))) {
-                throw new \RuntimeException("Model OpenAI ({$model}) mengembalikan respon kosong.");
+                $finishReason = $data['choices'][0]['finish_reason'] ?? 'tidak diketahui';
+                $preview = mb_strimwidth($response->body(), 0, 300, '...');
+                Log::warning('OpenAI empty response body', [
+                    'finish_reason' => $finishReason,
+                    'body' => $preview,
+                ]);
+                throw new \RuntimeException("Model OpenAI ({$model}) mengembalikan respon kosong (finish_reason: {$finishReason}). Respons mentah: {$preview}");
             }
 
             return [

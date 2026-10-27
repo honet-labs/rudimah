@@ -171,7 +171,7 @@ class TenantFinancialContextBuilder
         $prompt .= "- 'type': 'expense' (pengeluaran) atau 'income' (pemasukan).\n";
         $prompt .= "- 'description': nama / keterangan singkat transaksi.\n";
         $prompt .= "- 'amount_minor': nominal dalam satuan Rupiah bulat angka tanpa titik koma (contoh: 24000 untuk Rp 24.000).\n";
-        $prompt .= "- 'date': tanggal transaksi (format YYYY-MM-DD, gunakan tanggal hari ini jika disebutkan hari ini).\n";
+        $prompt .= "- 'date': tanggal transaksi (format YYYY-MM-DD, sesuaikan jika pengguna menyebut kemarin atau tanggal lain, default ke tanggal hari ini).\n";
         $prompt .= "- 'category': nama kategori terdekat dari daftar kategori atau pos anggaran yang tersedia (sangat penting: utamakan memilih nama kategori yang memiliki pos anggaran aktif agar pengeluaran terhitung ke anggaran).\n";
         $prompt .= "PENTING: Blok ```json:transaction_action``` HANYA boleh disertakan jika pengguna secara eksplisit meminta memasukkan / mencatat transaksi. DILARANG menyertakannya jika pengguna hanya bertanya informasi, saldo, atau konsultasi.\n\n";
 
