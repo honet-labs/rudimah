@@ -26,8 +26,12 @@ class NineRouterProvider implements AiProviderInterface
 
     public function chat(array $messages, array $options = []): array
     {
-        $model = $options['model'] ?? $this->defaultModel;
-        $endpoint = rtrim($options['api_endpoint'] ?? $this->apiBaseUrl, '/');
+        $model = !empty($options['model']) ? $options['model'] : $this->defaultModel;
+        $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;
+
+        if (empty($endpoint)) {
+            $endpoint = rtrim(config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1'), '/');
+        }
 
         if (empty($this->apiKey)) {
             throw new \RuntimeException('Token akses / API Key 9Router belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
@@ -89,8 +93,12 @@ class NineRouterProvider implements AiProviderInterface
 
     public function extractReceipt(string $fileBase64, string $mimeType, array $options = []): array
     {
-        $model = $options['model'] ?? $this->defaultModel;
-        $endpoint = rtrim($options['api_endpoint'] ?? $this->apiBaseUrl, '/');
+        $model = !empty($options['model']) ? $options['model'] : $this->defaultModel;
+        $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;
+
+        if (empty($endpoint)) {
+            $endpoint = rtrim(config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1'), '/');
+        }
 
         if (empty($this->apiKey)) {
             throw new \RuntimeException('Token akses 9Router belum dikonfigurasi untuk pemindaian kuitansi OCR.');
@@ -205,6 +213,9 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
     protected function buildChatCompletionsUrl(string $endpoint): string
     {
         $clean = rtrim($endpoint, '/');
+        if (empty($clean)) {
+            $clean = rtrim(config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1'), '/');
+        }
         if (str_ends_with($clean, '/chat/completions')) {
             return $clean;
         }

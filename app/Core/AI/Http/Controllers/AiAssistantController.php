@@ -5,6 +5,7 @@ namespace App\Core\AI\Http\Controllers;
 use App\Core\AI\Models\AiConversation;
 use App\Core\AI\Models\AiMessage;
 use App\Core\AI\Models\TenantAiSetting;
+use App\Core\AI\Services\PlatformAiService;
 use App\Core\AI\Services\TenantAssistantService;
 use App\Core\Applications\AppRegistry;
 use App\Core\Audit\AuditLogger;
@@ -33,6 +34,8 @@ class AiAssistantController
         if (!$tenant) {
             abort(403, 'Konteks ruang kerja belum aktif.');
         }
+
+        PlatformAiService::applyRuntimeConfig();
 
         $user = $request->user();
         $userId = $user?->id;
@@ -186,12 +189,19 @@ class AiAssistantController
             return response()->json(['message' => 'Akses ditolak.'], 403);
         }
 
-        $assistantMessage = $this->assistantService->sendMessage($conversation, $validated['message']);
+        try {
+            $assistantMessage = $this->assistantService->sendMessage($conversation, $validated['message']);
 
-        return response()->json([
-            'success' => true,
-            'reply' => $assistantMessage,
-        ]);
+            return response()->json([
+                'success' => true,
+                'reply' => $assistantMessage,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memproses pesan: ' . $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**

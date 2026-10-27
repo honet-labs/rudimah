@@ -26,8 +26,12 @@ class ClaudeProvider implements AiProviderInterface
 
     public function chat(array $messages, array $options = []): array
     {
-        $model = $options['model'] ?? $this->defaultModel;
-        $endpoint = rtrim($options['api_endpoint'] ?? $this->apiBaseUrl, '/');
+        $model = !empty($options['model']) ? $options['model'] : $this->defaultModel;
+        $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;
+
+        if (empty($endpoint)) {
+            $endpoint = rtrim(config('rudimah.ai.claude_endpoint', 'https://api.anthropic.com/v1'), '/');
+        }
 
         if (empty($this->apiKey)) {
             throw new \RuntimeException('Kunci API Anthropic Claude belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
@@ -115,8 +119,12 @@ class ClaudeProvider implements AiProviderInterface
 
     public function extractReceipt(string $fileBase64, string $mimeType, array $options = []): array
     {
-        $model = $options['model'] ?? $this->defaultModel;
-        $endpoint = rtrim($options['api_endpoint'] ?? $this->apiBaseUrl, '/');
+        $model = !empty($options['model']) ? $options['model'] : $this->defaultModel;
+        $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;
+
+        if (empty($endpoint)) {
+            $endpoint = rtrim(config('rudimah.ai.claude_endpoint', 'https://api.anthropic.com/v1'), '/');
+        }
 
         if (empty($this->apiKey)) {
             throw new \RuntimeException('Kunci API Anthropic Claude belum dikonfigurasi untuk pemindaian kuitansi OCR.');
@@ -252,6 +260,9 @@ Format JSON wajib:
     protected function buildMessagesUrl(string $endpoint): string
     {
         $clean = rtrim($endpoint, '/');
+        if (empty($clean)) {
+            $clean = rtrim(config('rudimah.ai.claude_endpoint', 'https://api.anthropic.com/v1'), '/');
+        }
         if (str_ends_with($clean, '/messages')) {
             return $clean;
         }

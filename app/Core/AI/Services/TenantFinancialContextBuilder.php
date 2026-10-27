@@ -19,85 +19,89 @@ class TenantFinancialContextBuilder
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
-            throw new \RuntimeException('Konteks ruang kerja belum aktif.');
+            return "Konteks ruang kerja belum aktif.\n";
         }
 
         $tenantId = $tenant->id;
 
-        // 1. Arus Kas & Saldo Berjalan (strictly scoped to tenant_id)
-        $totalIncomeMinor = (int) FinanceTransaction::where('tenant_id', $tenantId)->where('type', 'income')->sum('amount_minor');
-        $totalExpenseMinor = (int) FinanceTransaction::where('tenant_id', $tenantId)->where('type', 'expense')->sum('amount_minor');
-        $netCashFlowMinor = $totalIncomeMinor - $totalExpenseMinor;
+        try {
+            // 1. Arus Kas & Saldo Berjalan (strictly scoped to tenant_id)
+            $totalIncomeMinor = (int) FinanceTransaction::where('tenant_id', $tenantId)->where('type', 'income')->sum('amount_minor');
+            $totalExpenseMinor = (int) FinanceTransaction::where('tenant_id', $tenantId)->where('type', 'expense')->sum('amount_minor');
+            $netCashFlowMinor = $totalIncomeMinor - $totalExpenseMinor;
 
-        // 2. Anggaran Kategori Aktif
-        $budgets = FinanceBudget::where('tenant_id', $tenantId)
-            ->where('status', 'active')
-            ->get();
+            // 2. Anggaran Kategori Aktif
+            $budgets = FinanceBudget::where('tenant_id', $tenantId)
+                ->where('status', 'active')
+                ->get();
 
-        $budgetsSummary = [];
-        foreach ($budgets as $b) {
-            $pct = $b->amount_limit_minor > 0 ? round(($b->spent_amount_minor / $b->amount_limit_minor) * 100) : 0;
-            $budgetName = $b->name ?: "Kategori ID {$b->category_id}";
-            $budgetsSummary[] = "- {$budgetName}: limit " . MoneyHelper::formatIdr($b->amount_limit_minor) . ", terpakai " . MoneyHelper::formatIdr($b->spent_amount_minor) . " ({$pct}%)";
+            $budgetsSummary = [];
+            foreach ($budgets as $b) {
+                $pct = $b->amount_limit_minor > 0 ? round(($b->spent_amount_minor / $b->amount_limit_minor) * 100) : 0;
+                $budgetName = $b->name ?: "Kategori ID {$b->category_id}";
+                $budgetsSummary[] = "- {$budgetName}: limit " . MoneyHelper::formatIdr($b->amount_limit_minor) . ", terpakai " . MoneyHelper::formatIdr($b->spent_amount_minor) . " ({$pct}%)";
+            }
+
+            // 3. Tabungan Aktif
+            $savings = FinanceSavings::where('tenant_id', $tenantId)
+                ->where('status', 'active')
+                ->get();
+
+            $savingsSummary = [];
+            foreach ($savings as $s) {
+                $pct = $s->target_amount_minor > 0 ? round(($s->current_amount_minor / $s->target_amount_minor) * 100) : 0;
+                $savingsSummary[] = "- {$s->name}: " . MoneyHelper::formatIdr($s->current_amount_minor) . " dari target " . MoneyHelper::formatIdr($s->target_amount_minor) . " ({$pct}%)";
+            }
+
+            // 4. Pengingat Mendatang
+            $reminders = FinanceReminder::where('tenant_id', $tenantId)
+                ->where('status', 'pending')
+                ->orderBy('due_date', 'asc')
+                ->limit(5)
+                ->get();
+
+            $remindersSummary = [];
+            foreach ($reminders as $r) {
+                $remindersSummary[] = "- {$r->title}: jatuh tempo {$r->due_date}, nominal " . MoneyHelper::formatIdr($r->amount_minor ?? 0);
+            }
+
+            // 5. Transaksi Terbaru (5 terakhir)
+            $recentTransactions = FinanceTransaction::where('tenant_id', $tenantId)
+                ->orderBy('transaction_date', 'desc')
+                ->limit(5)
+                ->get();
+
+            $transactionsSummary = [];
+            foreach ($recentTransactions as $tx) {
+                $transactionsSummary[] = "- {$tx->transaction_date} [{$tx->type}]: " . MoneyHelper::formatIdr($tx->amount_minor) . " (" . ($tx->description ?: 'Tanpa keterangan') . ")";
+            }
+
+            $contextText = "=== KONTEKS RUANG KERJA AKTIF ===\n";
+            $contextText .= "Nama Ruang Kerja: {$tenant->name}\n";
+            $contextText .= "Kode Ruang Kerja: {$tenant->code}\n";
+            $contextText .= "ID Ruang Kerja: {$tenantId}\n\n";
+
+            $contextText .= "RINGKASAN ARUS KAS & SALDO BERJALAN:\n";
+            $contextText .= "- Total Pemasukan: " . MoneyHelper::formatIdr($totalIncomeMinor) . "\n";
+            $contextText .= "- Total Pengeluaran: " . MoneyHelper::formatIdr($totalExpenseMinor) . "\n";
+            $contextText .= "- Saldo Kas Bersih: " . MoneyHelper::formatIdr($netCashFlowMinor) . "\n\n";
+
+            $contextText .= "RINGKASAN ANGGARAN AKTIF:\n";
+            $contextText .= empty($budgetsSummary) ? "Belum ada anggaran aktif.\n\n" : implode("\n", $budgetsSummary) . "\n\n";
+
+            $contextText .= "TARGET TABUNGAN AKTIF:\n";
+            $contextText .= empty($savingsSummary) ? "Belum ada pos tabungan.\n\n" : implode("\n", $savingsSummary) . "\n\n";
+
+            $contextText .= "PENGINGAT JATUH TEMPO:\n";
+            $contextText .= empty($remindersSummary) ? "Tidak ada tagihan tertunda.\n\n" : implode("\n", $remindersSummary) . "\n\n";
+
+            $contextText .= "TRANSAKSI TERBARU:\n";
+            $contextText .= empty($transactionsSummary) ? "Belum ada riwayat transaksi.\n" : implode("\n", $transactionsSummary) . "\n";
+
+            return $contextText;
+        } catch (\Throwable $e) {
+            return "=== KONTEKS RUANG KERJA AKTIF ===\nNama Ruang Kerja: {$tenant->name}\n(Catatan: Ringkasan finansial ruang kerja sedang tidak dapat dimuat: {$e->getMessage()})\n\n";
         }
-
-        // 3. Tabungan Aktif
-        $savings = FinanceSavings::where('tenant_id', $tenantId)
-            ->where('status', 'active')
-            ->get();
-
-        $savingsSummary = [];
-        foreach ($savings as $s) {
-            $pct = $s->target_amount_minor > 0 ? round(($s->current_amount_minor / $s->target_amount_minor) * 100) : 0;
-            $savingsSummary[] = "- {$s->name}: " . MoneyHelper::formatIdr($s->current_amount_minor) . " dari target " . MoneyHelper::formatIdr($s->target_amount_minor) . " ({$pct}%)";
-        }
-
-        // 4. Pengingat Mendatang
-        $reminders = FinanceReminder::where('tenant_id', $tenantId)
-            ->where('status', 'pending')
-            ->orderBy('due_date', 'asc')
-            ->limit(5)
-            ->get();
-
-        $remindersSummary = [];
-        foreach ($reminders as $r) {
-            $remindersSummary[] = "- {$r->title}: jatuh tempo {$r->due_date}, nominal " . MoneyHelper::formatIdr($r->amount_minor ?? 0);
-        }
-
-        // 5. Transaksi Terbaru (5 terakhir)
-        $recentTransactions = FinanceTransaction::where('tenant_id', $tenantId)
-            ->orderBy('transaction_date', 'desc')
-            ->limit(5)
-            ->get();
-
-        $transactionsSummary = [];
-        foreach ($recentTransactions as $tx) {
-            $transactionsSummary[] = "- {$tx->transaction_date} [{$tx->type}]: " . MoneyHelper::formatIdr($tx->amount_minor) . " (" . ($tx->description ?: 'Tanpa keterangan') . ")";
-        }
-
-        $contextText = "=== KONTEKS RUANG KERJA AKTIF ===\n";
-        $contextText .= "Nama Ruang Kerja: {$tenant->name}\n";
-        $contextText .= "Kode Ruang Kerja: {$tenant->code}\n";
-        $contextText .= "ID Ruang Kerja: {$tenantId}\n\n";
-
-        $contextText .= "RINGKASAN ARUS KAS & SALDO BERJALAN:\n";
-        $contextText .= "- Total Pemasukan: " . MoneyHelper::formatIdr($totalIncomeMinor) . "\n";
-        $contextText .= "- Total Pengeluaran: " . MoneyHelper::formatIdr($totalExpenseMinor) . "\n";
-        $contextText .= "- Saldo Kas Bersih: " . MoneyHelper::formatIdr($netCashFlowMinor) . "\n\n";
-
-        $contextText .= "RINGKASAN ANGGARAN AKTIF:\n";
-        $contextText .= empty($budgetsSummary) ? "Belum ada anggaran aktif.\n\n" : implode("\n", $budgetsSummary) . "\n\n";
-
-        $contextText .= "TARGET TABUNGAN AKTIF:\n";
-        $contextText .= empty($savingsSummary) ? "Belum ada pos tabungan.\n\n" : implode("\n", $savingsSummary) . "\n\n";
-
-        $contextText .= "PENGINGAT JATUH TEMPO:\n";
-        $contextText .= empty($remindersSummary) ? "Tidak ada tagihan tertunda.\n\n" : implode("\n", $remindersSummary) . "\n\n";
-
-        $contextText .= "TRANSAKSI TERBARU:\n";
-        $contextText .= empty($transactionsSummary) ? "Belum ada riwayat transaksi.\n" : implode("\n", $transactionsSummary) . "\n";
-
-        return $contextText;
     }
 
     /**

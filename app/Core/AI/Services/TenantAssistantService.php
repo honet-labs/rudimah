@@ -8,6 +8,7 @@ use App\Core\AI\Models\AiMessage;
 use App\Core\AI\Models\TenantAiSetting;
 use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\TenantContext;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class TenantAssistantService
@@ -35,7 +36,10 @@ class TenantAssistantService
             throw new \RuntimeException('Konteks ruang kerja dan pengguna wajib aktif.');
         }
 
-        $activeProvider = $setting?->provider ?: config('rudimah.ai.default_provider', 'gemini');
+        PlatformAiService::applyRuntimeConfig();
+
+        $setting = TenantAiSetting::where('tenant_id', $tenantId)->first();
+        $activeProvider = $setting?->provider ?: config('rudimah.ai.default_provider', '9router');
         $activeModel = $setting?->model ?: config("rudimah.ai.{$activeProvider}_model", 'high-models-agent');
 
         $conversation = AiConversation::create([
@@ -72,6 +76,9 @@ class TenantAssistantService
             throw new \Illuminate\Auth\Access\AuthorizationException('Anda tidak memiliki akses ke percakapan ini.');
         }
 
+        // Terapkan konfigurasi AI platform runtime sebelum pemrosesan
+        PlatformAiService::applyRuntimeConfig();
+
         // 1. Simpan pesan pengguna
         $userMessage = AiMessage::create([
             'id' => (string) Str::uuid(),
@@ -102,7 +109,7 @@ class TenantAssistantService
         }
 
         // Tentukan provider dan model aktif
-        $activeProvider = $setting?->provider ?: config('rudimah.ai.default_provider', 'gemini');
+        $activeProvider = $setting?->provider ?: config('rudimah.ai.default_provider', '9router');
         $activeModel = $setting?->model ?: config("rudimah.ai.{$activeProvider}_model", 'high-models-agent');
 
         // Jika percakapan lama memiliki provider yang berbeda atau belum terset, sinkronkan ke provider aktif
@@ -140,7 +147,7 @@ class TenantAssistantService
         $options = [
             'model' => $activeModel,
             'temperature' => $setting?->temperature ?? 0.7,
-            'api_endpoint' => $setting?->api_endpoint,
+            'api_endpoint' => !empty($setting?->api_endpoint) ? $setting->api_endpoint : null,
         ];
 
         try {
@@ -171,10 +178,12 @@ class TenantAssistantService
             'tenant_id' => $tenantId,
             'role' => 'assistant',
             'content' => $replyContent,
-            'tokens_used' => $tokensUsed,
-            'metadata' => $meta,
+            'metadata' => array_merge($meta, [
+                'tokens_used' => $tokensUsed,
+            ]),
         ]);
 
         return $assistantMessage;
     }
 }
+
