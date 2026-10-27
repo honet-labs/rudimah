@@ -138,6 +138,7 @@ Route::prefix('t/{tenantSlug}')->middleware(['auth', EnsureMfaVerified::class, R
             // Pindai Struk OCR
             Route::get('/receipt-scan', [ReceiptScanController::class, 'index'])->name('receiptscan.index');
             Route::post('/receipt-scan/upload', [ReceiptScanController::class, 'upload'])->name('receiptscan.upload');
+            Route::post('/receipt-scan/confirm', [ReceiptScanController::class, 'confirm'])->name('receiptscan.confirm');
 
             // Laporan & Pengaturan
             Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');

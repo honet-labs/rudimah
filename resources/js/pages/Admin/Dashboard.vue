@@ -246,8 +246,23 @@ function saveAiSettings() {
   });
 }
 
+function getCsrfToken(): string {
+  const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement;
+  return meta?.content || '';
+}
+
+const aiTestResult = ref<{
+  loading: boolean;
+  success?: boolean;
+  message?: string;
+  latency_ms?: number;
+} | null>(null);
+
+const aiCardAlert = ref<{ type: 'success' | 'error'; message: string } | null>(null);
+
 function openAiTestModal(provider: 'gemini' | 'openai' | 'claude' | '9router') {
   testAiProvider.value = provider;
+  aiTestResult.value = null;
   showTestAiModal.value = true;
 }
 
@@ -256,23 +271,66 @@ const currentTestingConfig = computed(() => {
   return aiForm.value[provider];
 });
 
-function runAiTest() {
+async function runAiTest() {
   isAiTesting.value = true;
   const target = testAiProvider.value;
   const cfg = aiForm.value[target];
 
-  router.post('/admin/ai/test', {
-    provider: target,
-    api_endpoint: cfg.api_endpoint,
-    api_key: cfg.api_key || undefined,
-    model: cfg.model,
-  }, {
-    preserveScroll: true,
-    onFinish: () => {
-      isAiTesting.value = false;
-      showTestAiModal.value = false;
-    },
-  });
+  aiTestResult.value = { loading: true };
+
+  try {
+    const res = await fetch('/admin/ai/test', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-CSRF-TOKEN': getCsrfToken(),
+      },
+      body: JSON.stringify({
+        provider: target,
+        api_endpoint: cfg.api_endpoint,
+        api_key: cfg.api_key || undefined,
+        model: cfg.model,
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      aiTestResult.value = {
+        loading: false,
+        success: true,
+        message: data.message,
+        latency_ms: data.latency_ms,
+      };
+      aiCardAlert.value = {
+        type: 'success',
+        message: data.message,
+      };
+    } else {
+      aiTestResult.value = {
+        loading: false,
+        success: false,
+        message: data.message || 'Gagal terhubung ke penyedia AI.',
+      };
+      aiCardAlert.value = {
+        type: 'error',
+        message: data.message || 'Gagal terhubung ke penyedia AI.',
+      };
+    }
+  } catch (err: any) {
+    const errMsg = 'Gangguan jaringan saat menguji koneksi: ' + (err.message || 'Koneksi gagal');
+    aiTestResult.value = {
+      loading: false,
+      success: false,
+      message: errMsg,
+    };
+    aiCardAlert.value = {
+      type: 'error',
+      message: errMsg,
+    };
+  } finally {
+    isAiTesting.value = false;
+  }
 }
 </script>
 
@@ -462,6 +520,16 @@ function runAiTest() {
         title="Pusat Konfigurasi Penyedia AI Platform"
         description="Atur kecerdasan buatan terpusat untuk Asisten Keuangan, Ekstraksi Struk OCR, dan Analisis Cerdas di seluruh ruang kerja RUDIMAH (Google Gemini, OpenAI, Anthropic Claude, 9Router Gateway)"
       >
+        <!-- Banner Hasil Pengujian AI Terkini -->
+        <div v-if="aiCardAlert" class="mb-4">
+          <RdAlert
+            :variant="aiCardAlert.type"
+            :title="aiCardAlert.type === 'success' ? 'Hasil Pengujian AI Berhasil' : 'Kendala Uji Koneksi AI'"
+          >
+            {{ aiCardAlert.message }}
+          </RdAlert>
+        </div>
+
         <!-- Ringkasan Status Penyedia AI -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <div
@@ -1270,7 +1338,31 @@ function runAiTest() {
           <div>Endpoint: <span class="font-mono text-[11px]">{{ currentTestingConfig?.api_endpoint }}</span></div>
           <div>Model: <span class="font-mono text-[11px]">{{ currentTestingConfig?.model }}</span></div>
         </div>
-        <p class="text-xs text-slate-500">
+
+        <!-- Indikator Loading Saat Pengujian Berlangsung -->
+        <div v-if="aiTestResult?.loading" class="p-4 rounded-lg bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800 text-xs text-teal-800 dark:text-teal-300 flex items-center gap-2">
+          <svg class="animate-spin h-4 w-4 text-teal-700 dark:text-teal-400 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Menghubungi endpoint dan melakukan uji respon model...</span>
+        </div>
+
+        <!-- Hasil Pengujian Sukses -->
+        <div v-else-if="aiTestResult?.success === true" class="space-y-2">
+          <RdAlert variant="success" title="Koneksi Berhasil Diverifikasi">
+            {{ aiTestResult.message }}
+          </RdAlert>
+        </div>
+
+        <!-- Hasil Pengujian Gagal -->
+        <div v-else-if="aiTestResult?.success === false" class="space-y-2">
+          <RdAlert variant="error" title="Koneksi Gagal / Kendala Otentikasi">
+            {{ aiTestResult.message }}
+          </RdAlert>
+        </div>
+
+        <p v-if="!aiTestResult || aiTestResult.loading" class="text-xs text-slate-500">
           Sistem akan mengirimkan permintaan verifikasi ke endpoint AI di atas untuk memastikan otentikasi kunci API dan keterjangkauan layanan berfungsi dengan baik.
         </p>
       </div>
@@ -1284,7 +1376,7 @@ function runAiTest() {
             :disabled="isAiTesting"
             @click="showTestAiModal = false"
           >
-            Batal
+            {{ aiTestResult?.success !== undefined ? 'Tutup' : 'Batal' }}
           </RdButton>
           <RdButton
             variant="primary"
@@ -1294,6 +1386,7 @@ function runAiTest() {
             @click="runAiTest"
           >
             <span v-if="isAiTesting">Menguji Koneksi...</span>
+            <span v-else-if="aiTestResult?.success !== undefined">Uji Ulang Koneksi</span>
             <span v-else>Jalankan Uji Koneksi</span>
           </RdButton>
         </div>

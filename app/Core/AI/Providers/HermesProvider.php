@@ -65,53 +65,15 @@ class HermesProvider implements AiProviderInterface
                 ];
             }
 
-            Log::warning('Hermes API returned non-200', ['status' => $response->status(), 'endpoint' => $endpoint]);
-            return $this->generateLocalFallbackChat($messages, $model);
-        } catch (\Throwable $e) {
-            Log::info('Hermes API connection exception, using simulation fallback', ['error' => $e->getMessage()]);
-            return $this->generateLocalFallbackChat($messages, $model);
-        }
+        $status = $response->status();
+        $errBody = mb_strimwidth($response->body(), 0, 300, '...');
+        Log::warning('Hermes API returned non-200', ['status' => $status, 'endpoint' => $endpoint, 'body' => $errBody]);
+
+        throw new \RuntimeException("Permintaan ke Hermes ({$endpoint}) gagal (HTTP {$status}): {$errBody}");
     }
 
     public function extractReceipt(string $fileBase64, string $mimeType, array $options = []): array
     {
-        // Hermes difokuskan sebagai Reasoning/Chat Agent. Untuk OCR, delegasikan ke fallback vision standar.
-        return [
-            'merchant_name' => 'HERMES LOCAL STORE',
-            'receipt_number' => 'HRM-' . date('Ymd') . '-088',
-            'transaction_date' => date('Y-m-d'),
-            'currency' => 'Rp',
-            'subtotal_minor' => 150000,
-            'tax_minor' => 16500,
-            'service_charge_minor' => 0,
-            'discount_minor' => 10000,
-            'total_minor' => 156500,
-            'items' => [
-                ['item_name' => 'Paket Perlengkapan Kerja', 'quantity' => 1, 'price_minor' => 150000, 'discount_minor' => 10000, 'total_minor' => 140000],
-            ],
-        ];
-    }
-
-    protected function generateLocalFallbackChat(array $messages, string $model): array
-    {
-        $lastUserMsg = '';
-        foreach (array_reverse($messages) as $m) {
-            if ($m['role'] === 'user') {
-                $lastUserMsg = $m['content'];
-                break;
-            }
-        }
-
-        $reply = "Halo, saya adalah Asisten Cerdas RUDIMAH yang ditenagai model Hermes Agent ({$model}). Saya telah memproses permintaan Anda: \"" . mb_strimwidth($lastUserMsg, 0, 80, '...') . "\". Sesuai kebijakan keamanan platform, seluruh instruksi dan penalaran data saya terisolasi secara mutlak pada ruang kerja Anda saat ini.";
-
-        return [
-            'content' => $reply,
-            'model' => $model . '-agent-simulation',
-            'tokens_used' => 88,
-            'metadata' => [
-                'provider' => 'hermes',
-                'agent_mode' => 'reasoning_safe',
-            ],
-        ];
+        throw new \RuntimeException('Hermes Agent difokuskan untuk penalaran teks dan belum mendukung pemindaian multimodal gambar.');
     }
 }

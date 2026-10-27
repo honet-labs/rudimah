@@ -3,10 +3,12 @@
 namespace App\Modules\Pekan\Services;
 
 use App\Core\AI\AiProviderManager;
+use App\Core\AI\Services\PlatformAiService;
 use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Models\FinanceReceiptScan;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ReceiptOcrService
@@ -20,6 +22,8 @@ class ReceiptOcrService
 
     public function processUpload(UploadedFile $file): FinanceReceiptScan
     {
+        PlatformAiService::applyRuntimeConfig();
+
         $tenantId = TenantContext::id();
         if (!$tenantId) {
             throw new \RuntimeException('Konteks ruang kerja belum aktif.');
@@ -34,11 +38,12 @@ class ReceiptOcrService
         $allowedMimes = config('rudimah.ocr.allowed_mimes', ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
         $mimeType = $file->getMimeType() ?: $file->getClientMimeType();
         if (!in_array($mimeType, $allowedMimes, true)) {
-            throw new \InvalidArgumentException('Tipe berkas tidak didukung untuk pemindaian OCR.');
+            throw new \InvalidArgumentException('Tipe berkas tidak didukung untuk pemindaian OCR. Gunakan gambar JPG, PNG, WEBP, atau berkas PDF.');
         }
 
         $scanId = (string) Str::uuid();
-        $providerCode = config('rudimah.ocr.provider', 'gemini');
+        $providerCode = config('rudimah.ocr.provider', config('rudimah.ai.default_provider', 'gemini'));
+        $modelName = config('rudimah.ocr.model', config("rudimah.ai.{$providerCode}_model", 'high-models-agent'));
         $provider = $this->providerManager->resolve($providerCode);
 
         // Ekstraksi via AI Vision Provider
@@ -46,29 +51,32 @@ class ReceiptOcrService
 
         try {
             $extractedDraft = $provider->extractReceipt($fileBase64, $mimeType, [
-                'model' => config('rudimah.ocr.model', 'gemini-1.5-flash'),
+                'model' => $modelName,
             ]);
         } catch (\Throwable $e) {
-            $extractedDraft = [
-                'error' => 'Gagal membaca struk secara otomatis: ' . $e->getMessage(),
-                'merchant_name' => 'Koreksi Manual Diperlukan',
-                'receipt_number' => 'ERR-' . date('Ymd-His'),
-                'transaction_date' => date('Y-m-d'),
-                'currency' => 'Rp',
-                'subtotal_minor' => 0,
-                'tax_minor' => 0,
-                'service_charge_minor' => 0,
-                'discount_minor' => 0,
-                'total_minor' => 0,
-                'items' => [],
-            ];
+            Log::error("[ReceiptOcrService] Ekstraksi OCR gagal ({$providerCode}): " . $e->getMessage());
+
+            FinanceReceiptScan::create([
+                'id' => $scanId,
+                'tenant_id' => $tenantId,
+                'provider_code' => $providerCode,
+                'model_name' => $modelName,
+                'status' => 'failed',
+                'original_filename' => $file->getClientOriginalName(),
+                'mime_type' => $mimeType,
+                'extracted_json' => null,
+                'error_message' => $e->getMessage(),
+                'created_by' => auth()->id() ?? 'system',
+            ]);
+
+            throw new \RuntimeException("Gagal memproses struk dengan model AI {$providerCode}: " . $e->getMessage());
         }
 
         $scan = FinanceReceiptScan::create([
             'id' => $scanId,
             'tenant_id' => $tenantId,
             'provider_code' => $provider->getName(),
-            'model_name' => config('rudimah.ocr.model', 'gemini-1.5-flash'),
+            'model_name' => $modelName,
             'status' => 'pending_review',
             'original_filename' => $file->getClientOriginalName(),
             'mime_type' => $mimeType,
@@ -79,6 +87,7 @@ class ReceiptOcrService
         AuditLogger::log('ocr_scan_created', 'finance_receipt_scans', $scanId, null, [
             'filename' => $file->getClientOriginalName(),
             'provider' => $provider->getName(),
+            'model' => $modelName,
         ]);
 
         return $scan;

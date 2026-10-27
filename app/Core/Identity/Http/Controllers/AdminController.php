@@ -217,7 +217,7 @@ class AdminController
     /**
      * Uji coba koneksi ke penyedia AI platform terpilih.
      */
-    public function testAi(Request $request): RedirectResponse
+    public function testAi(Request $request): \Illuminate\Http\JsonResponse|RedirectResponse
     {
         $user = $request->user();
         if (!$user->is_super_admin) {
@@ -237,6 +237,10 @@ class AdminController
             $validated['api_key'] ?? null,
             $validated['model'] ?? null
         );
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json($res, $res['success'] ? 200 : 422);
+        }
 
         if ($res['success']) {
             return back()->with('status', $res['message']);

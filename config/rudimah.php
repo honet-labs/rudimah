@@ -42,7 +42,17 @@ return [
     'ai' => [
         'default_provider' => env('AI_DEFAULT_PROVIDER', 'gemini'),
         'gemini_key' => env('GEMINI_API_KEY', ''),
+        'gemini_endpoint' => env('GEMINI_API_ENDPOINT', 'https://generativelanguage.googleapis.com'),
+        'gemini_model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
         'openai_key' => env('OPENAI_API_KEY', ''),
+        'openai_endpoint' => env('OPENAI_API_ENDPOINT', 'https://api.openai.com/v1'),
+        'openai_model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
+        'claude_key' => env('CLAUDE_API_KEY', ''),
+        'claude_endpoint' => env('CLAUDE_API_ENDPOINT', 'https://api.anthropic.com/v1'),
+        'claude_model' => env('CLAUDE_MODEL', 'claude-3-5-sonnet-20241022'),
+        'ninerouter_key' => env('NINEROUTER_API_KEY', ''),
+        'ninerouter_endpoint' => env('NINEROUTER_API_ENDPOINT', 'https://api.9router.com/v1'),
+        'ninerouter_model' => env('NINEROUTER_MODEL', 'high-models-agent'),
         'hermes_key' => env('HERMES_API_KEY', ''),
         'hermes_endpoint' => env('HERMES_API_ENDPOINT', 'http://localhost:11434/v1'),
         'openclaw_key' => env('OPENCLAW_API_KEY', ''),
@@ -51,8 +61,8 @@ return [
     ],
 
     'ocr' => [
-        'provider' => env('OCR_PROVIDER', 'gemini'),
-        'model' => env('OCR_MODEL', 'gemini-1.5-flash'),
+        'provider' => env('OCR_PROVIDER', env('AI_DEFAULT_PROVIDER', 'gemini')),
+        'model' => env('OCR_MODEL', 'high-models-agent'),
         'max_file_size_bytes' => 10 * 1024 * 1024,
         'allowed_mimes' => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
         'auto_commit' => false,

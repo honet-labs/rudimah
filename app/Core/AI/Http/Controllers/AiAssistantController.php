@@ -65,8 +65,8 @@ class AiAssistantController
             'conversations' => $conversations,
             'settings' => [
                 'provider' => $setting?->provider ?: config('rudimah.ai.default_provider', 'gemini'),
-                'model' => $setting?->model ?: 'gemini-1.5-flash',
-                'api_endpoint' => $setting?->api_endpoint,
+                'model' => $setting?->model ?: config("rudimah.ai." . ($setting?->provider ?: config('rudimah.ai.default_provider', 'gemini')) . "_model", 'high-models-agent'),
+                'api_endpoint' => $setting?->api_endpoint ?: config("rudimah.ai." . ($setting?->provider ?: config('rudimah.ai.default_provider', 'gemini')) . "_endpoint"),
                 'has_custom_key' => !empty($setting?->api_key_encrypted),
                 'system_instructions' => $setting?->system_instructions,
                 'is_enabled' => $setting?->is_enabled ?? true,
@@ -74,6 +74,11 @@ class AiAssistantController
             ],
             'can_manage_settings' => $canManageSettings,
             'available_providers' => [
+                [
+                    'code' => '9router',
+                    'name' => '9Router AI Gateway (Multi-Model)',
+                    'description' => 'Integrasi gateway AI multi-model mandiri dan berkinerja tinggi.',
+                ],
                 [
                     'code' => 'gemini',
                     'name' => 'Google Gemini (1.5 Flash / 2.0 Flash)',
@@ -83,6 +88,11 @@ class AiAssistantController
                     'code' => 'openai',
                     'name' => 'OpenAI (GPT-4o / GPT-4o-mini)',
                     'description' => 'Model reasoning umum dan visi kuitansi canggih.',
+                ],
+                [
+                    'code' => 'claude',
+                    'name' => 'Anthropic Claude (3.5 Sonnet / Haiku)',
+                    'description' => 'Model penalaran finansial mendalam dan analisis akurat.',
                 ],
                 [
                     'code' => 'hermes',
@@ -229,9 +239,9 @@ class AiAssistantController
         }
 
         $validated = $request->validate([
-            'provider' => 'required|string|in:gemini,openai,hermes,openclaw,mock',
+            'provider' => 'required|string|in:9router,gemini,openai,claude,hermes,openclaw,mock',
             'model' => 'required|string|max:100',
-            'api_endpoint' => 'nullable|url|max:255',
+            'api_endpoint' => 'nullable|string|max:255',
             'api_key' => 'nullable|string|max:255',
             'system_instructions' => 'nullable|string|max:2000',
             'is_enabled' => 'required|boolean',

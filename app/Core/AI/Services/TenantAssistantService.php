@@ -35,22 +35,21 @@ class TenantAssistantService
             throw new \RuntimeException('Konteks ruang kerja dan pengguna wajib aktif.');
         }
 
-        $setting = TenantAiSetting::where('tenant_id', $tenantId)->first();
-        $provider = $setting?->provider ?: config('rudimah.ai.default_provider', 'gemini');
-        $model = $setting?->model ?: 'gemini-1.5-flash';
+        $activeProvider = $setting?->provider ?: config('rudimah.ai.default_provider', 'gemini');
+        $activeModel = $setting?->model ?: config("rudimah.ai.{$activeProvider}_model", 'high-models-agent');
 
         $conversation = AiConversation::create([
             'id' => (string) Str::uuid(),
             'tenant_id' => $tenantId,
             'user_id' => $userId,
             'title' => $title,
-            'provider' => $provider,
-            'model' => $model,
+            'provider' => $activeProvider,
+            'model' => $activeModel,
         ]);
 
         AuditLogger::log('ai_conversation_created', 'ai_conversations', $conversation->id, null, [
-            'provider' => $provider,
-            'model' => $model,
+            'provider' => $activeProvider,
+            'model' => $activeModel,
         ]);
 
         return $conversation;
@@ -89,7 +88,7 @@ class TenantAssistantService
             ]);
         }
 
-        // 2. Ambil konfigurasi AI Ruang Kerja
+        // 2. Ambil konfigurasi AI Ruang Kerja atau Platform Global
         $setting = TenantAiSetting::where('tenant_id', $tenantId)->first();
         if ($setting && !$setting->is_enabled) {
             return AiMessage::create([
@@ -102,7 +101,19 @@ class TenantAssistantService
             ]);
         }
 
-        // 3. Bangun prompt sistem dengan batasan ketat tenant dan konteks data
+        // Tentukan provider dan model aktif
+        $activeProvider = $setting?->provider ?: config('rudimah.ai.default_provider', 'gemini');
+        $activeModel = $setting?->model ?: config("rudimah.ai.{$activeProvider}_model", 'high-models-agent');
+
+        // Jika percakapan lama memiliki provider yang berbeda atau belum terset, sinkronkan ke provider aktif
+        if ($conversation->provider !== $activeProvider || empty($conversation->model)) {
+            $conversation->update([
+                'provider' => $activeProvider,
+                'model' => $activeModel,
+            ]);
+        }
+
+        // 3. Bangun prompt sistem dengan batasan ketat tenant dan konteks data riil
         $systemPrompt = $this->contextBuilder->buildSystemPrompt($setting?->system_instructions);
 
         // 4. Siapkan riwayat percakapan (maksimal 10 pesan terakhir)
@@ -125,14 +136,33 @@ class TenantAssistantService
         }
 
         // 5. Panggil provider AI yang sesuai
-        $provider = $this->providerManager->resolve($conversation->provider, $setting);
+        $provider = $this->providerManager->resolve($activeProvider, $setting);
         $options = [
-            'model' => $conversation->model ?: $setting?->model,
+            'model' => $activeModel,
             'temperature' => $setting?->temperature ?? 0.7,
             'api_endpoint' => $setting?->api_endpoint,
         ];
 
-        $response = $provider->chat($messagesPayload, $options);
+        try {
+            $response = $provider->chat($messagesPayload, $options);
+            $replyContent = $response['content'] ?? '';
+            $tokensUsed = (int) ($response['tokens_used'] ?? 0);
+            $meta = array_merge($response['metadata'] ?? [], [
+                'model' => $response['model'] ?? $activeModel,
+                'tokens_used' => $tokensUsed,
+                'tenant_verified' => $tenantId,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("[TenantAssistantService] Gagal memproses respon AI ({$activeProvider}): " . $e->getMessage());
+            $replyContent = "Terjadi kendala saat menghubungi layanan AI ({$activeProvider}): " . $e->getMessage();
+            $tokensUsed = 0;
+            $meta = [
+                'error' => true,
+                'provider' => $activeProvider,
+                'model' => $activeModel,
+                'error_detail' => $e->getMessage(),
+            ];
+        }
 
         // 6. Simpan respon asisten
         $assistantMessage = AiMessage::create([
@@ -140,12 +170,9 @@ class TenantAssistantService
             'conversation_id' => $conversation->id,
             'tenant_id' => $tenantId,
             'role' => 'assistant',
-            'content' => $response['content'],
-            'metadata' => array_merge($response['metadata'] ?? [], [
-                'model' => $response['model'],
-                'tokens_used' => $response['tokens_used'],
-                'tenant_verified' => $tenantId,
-            ]),
+            'content' => $replyContent,
+            'tokens_used' => $tokensUsed,
+            'metadata' => $meta,
         ]);
 
         return $assistantMessage;

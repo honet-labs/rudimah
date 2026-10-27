@@ -126,26 +126,47 @@ class PlatformAiService
         try {
             $settings = SystemSetting::where('group', 'ai')->pluck('value', 'key');
 
-            $activeProvider = $settings->get('ai_default_provider', env('AI_DEFAULT_PROVIDER', 'gemini'));
+            $activeProvider = $settings->get('ai_default_provider', config('rudimah.ai.default_provider', env('AI_DEFAULT_PROVIDER', 'gemini')));
+            
             $geminiKey = $settings->get('ai_gemini_key', env('GEMINI_API_KEY', ''));
             $geminiEndpoint = $settings->get('ai_gemini_endpoint', 'https://generativelanguage.googleapis.com');
+            $geminiModel = $settings->get('ai_gemini_model', 'gemini-1.5-flash');
+
             $openaiKey = $settings->get('ai_openai_key', env('OPENAI_API_KEY', ''));
             $openaiEndpoint = $settings->get('ai_openai_endpoint', 'https://api.openai.com/v1');
+            $openaiModel = $settings->get('ai_openai_model', 'gpt-4o-mini');
+
             $claudeKey = $settings->get('ai_claude_key', env('CLAUDE_API_KEY', ''));
             $claudeEndpoint = $settings->get('ai_claude_endpoint', 'https://api.anthropic.com/v1');
+            $claudeModel = $settings->get('ai_claude_model', 'claude-3-5-sonnet-20241022');
+
             $routerKey = $settings->get('ai_9router_key', env('NINEROUTER_API_KEY', ''));
             $routerEndpoint = $settings->get('ai_9router_endpoint', 'https://api.9router.com/v1');
+            $routerModel = $settings->get('ai_9router_model', 'high-models-agent');
+
+            $activeOcrModel = match ($activeProvider) {
+                '9router' => $routerModel,
+                'openai' => $openaiModel,
+                'claude' => $claudeModel,
+                default => $geminiModel,
+            };
 
             config([
                 'rudimah.ai.default_provider' => $activeProvider,
                 'rudimah.ai.gemini_key' => $geminiKey,
                 'rudimah.ai.gemini_endpoint' => $geminiEndpoint,
+                'rudimah.ai.gemini_model' => $geminiModel,
                 'rudimah.ai.openai_key' => $openaiKey,
                 'rudimah.ai.openai_endpoint' => $openaiEndpoint,
+                'rudimah.ai.openai_model' => $openaiModel,
                 'rudimah.ai.claude_key' => $claudeKey,
                 'rudimah.ai.claude_endpoint' => $claudeEndpoint,
+                'rudimah.ai.claude_model' => $claudeModel,
                 'rudimah.ai.ninerouter_key' => $routerKey,
                 'rudimah.ai.ninerouter_endpoint' => $routerEndpoint,
+                'rudimah.ai.ninerouter_model' => $routerModel,
+                'rudimah.ocr.provider' => $activeProvider,
+                'rudimah.ocr.model' => $activeOcrModel,
             ]);
         } catch (\Throwable $e) {
             Log::debug('[PlatformAiService] Belum dapat menerapkan konfigurasi runtime: ' . $e->getMessage());
@@ -166,7 +187,7 @@ class PlatformAiService
             $dbKey = $key;
             if (empty($dbKey) || $dbKey === '******') {
                 $dbKey = SystemSetting::get("ai_{$provider}_key", config("rudimah.ai.{$provider}_key", ''));
-                if (empty($dbKey) && $provider === '9router') {
+                if (empty($dbKey) && ($provider === '9router' || $provider === 'ninerouter')) {
                     $dbKey = SystemSetting::get('ai_9router_key', config('rudimah.ai.ninerouter_key', ''));
                 }
             }
@@ -174,40 +195,53 @@ class PlatformAiService
             if (empty($dbKey)) {
                 return [
                     'success' => false,
-                    'message' => "Kunci/Token API untuk penyedia {$provider} belum diisi.",
+                    'message' => "Kunci/Token API untuk penyedia {$provider} belum diisi atau tersimpan di sistem.",
                 ];
             }
 
             $activeEndpoint = $endpoint ?: SystemSetting::get("ai_{$provider}_endpoint");
-            if ($provider === '9router' && empty($activeEndpoint)) {
-                $activeEndpoint = SystemSetting::get('ai_9router_endpoint', 'https://api.9router.com/v1');
+            if (($provider === '9router' || $provider === 'ninerouter') && empty($activeEndpoint)) {
+                $activeEndpoint = SystemSetting::get('ai_9router_endpoint', config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1'));
             }
 
             $activeModel = $model ?: SystemSetting::get("ai_{$provider}_model");
+            if (empty($activeModel)) {
+                $activeModel = match (strtolower($provider)) {
+                    '9router', 'ninerouter' => config('rudimah.ai.ninerouter_model', 'high-models-agent'),
+                    'openai' => config('rudimah.ai.openai_model', 'gpt-4o-mini'),
+                    'claude' => config('rudimah.ai.claude_model', 'claude-3-5-sonnet-20241022'),
+                    default => config('rudimah.ai.gemini_model', 'gemini-1.5-flash'),
+                };
+            }
 
-            // Resolusi provider langsung dengan parameter kustom
+            // Resolusi provider langsung dengan kredensial aktif
             $instance = match (strtolower($provider)) {
                 'gemini' => new \App\Core\AI\Providers\GeminiProvider($dbKey, $activeModel ?: 'gemini-1.5-flash'),
                 'openai' => new \App\Core\AI\Providers\OpenAiProvider($dbKey, $activeModel ?: 'gpt-4o-mini', $activeEndpoint),
                 'claude' => new \App\Core\AI\Providers\ClaudeProvider($dbKey, $activeModel ?: 'claude-3-5-sonnet-20241022', $activeEndpoint),
-                '9router' => new \App\Core\AI\Providers\NineRouterProvider($dbKey, $activeModel ?: 'gpt-4o-mini', $activeEndpoint),
+                '9router', 'ninerouter' => new \App\Core\AI\Providers\NineRouterProvider($dbKey, $activeModel ?: 'high-models-agent', $activeEndpoint),
                 default => $manager->resolve($provider),
             };
 
             $messages = [
-                ['role' => 'user', 'content' => 'Halo! Ini adalah uji koneksi otomatis dari RUDIMAH. Mohon jawab dalam 1 kalimat singkat.'],
+                ['role' => 'user', 'content' => 'Halo! Ini adalah tes verifikasi koneksi dari platform RUDIMAH. Jawab dalam 1 kalimat singkat.'],
             ];
 
+            $startTime = microtime(true);
             $response = $instance->chat($messages, [
                 'model' => $activeModel,
                 'api_endpoint' => $activeEndpoint,
             ]);
+            $latencyMs = round((microtime(true) - $startTime) * 1000);
 
             if (!empty($response['content'])) {
-                $sampleReply = mb_strimwidth($response['content'], 0, 100, '...');
+                $sampleReply = mb_strimwidth($response['content'], 0, 150, '...');
                 return [
                     'success' => true,
-                    'message' => "Koneksi ke {$instance->getName()} berhasil! Respon: \"{$sampleReply}\"",
+                    'latency_ms' => $latencyMs,
+                    'provider' => $instance->getName(),
+                    'model' => $response['model'] ?? $activeModel,
+                    'message' => "Koneksi ke {$instance->getName()} berhasil ({$latencyMs}ms)! Respon model: \"{$sampleReply}\"",
                 ];
             }
 

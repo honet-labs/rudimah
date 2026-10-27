@@ -11,10 +11,10 @@ class GeminiProvider implements AiProviderInterface
     protected string $apiKey;
     protected string $defaultModel;
 
-    public function __construct(?string $apiKey = null, string $defaultModel = 'gemini-1.5-flash')
+    public function __construct(?string $apiKey = null, ?string $defaultModel = null)
     {
         $this->apiKey = $apiKey ?: (string) config('rudimah.ai.gemini_key', env('GEMINI_API_KEY', ''));
-        $this->defaultModel = $defaultModel;
+        $this->defaultModel = $defaultModel ?: config('rudimah.ai.gemini_model', 'gemini-1.5-flash');
     }
 
     public function getName(): string
@@ -27,79 +27,106 @@ class GeminiProvider implements AiProviderInterface
         $model = $options['model'] ?? $this->defaultModel;
 
         if (empty($this->apiKey)) {
-            // Mode fallback lokal cerdas bila kunci API belum dikonfigurasi
-            return $this->generateLocalFallbackChat($messages, $model);
+            throw new \RuntimeException('Kunci API Google Gemini belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
         }
 
-        try {
-            $contents = [];
-            $systemInstruction = null;
+        $contents = [];
+        $systemInstruction = null;
 
-            foreach ($messages as $msg) {
-                if ($msg['role'] === 'system') {
-                    $systemInstruction = ['parts' => [['text' => $msg['content']]]];
-                } else {
-                    $contents[] = [
-                        'role' => $msg['role'] === 'user' ? 'user' : 'model',
-                        'parts' => [['text' => $msg['content']]],
-                    ];
-                }
-            }
-
-            $payload = [
-                'contents' => $contents,
-                'generationConfig' => [
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'maxOutputTokens' => 2048,
-                ],
-            ];
-
-            if ($systemInstruction) {
-                $payload['systemInstruction'] = $systemInstruction;
-            }
-
-            $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$this->apiKey}";
-
-            $response = Http::timeout(30)->post($endpoint, $payload);
-
-            if ($response->successful()) {
-                $data = $response->json();
-                $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
-                $tokens = $data['usageMetadata']['totalTokenCount'] ?? 0;
-
-                return [
-                    'content' => $text,
-                    'model' => $model,
-                    'tokens_used' => (int) $tokens,
-                    'metadata' => [
-                        'provider' => 'gemini',
-                        'finish_reason' => $data['candidates'][0]['finishReason'] ?? 'STOP',
-                    ],
+        foreach ($messages as $msg) {
+            if ($msg['role'] === 'system') {
+                $systemInstruction = ['parts' => [['text' => $msg['content']]]];
+            } else {
+                $contents[] = [
+                    'role' => $msg['role'] === 'user' ? 'user' : 'model',
+                    'parts' => [['text' => $msg['content']]],
                 ];
             }
+        }
 
-            Log::warning('Gemini API call returned non-200', ['status' => $response->status(), 'body' => $response->body()]);
-            return $this->generateLocalFallbackChat($messages, $model);
+        $payload = [
+            'contents' => $contents,
+            'generationConfig' => [
+                'temperature' => (float) ($options['temperature'] ?? 0.7),
+                'maxOutputTokens' => 2048,
+            ],
+        ];
+
+        if ($systemInstruction) {
+            $payload['systemInstruction'] = $systemInstruction;
+        }
+
+        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$this->apiKey}";
+
+        try {
+            $response = Http::timeout(45)->post($endpoint, $payload);
         } catch (\Throwable $e) {
             Log::error('Gemini API exception', ['error' => $e->getMessage()]);
-            return $this->generateLocalFallbackChat($messages, $model);
+            throw new \RuntimeException('Gagal menghubungi Google Gemini API: ' . $e->getMessage());
         }
+
+        if ($response->successful()) {
+            $data = $response->json();
+            $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+            $tokens = $data['usageMetadata']['totalTokenCount'] ?? 0;
+
+            if (empty(trim($text))) {
+                throw new \RuntimeException("Model Google Gemini ({$model}) mengembalikan respon kosong.");
+            }
+
+            return [
+                'content' => $text,
+                'model' => $model,
+                'tokens_used' => (int) $tokens,
+                'metadata' => [
+                    'provider' => 'gemini',
+                    'finish_reason' => $data['candidates'][0]['finishReason'] ?? 'STOP',
+                ],
+            ];
+        }
+
+        $status = $response->status();
+        $errBody = mb_strimwidth($response->body(), 0, 300, '...');
+        Log::warning('Gemini API call returned non-200', ['status' => $status, 'body' => $errBody]);
+
+        throw new \RuntimeException("Permintaan ke Google Gemini gagal (HTTP {$status}): {$errBody}");
     }
 
     public function extractReceipt(string $fileBase64, string $mimeType, array $options = []): array
     {
-        $model = $options['model'] ?? 'gemini-1.5-flash';
+        $model = $options['model'] ?? $this->defaultModel;
 
         if (empty($this->apiKey)) {
-            return $this->generateLocalFallbackReceipt();
+            throw new \RuntimeException('Kunci API Google Gemini belum dikonfigurasi untuk pemindaian kuitansi OCR.');
         }
 
+        $systemPrompt = "Ekstrak struk belanja/kuitansi ini ke dalam format JSON murni tanpa markdown wrapper. Satuan Rupiah integer tanpa sen.
+Format JSON wajib:
+{
+  \"merchant_name\": \"string\",
+  \"receipt_number\": \"string\",
+  \"transaction_date\": \"YYYY-MM-DD\",
+  \"currency\": \"Rp\",
+  \"subtotal_minor\": 0,
+  \"tax_minor\": 0,
+  \"service_charge_minor\": 0,
+  \"discount_minor\": 0,
+  \"total_minor\": 0,
+  \"items\": [
+    {
+      \"item_name\": \"string\",
+      \"quantity\": 1,
+      \"price_minor\": 0,
+      \"discount_minor\": 0,
+      \"total_minor\": 0
+    }
+  ]
+}";
+
+        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$this->apiKey}";
+
         try {
-            $systemPrompt = "Ekstrak struk belanja/kuitansi ini ke dalam format JSON murni. Pastikan subtotal_minor + tax_minor - discount_minor = total_minor. Gunakan satuan Rupiah integer (tanpa desimal/sen). Struktur JSON wajib: merchant_name, receipt_number, transaction_date, currency (Rp), subtotal_minor, tax_minor, service_charge_minor, discount_minor, total_minor, items (array of item_name, quantity, price_minor, discount_minor, total_minor).";
-
-            $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$this->apiKey}";
-
-            $response = Http::timeout(45)->post($endpoint, [
+            $response = Http::timeout(60)->post($endpoint, [
                 'contents' => [
                     [
                         'role' => 'user',
@@ -119,62 +146,65 @@ class GeminiProvider implements AiProviderInterface
                     'temperature' => 0.1,
                 ],
             ]);
-
-            if ($response->successful()) {
-                $jsonText = $response->json('candidates.0.content.parts.0.text');
-                $parsed = json_decode($jsonText, true);
-                if (is_array($parsed)) {
-                    return $parsed;
-                }
-            }
-
-            return $this->generateLocalFallbackReceipt();
         } catch (\Throwable $e) {
             Log::error('Gemini Vision exception', ['error' => $e->getMessage()]);
-            return $this->generateLocalFallbackReceipt();
+            throw new \RuntimeException('Gagal menghubungi model Vision Google Gemini: ' . $e->getMessage());
         }
+
+        if ($response->successful()) {
+            $jsonText = $response->json('candidates.0.content.parts.0.text');
+            $cleanJson = preg_replace('/```(?:json)?\s*([\s\S]*?)\s*```/', '$1', trim($jsonText));
+            $parsed = json_decode($cleanJson, true);
+            if (is_array($parsed)) {
+                return $this->normalizeReceiptData($parsed);
+            }
+            throw new \RuntimeException('Respon Gemini Vision tidak menghasilkan struktur JSON kuitansi yang valid.');
+        }
+
+        $status = $response->status();
+        $errBody = mb_strimwidth($response->body(), 0, 300, '...');
+        throw new \RuntimeException("Pemindaian OCR Google Gemini gagal (HTTP {$status}): {$errBody}");
     }
 
-    protected function generateLocalFallbackChat(array $messages, string $model): array
+    protected function normalizeReceiptData(array $raw): array
     {
-        $lastUserMsg = '';
-        foreach (array_reverse($messages) as $m) {
-            if ($m['role'] === 'user') {
-                $lastUserMsg = $m['content'];
-                break;
+        $items = [];
+        if (!empty($raw['items']) && is_array($raw['items'])) {
+            foreach ($raw['items'] as $it) {
+                $qty = (int) ($it['quantity'] ?? 1);
+                $price = (int) ($it['price_minor'] ?? ($it['price'] ?? 0));
+                $disc = (int) ($it['discount_minor'] ?? ($it['discount'] ?? 0));
+                $total = (int) ($it['total_minor'] ?? ($it['total'] ?? (($qty * $price) - $disc)));
+                $items[] = [
+                    'item_name' => (string) ($it['item_name'] ?? $it['name'] ?? 'Item'),
+                    'quantity' => max(1, $qty),
+                    'price_minor' => $price,
+                    'discount_minor' => $disc,
+                    'total_minor' => $total,
+                ];
             }
         }
 
-        $reply = "Halo, saya adalah Asisten Cerdas RUDIMAH (mode Gemini). Terkait pesan Anda: \"" . mb_strimwidth($lastUserMsg, 0, 80, '...') . "\", seluruh data ruang kerja ini terlindungi secara aman. Anda dapat menanyakan ringkasan anggaran, mutasi kas, atau transaksi terbaru.";
+        $subtotal = (int) ($raw['subtotal_minor'] ?? ($raw['subtotal'] ?? 0));
+        if ($subtotal === 0 && count($items) > 0) {
+            $subtotal = array_sum(array_column($items, 'total_minor'));
+        }
+        $tax = (int) ($raw['tax_minor'] ?? ($raw['tax'] ?? 0));
+        $service = (int) ($raw['service_charge_minor'] ?? ($raw['service_charge'] ?? 0));
+        $discount = (int) ($raw['discount_minor'] ?? ($raw['discount'] ?? 0));
+        $total = (int) ($raw['total_minor'] ?? ($raw['total'] ?? ($subtotal + $tax + $service - $discount)));
 
         return [
-            'content' => $reply,
-            'model' => $model . '-local-simulation',
-            'tokens_used' => 64,
-            'metadata' => [
-                'provider' => 'gemini',
-                'mode' => 'simulated_fallback',
-            ],
-        ];
-    }
-
-    protected function generateLocalFallbackReceipt(): array
-    {
-        return [
-            'merchant_name' => 'SUPERINDO TRANSMART',
-            'receipt_number' => 'STR-' . date('Ymd') . '-049',
-            'transaction_date' => date('Y-m-d'),
+            'merchant_name' => (string) ($raw['merchant_name'] ?? $raw['store_name'] ?? 'Toko Belanja'),
+            'receipt_number' => (string) ($raw['receipt_number'] ?? $raw['invoice_number'] ?? 'STR-' . date('Ymd-His')),
+            'transaction_date' => (string) ($raw['transaction_date'] ?? $raw['date'] ?? date('Y-m-d')),
             'currency' => 'Rp',
-            'subtotal_minor' => 125000,
-            'tax_minor' => 13750,
-            'service_charge_minor' => 0,
-            'discount_minor' => 5000,
-            'total_minor' => 133750,
-            'items' => [
-                ['item_name' => 'Beras Pandan Wangi 5kg', 'quantity' => 1, 'price_minor' => 75000, 'discount_minor' => 0, 'total_minor' => 75000],
-                ['item_name' => 'Minyak Goreng 2L', 'quantity' => 1, 'price_minor' => 34000, 'discount_minor' => 0, 'total_minor' => 34000],
-                ['item_name' => 'Telur Ayam Negeri 1kg', 'quantity' => 1, 'price_minor' => 16000, 'discount_minor' => 5000, 'total_minor' => 11000],
-            ],
+            'subtotal_minor' => $subtotal,
+            'tax_minor' => $tax,
+            'service_charge_minor' => $service,
+            'discount_minor' => $discount,
+            'total_minor' => $total,
+            'items' => $items,
         ];
     }
 }

@@ -556,18 +556,18 @@ onMounted(() => {
             />
           </div>
 
-          <div v-if="['hermes', 'openclaw', 'openai'].includes(formSettings.provider)">
+          <div v-if="['hermes', 'openclaw', 'openai', '9router', 'claude'].includes(formSettings.provider)">
             <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
               Kustom Endpoint API (Opsional)
             </label>
             <input
               v-model="formSettings.api_endpoint"
               type="text"
-              placeholder="cth: http://localhost:11434/v1 atau https://api.openai.com/v1"
+              placeholder="cth: https://9router-tools.honet.web.id/v1 atau http://localhost:11434/v1"
               class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
             />
             <span class="text-[11px] text-slate-400 mt-0.5 block">
-              Gunakan endpoint lokal jika menjalankan model Hermes atau OpenClaw secara mandiri.
+              Gunakan endpoint kustom jika menggunakan server gateway mandiri atau proxy internal.
             </span>
           </div>
 
