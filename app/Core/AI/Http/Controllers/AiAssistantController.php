@@ -36,6 +36,9 @@ class AiAssistantController
         }
 
         PlatformAiService::applyRuntimeConfig();
+        $platformSettings = PlatformAiService::getSettings();
+        $activePlatformProvider = $platformSettings['active_provider'] ?? config('rudimah.ai.default_provider', 'gemini');
+        $activeProviderDetails = $platformSettings['providers'][$activePlatformProvider] ?? [];
 
         $user = $request->user();
         $userId = $user?->id;
@@ -46,6 +49,8 @@ class AiAssistantController
             ->get();
 
         $setting = TenantAiSetting::where('tenant_id', $tenant->id)->first();
+        $hasCustomKey = !empty($setting?->api_key_encrypted);
+        $isUsingCustom = $hasCustomKey && !empty($setting?->provider);
 
         $membership = TenantMembership::where('tenant_id', $tenant->id)
             ->where('user_id', $userId)
@@ -54,6 +59,14 @@ class AiAssistantController
         $canManageSettings = auth()->user()?->is_super_admin || in_array($membership?->role, ['owner', 'admin']);
 
         $tenants = $user ? $user->getActiveTenants() : [];
+
+        $effectiveProvider = $isUsingCustom ? $setting->provider : $activePlatformProvider;
+        $effectiveModel = $isUsingCustom
+            ? ($setting->model ?: ($activeProviderDetails['model'] ?? 'high-models-agent'))
+            : ($activeProviderDetails['model'] ?? config("rudimah.ai.{$activePlatformProvider}_model", 'high-models-agent'));
+        $effectiveEndpoint = $isUsingCustom
+            ? $setting->api_endpoint
+            : ($activeProviderDetails['api_endpoint'] ?? config("rudimah.ai.{$activePlatformProvider}_endpoint"));
 
         return Inertia::render('Assistant/Index', [
             'user' => $user ? [
@@ -66,11 +79,20 @@ class AiAssistantController
             'tenants' => $tenants,
             'apps' => AppRegistry::all(),
             'conversations' => $conversations,
+            'platform_config' => [
+                'provider' => $activePlatformProvider,
+                'provider_name' => $activeProviderDetails['name'] ?? strtoupper($activePlatformProvider),
+                'model' => $activeProviderDetails['model'] ?? '',
+                'api_endpoint' => $activeProviderDetails['api_endpoint'] ?? '',
+                'has_api_key' => $activeProviderDetails['has_api_key'] ?? false,
+                'is_configured' => $activeProviderDetails['is_configured'] ?? false,
+            ],
             'settings' => [
-                'provider' => $setting?->provider ?: config('rudimah.ai.default_provider', 'gemini'),
-                'model' => $setting?->model ?: config("rudimah.ai." . ($setting?->provider ?: config('rudimah.ai.default_provider', 'gemini')) . "_model", 'high-models-agent'),
-                'api_endpoint' => $setting?->api_endpoint ?: config("rudimah.ai." . ($setting?->provider ?: config('rudimah.ai.default_provider', 'gemini')) . "_endpoint"),
-                'has_custom_key' => !empty($setting?->api_key_encrypted),
+                'is_custom' => $isUsingCustom,
+                'provider' => $effectiveProvider,
+                'model' => $effectiveModel,
+                'api_endpoint' => $effectiveEndpoint,
+                'has_custom_key' => $hasCustomKey,
                 'system_instructions' => $setting?->system_instructions,
                 'is_enabled' => $setting?->is_enabled ?? true,
                 'temperature' => $setting?->temperature ?? 0.70,
@@ -249,8 +271,10 @@ class AiAssistantController
         }
 
         $validated = $request->validate([
-            'provider' => 'required|string|in:9router,gemini,openai,claude,hermes,openclaw,mock',
-            'model' => 'required|string|max:100',
+            'is_custom' => 'nullable|boolean',
+            'reset_to_platform' => 'nullable|boolean',
+            'provider' => 'nullable|string|in:9router,gemini,openai,claude,hermes,openclaw,mock',
+            'model' => 'nullable|string|max:100',
             'api_endpoint' => 'nullable|string|max:255',
             'api_key' => 'nullable|string|max:255',
             'system_instructions' => 'nullable|string|max:2000',
@@ -259,17 +283,28 @@ class AiAssistantController
         ]);
 
         $setting = TenantAiSetting::firstOrNew(['tenant_id' => $tenant->id]);
-        $setting->provider = $validated['provider'];
-        $setting->model = $validated['model'];
-        $setting->api_endpoint = $validated['api_endpoint'];
-        $setting->system_instructions = $validated['system_instructions'];
-        $setting->is_enabled = $validated['is_enabled'];
-        if (isset($validated['temperature'])) {
-            $setting->temperature = $validated['temperature'];
+
+        $reset = !empty($validated['reset_to_platform']) || empty($validated['is_custom']);
+
+        if ($reset) {
+            // Hapus kustomisasi ruang kerja agar 100% otomatis mewarisi Administrasi Sistem
+            $setting->provider = config('rudimah.ai.default_provider', 'gemini');
+            $setting->model = config("rudimah.ai.{$setting->provider}_model", 'high-models-agent');
+            $setting->api_endpoint = null;
+            $setting->api_key_encrypted = null;
+        } else {
+            $setting->provider = $validated['provider'] ?? config('rudimah.ai.default_provider', 'gemini');
+            $setting->model = $validated['model'] ?? config("rudimah.ai.{$setting->provider}_model", 'high-models-agent');
+            $setting->api_endpoint = !empty($validated['api_endpoint']) ? trim($validated['api_endpoint']) : null;
+            if (!empty($validated['api_key'])) {
+                $setting->api_key = trim($validated['api_key']);
+            }
         }
 
-        if (!empty($validated['api_key'])) {
-            $setting->api_key = $validated['api_key'];
+        $setting->system_instructions = $validated['system_instructions'] ?? null;
+        $setting->is_enabled = $validated['is_enabled'] ?? true;
+        if (isset($validated['temperature'])) {
+            $setting->temperature = $validated['temperature'];
         }
 
         $setting->save();
@@ -277,11 +312,14 @@ class AiAssistantController
         AuditLogger::log('tenant_ai_settings_updated', 'tenant_ai_settings', $setting->id, null, [
             'provider' => $setting->provider,
             'model' => $setting->model,
+            'is_custom' => !$reset,
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Pengaturan AI ruang kerja berhasil disimpan.',
+            'message' => $reset
+                ? 'Ruang kerja kini otomatis menggunakan konfigurasi AI dari Administrasi Sistem.'
+                : 'Pengaturan kustom AI ruang kerja berhasil disimpan.',
         ]);
     }
 }

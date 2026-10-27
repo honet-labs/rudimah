@@ -29,7 +29,17 @@ interface Message {
   created_at: string;
 }
 
+interface PlatformConfig {
+  provider: string;
+  provider_name: string;
+  model: string;
+  api_endpoint: string;
+  has_api_key: boolean;
+  is_configured: boolean;
+}
+
 interface AiSettings {
+  is_custom?: boolean;
   provider: string;
   model: string;
   api_endpoint: string | null;
@@ -52,6 +62,7 @@ const props = defineProps<{
   user?: User;
   conversations: Conversation[];
   settings: AiSettings;
+  platform_config?: PlatformConfig;
   can_manage_settings: boolean;
   available_providers: ProviderOption[];
 }>();
@@ -67,10 +78,12 @@ const isHistoryDrawerOpen = ref(false);
 
 // Modal Pengaturan AI
 const isSettingsModalOpen = ref(false);
+const useCustom = ref(props.settings.is_custom || false);
 const formSettings = ref({
-  provider: props.settings.provider,
-  model: props.settings.model,
-  api_endpoint: props.settings.api_endpoint || '',
+  is_custom: props.settings.is_custom || false,
+  provider: props.settings.provider || props.platform_config?.provider || '9router',
+  model: props.settings.model || props.platform_config?.model || 'high-models-agent',
+  api_endpoint: props.settings.api_endpoint || props.platform_config?.api_endpoint || '',
   api_key: '',
   system_instructions: props.settings.system_instructions || '',
   is_enabled: props.settings.is_enabled,
@@ -236,18 +249,29 @@ async function saveSettings() {
   settingsAlert.value = null;
 
   try {
+    const payload = {
+      is_custom: useCustom.value,
+      provider: useCustom.value ? formSettings.value.provider : (props.platform_config?.provider || formSettings.value.provider),
+      model: useCustom.value ? formSettings.value.model : (props.platform_config?.model || formSettings.value.model),
+      api_endpoint: useCustom.value ? formSettings.value.api_endpoint : null,
+      api_key: useCustom.value ? formSettings.value.api_key : null,
+      system_instructions: formSettings.value.system_instructions,
+      is_enabled: formSettings.value.is_enabled,
+      temperature: formSettings.value.temperature,
+    };
+
     const res = await secureFetch(`/t/${props.tenant.slug}/assistant/settings`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify(formSettings.value),
+      body: JSON.stringify(payload),
     });
 
     const data = await res.json();
     if (res.ok) {
-      settingsAlert.value = { type: 'success', message: 'Pengaturan asisten AI berhasil disimpan.' };
+      settingsAlert.value = { type: 'success', message: data.message || 'Pengaturan asisten AI berhasil disimpan.' };
       setTimeout(() => {
         isSettingsModalOpen.value = false;
         settingsAlert.value = null;
@@ -257,6 +281,51 @@ async function saveSettings() {
     }
   } catch (err) {
     settingsAlert.value = { type: 'error', message: 'Kesalahan jaringan saat menyimpan konfigurasi.' };
+  } finally {
+    isSavingSettings.value = false;
+  }
+}
+
+async function resetToPlatformDefault() {
+  if (!confirm('Kembalikan konfigurasi AI agar otomatis 100% mewarisi seluruh pengaturan dari Administrasi Sistem?')) return;
+
+  isSavingSettings.value = true;
+  settingsAlert.value = null;
+
+  try {
+    const res = await secureFetch(`/t/${props.tenant.slug}/assistant/settings`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        reset_to_platform: true,
+        is_enabled: true,
+        system_instructions: formSettings.value.system_instructions,
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      useCustom.value = false;
+      formSettings.value.is_custom = false;
+      if (props.platform_config) {
+        formSettings.value.provider = props.platform_config.provider;
+        formSettings.value.model = props.platform_config.model;
+        formSettings.value.api_endpoint = props.platform_config.api_endpoint;
+      }
+      formSettings.value.api_key = '';
+      settingsAlert.value = { type: 'success', message: 'Berhasil dikembalikan ke konfigurasi otomatis Administrasi Sistem.' };
+      setTimeout(() => {
+        isSettingsModalOpen.value = false;
+        settingsAlert.value = null;
+      }, 1200);
+    } else {
+      settingsAlert.value = { type: 'error', message: data.message || 'Gagal mereset konfigurasi.' };
+    }
+  } catch (err) {
+    settingsAlert.value = { type: 'error', message: 'Kesalahan jaringan saat mereset konfigurasi.' };
   } finally {
     isSavingSettings.value = false;
   }
@@ -304,10 +373,10 @@ onMounted(() => {
             />
           </h1>
           <RdBadge variant="neutral" size="sm" class="hidden sm:inline-flex shrink-0">
-            Konteks Aman: {{ tenant.name }}
+            Konteks: {{ tenant.name }}
           </RdBadge>
-          <RdBadge variant="info" size="sm" class="hidden md:inline-flex shrink-0">
-            Provider: {{ formSettings.provider.toUpperCase() }}
+          <RdBadge :variant="settings.is_custom ? 'warning' : 'neutral'" size="sm" class="hidden md:inline-flex shrink-0">
+            {{ settings.is_custom ? `Kredensial Kustom: ${formSettings.provider.toUpperCase()}` : `AI: Administrasi Sistem (${(platform_config?.provider || formSettings.provider).toUpperCase()})` }}
           </RdBadge>
         </div>
 
@@ -518,63 +587,116 @@ onMounted(() => {
             {{ settingsAlert.message }}
           </RdAlert>
 
-          <div>
-            <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Penyedia Layanan AI (Provider)
-            </label>
-            <select
-              v-model="formSettings.provider"
-              class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200"
-            >
-              <option
-                v-for="prov in available_providers"
-                :key="prov.code"
-                :value="prov.code"
-              >
-                {{ prov.name }}
-              </option>
-            </select>
+          <!-- Status Konfigurasi Otomatis dari Administrasi Sistem -->
+          <div class="p-3.5 rounded-lg border border-teal-200 dark:border-teal-800/60 bg-teal-50/70 dark:bg-teal-950/30 text-xs space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-teal-950 dark:text-teal-200 flex items-center gap-1.5">
+                <svg class="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                Konfigurasi Administrasi Sistem
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200">
+                Otomatis Aktif
+              </span>
+            </div>
+            <p class="text-slate-600 dark:text-slate-300 leading-relaxed text-[11px]">
+              Ruang kerja Anda secara otomatis mewarisi kredensial AI terpusat dari Administrasi Sistem platform. Anda tidak perlu memasukkan kunci API atau URL endpoint lagi di sini.
+            </p>
+            <div class="grid grid-cols-2 gap-2 pt-1 text-[11px] border-t border-teal-200/60 dark:border-teal-900/50 text-slate-700 dark:text-slate-300">
+              <div>
+                <span class="text-slate-500 dark:text-slate-400 block text-[10px]">Penyedia Default:</span>
+                <span class="font-semibold font-mono">{{ platform_config?.provider_name || '9Router AI Gateway' }}</span>
+              </div>
+              <div>
+                <span class="text-slate-500 dark:text-slate-400 block text-[10px]">Model Platform:</span>
+                <span class="font-semibold font-mono">{{ platform_config?.model || 'high-models-agent' }}</span>
+              </div>
+              <div class="col-span-2">
+                <span class="text-slate-500 dark:text-slate-400 block text-[10px]">Kunci API & Endpoint:</span>
+                <span class="font-medium text-teal-700 dark:text-teal-300 text-[11px]">Dikelola Terpusat di Administrasi Sistem</span>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Nama Model
-            </label>
-            <input
-              v-model="formSettings.model"
-              type="text"
-              placeholder="cth: gemini-1.5-flash, gpt-4o-mini, hermes-3-llama-3.1-8b"
-              class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
-            />
+          <!-- Opsi Kustomisasi Khusus Ruang Kerja (BYOK) -->
+          <div class="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 space-y-3">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <label for="use_custom_toggle" class="font-semibold text-slate-800 dark:text-slate-200 block text-xs cursor-pointer">
+                  Kustomisasi Akun / Kunci API Sendiri (Opsional)
+                </label>
+                <span class="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                  Centang opsi ini hanya jika ruang kerja Anda ingin menggunakan akun/kunci API terpisah di luar Administrasi Sistem.
+                </span>
+              </div>
+              <input
+                id="use_custom_toggle"
+                v-model="useCustom"
+                type="checkbox"
+                class="rounded border-slate-300 dark:border-slate-700 text-teal-600 focus:ring-teal-500 h-4 w-4 mt-0.5 shrink-0"
+              />
+            </div>
+
+            <!-- Form Kustom (Hanya Ditampilkan jika Kustomisasi Diaktifkan) -->
+            <div v-if="useCustom" class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+              <div>
+                <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Penyedia Layanan AI Kustom
+                </label>
+                <select
+                  v-model="formSettings.provider"
+                  class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200"
+                >
+                  <option
+                    v-for="prov in available_providers"
+                    :key="prov.code"
+                    :value="prov.code"
+                  >
+                    {{ prov.name }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Model Kustom
+                </label>
+                <input
+                  v-model="formSettings.model"
+                  type="text"
+                  placeholder="cth: gemini-1.5-flash, gpt-4o-mini, hermes-3-llama-3.1-8b"
+                  class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                />
+              </div>
+
+              <div>
+                <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Kustom Endpoint API
+                </label>
+                <input
+                  v-model="formSettings.api_endpoint"
+                  type="text"
+                  placeholder="cth: https://api.9router.com/v1 atau http://localhost:11434/v1"
+                  class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
+                />
+              </div>
+
+              <div>
+                <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Kunci API Pribadi Ruang Kerja
+                </label>
+                <input
+                  v-model="formSettings.api_key"
+                  type="password"
+                  placeholder="Masukkan kunci API khusus ruang kerja Anda..."
+                  class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
+                />
+              </div>
+            </div>
           </div>
 
-          <div v-if="['hermes', 'openclaw', 'openai', '9router', 'claude'].includes(formSettings.provider)">
-            <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Kustom Endpoint API (Opsional)
-            </label>
-            <input
-              v-model="formSettings.api_endpoint"
-              type="text"
-              placeholder="cth: https://9router-tools.honet.web.id/v1 atau http://localhost:11434/v1"
-              class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
-            />
-            <span class="text-[11px] text-slate-400 mt-0.5 block">
-              Gunakan endpoint kustom jika menggunakan server gateway mandiri atau proxy internal.
-            </span>
-          </div>
-
-          <div>
-            <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Kunci API (Disimpan Terenkripsi)
-            </label>
-            <input
-              v-model="formSettings.api_key"
-              type="password"
-              placeholder="Kosongkan bila menggunakan kunci global platform"
-              class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
-            />
-          </div>
-
+          <!-- Persona Ruang Kerja (Selalu Tersedia) -->
           <div>
             <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
               Instruksi Sistem Khusus (Persona Ruang Kerja)
@@ -582,12 +704,12 @@ onMounted(() => {
             <textarea
               v-model="formSettings.system_instructions"
               rows="3"
-              placeholder="Tambahkan arahan khusus gaya bahasa atau fokus pembukuan keluarga/bisnis Anda..."
+              placeholder="Opsional: Tambahkan arahan khusus gaya bahasa atau fokus pembukuan keluarga/bisnis ruang kerja ini..."
               class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
             ></textarea>
           </div>
 
-          <div class="flex items-center gap-2 pt-2">
+          <div class="flex items-center gap-2 pt-1">
             <input
               id="ai_enabled"
               v-model="formSettings.is_enabled"
@@ -599,22 +721,34 @@ onMounted(() => {
             </label>
           </div>
 
-          <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
-            <RdButton
-              variant="outline"
-              size="sm"
-              @click="isSettingsModalOpen = false"
-            >
-              Batal
-            </RdButton>
-            <RdButton
-              variant="primary"
-              size="sm"
-              :loading="isSavingSettings"
-              @click="saveSettings"
-            >
-              Simpan Pengaturan
-            </RdButton>
+          <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+            <div>
+              <button
+                v-if="settings.is_custom"
+                type="button"
+                class="text-[11px] text-red-600 hover:text-red-700 dark:text-red-400 hover:underline"
+                @click="resetToPlatformDefault"
+              >
+                Kembalikan ke Default Sistem
+              </button>
+            </div>
+            <div class="flex items-center gap-2">
+              <RdButton
+                variant="outline"
+                size="sm"
+                @click="isSettingsModalOpen = false"
+              >
+                Batal
+              </RdButton>
+              <RdButton
+                variant="primary"
+                size="sm"
+                :loading="isSavingSettings"
+                @click="saveSettings"
+              >
+                Simpan Pengaturan
+              </RdButton>
+            </div>
           </div>
         </div>
       </RdModal>
