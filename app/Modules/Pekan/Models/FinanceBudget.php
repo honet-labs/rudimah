@@ -46,6 +46,8 @@ class FinanceBudget extends Model
 
     protected $appends = [
         'progress_percent',
+        'is_past',
+        'period_label',
     ];
 
     protected static function booted(): void
@@ -62,5 +64,43 @@ class FinanceBudget extends Model
     {
         if ($this->amount_limit_minor <= 0) return 0.0;
         return round(($this->spent_amount_minor / $this->amount_limit_minor) * 100, 1);
+    }
+
+    public function getIsPastAttribute(): bool
+    {
+        if ($this->status === 'archived') {
+            return true;
+        }
+
+        if ($this->end_date && \Carbon\Carbon::parse($this->end_date)->endOfDay()->isPast()) {
+            return true;
+        }
+
+        if ($this->start_date) {
+            $start = \Carbon\Carbon::parse($this->start_date);
+            $period = $this->period ?: 'monthly';
+            if ($period === 'monthly') {
+                return $start->copy()->endOfMonth()->endOfDay()->isPast();
+            } elseif ($period === 'weekly') {
+                return $start->copy()->endOfWeek()->endOfDay()->isPast();
+            } elseif ($period === 'yearly') {
+                return $start->copy()->endOfYear()->endOfDay()->isPast();
+            }
+        }
+
+        return false;
+    }
+
+    public function getPeriodLabelAttribute(): string
+    {
+        if (!$this->start_date) return 'Bulanan';
+        $start = \Carbon\Carbon::parse($this->start_date);
+        $period = $this->period ?: 'monthly';
+        if ($period === 'monthly') {
+            return $start->translatedFormat('F Y');
+        } elseif ($period === 'weekly') {
+            return 'Pekan ' . $start->weekOfYear . ' (' . $start->format('d M Y') . ')';
+        }
+        return 'Tahun ' . $start->format('Y');
     }
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
 import RdCard from '../../../design-system/RdCard.vue';
@@ -13,52 +14,55 @@ import RdBadge from '../../../design-system/RdBadge.vue';
 import type { User, Tenant } from '../../../types/core';
 import type { Transaction } from '../../../types/pekan';
 
+interface PaginationMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from: number | null;
+  to: number | null;
+}
+
 const props = withDefaults(
   defineProps<{
     user: User;
     tenant: Tenant;
     transactions?: Transaction[];
     totalCount?: number;
+    pagination?: PaginationMeta;
+    filters?: {
+      search?: string;
+      type?: string;
+    };
   }>(),
   {
-    totalCount: 3,
-    transactions: () => [
-      {
-        id: 'tx-001',
-        category_name: 'Gaji Pokok',
-        type: 'income',
-        amount_minor: 12000000,
-        currency: 'Rp',
-        transaction_date: '2026-10-10',
-        description: 'Penerimaan gaji bulanan',
-        created_at: '2026-10-10T08:00:00Z',
-      },
-      {
-        id: 'tx-002',
-        category_name: 'Belanja Dapur',
-        type: 'expense',
-        amount_minor: 450000,
-        currency: 'Rp',
-        transaction_date: '2026-10-12',
-        description: 'Belanja bahan mingguan di supermarket',
-        created_at: '2026-10-12T14:30:00Z',
-      },
-      {
-        id: 'tx-003',
-        category_name: 'Transportasi',
-        type: 'expense',
-        amount_minor: 85000,
-        currency: 'Rp',
-        transaction_date: '2026-10-13',
-        description: 'Bahan bakar kendaraan',
-        created_at: '2026-10-13T09:15:00Z',
-      },
-    ],
+    totalCount: 0,
+    transactions: () => [],
   }
 );
 
-const searchQuery = ref('');
-const selectedType = ref('all');
+const searchQuery = ref(props.filters?.search || '');
+const selectedType = ref(props.filters?.type || 'all');
+
+function applyFilter(page = 1) {
+  router.get(
+    `/t/${props.tenant.slug}/apps/pekan/transactions`,
+    {
+      search: searchQuery.value.trim() ? searchQuery.value.trim() : undefined,
+      type: selectedType.value !== 'all' ? selectedType.value : undefined,
+      page: page > 1 ? page : undefined,
+    },
+    {
+      preserveState: true,
+      preserveScroll: true,
+    }
+  );
+}
+
+function goToPage(page: number) {
+  if (page < 1 || (props.pagination && page > props.pagination.last_page)) return;
+  applyFilter(page);
+}
 
 const typeOptions = [
   { label: 'Semua Jenis Mutasi', value: 'all' },
@@ -100,26 +104,28 @@ const columns = [
 
     <!-- Bilah Filter & Pencarian -->
     <RdCard padding class="mb-4">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <form @submit.prevent="applyFilter(1)" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <RdInput
           v-model="searchQuery"
           placeholder="Cari transaksi berdasarkan catatan..."
+          @keyup.enter="applyFilter(1)"
         />
         <RdSelect
           v-model="selectedType"
           :options="typeOptions"
+          @update:model-value="applyFilter(1)"
         />
         <div class="flex items-center gap-2">
-          <RdButton variant="secondary" size="md" class="w-full">
+          <RdButton type="submit" variant="secondary" size="md" class="w-full">
             Terapkan Filter
           </RdButton>
           <a :href="`/t/${tenant.slug}/apps/pekan/reports`">
-            <RdButton variant="outline" size="md">
+            <RdButton type="button" variant="outline" size="md">
               Ekspor
             </RdButton>
           </a>
         </div>
-      </div>
+      </form>
     </RdCard>
 
     <!-- Tabel Data Mutasi -->
@@ -146,5 +152,39 @@ const columns = [
         </a>
       </template>
     </RdTable>
+
+    <!-- Kontrol Pagination Transaksi (Batas 20 per Halaman) -->
+    <div
+      v-if="pagination && pagination.total > 0"
+      class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 border-t border-slate-200 dark:border-slate-800 text-xs"
+    >
+      <div class="text-slate-600 dark:text-slate-400">
+        Menampilkan <span class="font-semibold text-slate-800 dark:text-slate-200">{{ pagination.from || 0 }}</span> - <span class="font-semibold text-slate-800 dark:text-slate-200">{{ pagination.to || 0 }}</span> dari <span class="font-semibold text-slate-800 dark:text-slate-200">{{ pagination.total }}</span> transaksi (Batas {{ pagination.per_page }} per halaman)
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <RdButton
+          variant="outline"
+          size="sm"
+          :disabled="pagination.current_page <= 1"
+          @click="goToPage(pagination.current_page - 1)"
+        >
+          Sebelumnya
+        </RdButton>
+
+        <span class="px-3 py-1 font-semibold text-slate-700 dark:text-slate-300">
+          Hal. {{ pagination.current_page }} dari {{ pagination.last_page || 1 }}
+        </span>
+
+        <RdButton
+          variant="outline"
+          size="sm"
+          :disabled="pagination.current_page >= pagination.last_page"
+          @click="goToPage(pagination.current_page + 1)"
+        >
+          Selanjutnya
+        </RdButton>
+      </div>
+    </div>
   </RudimahAppShell>
 </template>

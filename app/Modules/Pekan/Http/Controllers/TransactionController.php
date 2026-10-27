@@ -36,7 +36,7 @@ class TransactionController
             $query->where('description', 'like', '%' . $request->search . '%');
         }
 
-        $transactions = $query->paginate(15);
+        $transactions = $query->paginate(20)->withQueryString();
 
         return Inertia::render('Pekan/Transactions/Index', [
             'user' => $user ? [
@@ -50,6 +50,18 @@ class TransactionController
             'apps' => AppRegistry::all(),
             'transactions' => $transactions->items(),
             'totalCount' => $transactions->total(),
+            'pagination' => [
+                'current_page' => $transactions->currentPage(),
+                'last_page' => $transactions->lastPage(),
+                'per_page' => $transactions->perPage(),
+                'total' => $transactions->total(),
+                'from' => $transactions->firstItem(),
+                'to' => $transactions->lastItem(),
+            ],
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'type' => $request->input('type', 'all'),
+            ],
         ]);
     }
 

@@ -53,6 +53,8 @@ export interface FinanceBudget {
   start_date: string;
   alert_threshold_pct: number;
   status: 'active' | 'exceeded' | 'archived';
+  is_past?: boolean;
+  period_label?: string;
 }
 
 export interface FinanceSavings {

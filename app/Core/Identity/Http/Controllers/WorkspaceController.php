@@ -2,6 +2,7 @@
 
 namespace App\Core\Identity\Http\Controllers;
 
+use App\Core\Applications\AppRegistry;
 use App\Core\Tenancy\Models\Tenant;
 use App\Core\Tenancy\Models\TenantMembership;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +25,7 @@ class WorkspaceController
                 'email' => $user->email,
             ],
             'tenants' => $tenants,
+            'apps' => AppRegistry::all(),
         ]);
     }
 

@@ -7,14 +7,29 @@ import RdModal from '../design-system/RdModal.vue';
 import RdInput from '../design-system/RdInput.vue';
 import RdInfoTooltip from '../design-system/RdInfoTooltip.vue';
 import RdThemeToggle from '../design-system/RdThemeToggle.vue';
-import type { Tenant, User } from '../types/core';
+import type { Tenant, User, AppManifest } from '../types/core';
 
 const page = usePage();
+
+const defaultApps: AppManifest[] = [
+  { key: 'pekan', slug: 'pekan', name: 'PEKAN', description: 'Pengelolaan keuangan dan anggaran', icon: 'wallet', route_prefix: '/pekan', enabled: true },
+  { key: 'app1', slug: 'app1', name: 'Catatan Harian', description: 'Log harian dan agenda tugas', icon: 'calendar', route_prefix: '/app1', enabled: false },
+  { key: 'app2', slug: 'app2', name: 'Inventaris Rumah', description: 'Pencatatan aset dan garansi barang', icon: 'box', route_prefix: '/app2', enabled: false },
+];
 
 const props = defineProps<{
   user?: User;
   tenants: Tenant[];
+  apps?: AppManifest[];
 }>();
+
+const isAppModalOpen = ref(false);
+const selectedTenant = ref<Tenant | null>(null);
+
+function openAppSelector(tenant: Tenant) {
+  selectedTenant.value = tenant;
+  isAppModalOpen.value = true;
+}
 
 const isCreateModalOpen = ref(false);
 const isUserMenuOpen = ref(false);
@@ -176,11 +191,9 @@ function logout() {
                 Peran: <span class="uppercase font-medium">{{ t.role }}</span>
               </p>
             </div>
-            <a :href="`/t/${t.slug}/apps/pekan/dashboard`">
-              <RdButton size="sm" variant="primary">
-                Buka Aplikasi
-              </RdButton>
-            </a>
+            <RdButton size="sm" variant="primary" @click="openAppSelector(t)">
+              Buka Aplikasi
+            </RdButton>
           </div>
         </div>
       </RdCard>
@@ -209,6 +222,73 @@ function logout() {
           </RdButton>
           <RdButton form="create-workspace-form" type="submit" variant="primary" size="sm" :loading="form.processing">
             Simpan Ruang Kerja
+          </RdButton>
+        </template>
+      </RdModal>
+
+      <!-- Modal Pilih Aplikasi Ruang Kerja -->
+      <RdModal
+        v-model="isAppModalOpen"
+        :title="`Pilih Aplikasi: ${selectedTenant?.name || 'Ruang Kerja'}`"
+        description="Pilih modul aplikasi yang ingin Anda buka di ruang kerja ini"
+        max-width="lg"
+      >
+        <div class="space-y-3 py-2">
+          <div
+            v-for="app in (apps && apps.length > 0 ? apps : defaultApps)"
+            :key="app.key"
+            class="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 transition-all"
+            :class="app.enabled ? 'bg-white dark:bg-slate-900 hover:border-teal-500/50 shadow-xs' : 'bg-slate-50 dark:bg-slate-900/50 opacity-60'"
+          >
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
+                :class="app.enabled ? 'bg-teal-700 text-white dark:bg-teal-600' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'"
+              >
+                {{ app.name.substring(0, 2).toUpperCase() }}
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {{ app.name }}
+                  </h4>
+                  <span
+                    v-if="!app.enabled"
+                    class="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700"
+                  >
+                    Segera Hadir
+                  </span>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {{ app.description }}
+                </p>
+              </div>
+            </div>
+
+            <div class="shrink-0">
+              <a
+                v-if="app.enabled && selectedTenant"
+                :href="`/t/${selectedTenant.slug}/apps/${app.slug}/dashboard`"
+              >
+                <RdButton size="sm" variant="primary">
+                  Buka Modul
+                </RdButton>
+              </a>
+              <RdButton
+                v-else
+                size="sm"
+                variant="outline"
+                disabled
+              >
+                Terkunci
+              </RdButton>
+            </div>
+          </div>
+        </div>
+
+        <template #footer>
+          <RdButton variant="outline" size="sm" @click="isAppModalOpen = false">
+            Tutup
           </RdButton>
         </template>
       </RdModal>

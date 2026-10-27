@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue';
 import RudimahAppShell from '../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../design-system/RdPageHeader.vue';
 import RdCard from '../../design-system/RdCard.vue';
@@ -36,86 +37,27 @@ withDefaults(
       netMinor: 0,
       savingsMinor: 0,
     }),
-    recentTransactions: () => [
-      {
-        id: 'tx-001',
-        category_name: 'Gaji Pokok',
-        type: 'income',
-        amount_minor: 12000000,
-        currency: 'Rp',
-        transaction_date: '2026-10-10',
-        description: 'Penerimaan gaji bulanan',
-        created_at: '2026-10-10T08:00:00Z',
-      },
-      {
-        id: 'tx-002',
-        category_name: 'Belanja Dapur',
-        type: 'expense',
-        amount_minor: 450000,
-        currency: 'Rp',
-        transaction_date: '2026-10-12',
-        description: 'Belanja bahan mingguan di supermarket',
-        created_at: '2026-10-12T14:30:00Z',
-      },
-      {
-        id: 'tx-003',
-        category_name: 'Transportasi',
-        type: 'expense',
-        amount_minor: 85000,
-        currency: 'Rp',
-        transaction_date: '2026-10-13',
-        description: 'Bahan bakar kendaraan',
-        created_at: '2026-10-13T09:15:00Z',
-      },
-    ],
-    activeBudgets: () => [
-      {
-        id: 'bg-1',
-        name: 'Makan & Minum',
-        category_name: 'Konsumsi Harian',
-        amount_limit_minor: 3500000,
-        spent_amount_minor: 2100000,
-        progress_percent: 60,
-        period: 'monthly',
-        start_date: '2026-10-01',
-        alert_threshold_pct: 80,
-        status: 'active',
-      },
-      {
-        id: 'bg-2',
-        name: 'Tagihan Utilitas',
-        category_name: 'Listrik & Air',
-        amount_limit_minor: 1200000,
-        spent_amount_minor: 950000,
-        progress_percent: 79,
-        period: 'monthly',
-        start_date: '2026-10-01',
-        alert_threshold_pct: 80,
-        status: 'active',
-      },
-    ],
-    activeSavings: () => [
-      {
-        id: 'sv-1',
-        name: 'Dana Darurat 6 Bulan',
-        target_amount_minor: 30000000,
-        current_amount_minor: 18500000,
-        progress_percent: 61.6,
-        target_date: '2027-04-01',
-        status: 'active',
-      },
-      {
-        id: 'sv-2',
-        name: 'Renovasi Rumah',
-        target_amount_minor: 15000000,
-        current_amount_minor: 6200000,
-        progress_percent: 41.3,
-        target_date: '2026-12-31',
-        status: 'active',
-      },
-    ],
+    recentTransactions: () => [],
+    activeBudgets: () => [],
+    activeSavings: () => [],
   }
 );
+
+const isNominalHidden = ref(true);
+
+onMounted(() => {
+  const saved = localStorage.getItem('pekan_hide_nominal');
+  if (saved !== null) {
+    isNominalHidden.value = saved === 'true';
+  } else {
+    isNominalHidden.value = true;
+  }
+});
+
+function toggleNominal() {
+  isNominalHidden.value = !isNominalHidden.value;
+  localStorage.setItem('pekan_hide_nominal', String(isNominalHidden.value));
+}
 
 const txColumns = [
   { key: 'transaction_date', label: 'Tanggal', width: '130px' },
@@ -140,6 +82,25 @@ const txColumns = [
       :breadcrumbs="[{ label: 'Ruang Kerja', href: '/workspaces' }, { label: 'PEKAN', href: `/t/${tenant?.slug || ''}/apps/pekan/dashboard` }, { label: 'Dasbor' }]"
     >
       <template #actions>
+        <!-- Tombol Sensor / Buka Sensor Nominal (Default: Sembunyi) -->
+        <RdButton
+          type="button"
+          variant="outline"
+          size="sm"
+          class="flex items-center gap-1.5 cursor-pointer"
+          @click="toggleNominal"
+          :title="isNominalHidden ? 'Tampilkan Nominal Angka' : 'Sembunyikan Nominal Angka'"
+        >
+          <svg v-if="isNominalHidden" class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <svg v-else class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+          </svg>
+          <span>{{ isNominalHidden ? 'Buka Sensor' : 'Sensor Nominal' }}</span>
+        </RdButton>
+
         <a :href="`/t/${tenant?.slug || ''}/apps/pekan/receipt-scan`">
           <RdButton variant="outline" size="sm">
             Pindai Struk OCR
@@ -161,7 +122,7 @@ const txColumns = [
           <RdInfoTooltip text="Total seluruh mutasi kas masuk bulan berjalan" size="sm" title="Pemasukan" />
         </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
-          <RdMoney :amount-minor="summary.incomeMinor" />
+          <RdMoney :amount-minor="summary.incomeMinor" :masked="isNominalHidden" />
         </div>
       </RdCard>
 
@@ -171,7 +132,7 @@ const txColumns = [
           <RdInfoTooltip text="Total mutasi belanja dan biaya bulan berjalan" size="sm" title="Pengeluaran" />
         </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
-          <RdMoney :amount-minor="summary.expenseMinor" />
+          <RdMoney :amount-minor="summary.expenseMinor" :masked="isNominalHidden" />
         </div>
       </RdCard>
 
@@ -181,7 +142,7 @@ const txColumns = [
           <RdInfoTooltip text="Surplus atau selisih antara pemasukan dan pengeluaran bulan berjalan" size="sm" title="Saldo Kas" />
         </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
-          <RdMoney :amount-minor="summary.netMinor" />
+          <RdMoney :amount-minor="summary.netMinor" :masked="isNominalHidden" />
         </div>
       </RdCard>
 
@@ -191,7 +152,7 @@ const txColumns = [
           <RdInfoTooltip text="Total akumulasi saldo dari seluruh pos simpanan aktif" size="sm" title="Tabungan" />
         </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
-          <RdMoney :amount-minor="summary.savingsMinor" />
+          <RdMoney :amount-minor="summary.savingsMinor" :masked="isNominalHidden" />
         </div>
       </RdCard>
     </div>
@@ -215,7 +176,7 @@ const txColumns = [
             </template>
             <template #amount_minor="{ item }">
               <span :class="item.type === 'income' ? 'text-teal-800 dark:text-teal-300 font-bold' : 'text-slate-800 dark:text-slate-100 font-semibold'">
-                <RdMoney :amount-minor="item.amount_minor" :show-sign="item.type === 'income'" />
+                <RdMoney :amount-minor="item.amount_minor" :show-sign="item.type === 'income'" :masked="isNominalHidden" />
               </span>
             </template>
           </RdTable>
@@ -247,8 +208,8 @@ const txColumns = [
                 ></div>
               </div>
               <div class="flex items-center justify-between text-slate-500 text-[11px]">
-                <span>Terpakai: <RdMoney :amount-minor="b.spent_amount_minor" /></span>
-                <span>Batas: <RdMoney :amount-minor="b.amount_limit_minor" /></span>
+                <span>Terpakai: <RdMoney :amount-minor="b.spent_amount_minor" :masked="isNominalHidden" /></span>
+                <span>Batas: <RdMoney :amount-minor="b.amount_limit_minor" :masked="isNominalHidden" /></span>
               </div>
             </div>
           </div>
@@ -277,8 +238,8 @@ const txColumns = [
             <div class="bg-teal-700 h-full" :style="{ width: `${Math.min(s.progress_percent || 0, 100)}%` }"></div>
           </div>
           <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
-            <span>Terkumpul: <RdMoney :amount-minor="s.current_amount_minor" /></span>
-            <span>Target: <RdMoney :amount-minor="s.target_amount_minor" /></span>
+            <span>Terkumpul: <RdMoney :amount-minor="s.current_amount_minor" :masked="isNominalHidden" /></span>
+            <span>Target: <RdMoney :amount-minor="s.target_amount_minor" :masked="isNominalHidden" /></span>
           </div>
         </div>
       </div>

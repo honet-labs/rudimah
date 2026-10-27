@@ -7,16 +7,22 @@ const props = withDefaults(
     currency?: string;
     showSign?: boolean;
     compact?: boolean;
+    masked?: boolean;
   }>(),
   {
     amountMinor: 0,
     currency: 'Rp',
     showSign: false,
     compact: false,
+    masked: false,
   }
 );
 
 const formatted = computed(() => {
+  if (props.masked) {
+    return `${props.currency} ••••••`;
+  }
+
   const raw = props.amountMinor ?? 0;
   const value = isNaN(raw) ? 0 : Math.round(raw);
   const isNegative = value < 0;
