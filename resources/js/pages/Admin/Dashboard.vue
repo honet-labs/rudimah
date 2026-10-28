@@ -327,6 +327,79 @@ async function runAiTest() {
     isAiTesting.value = false;
   }
 }
+
+interface DetectedModelItem {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+const detectingModels = ref<Record<'gemini' | 'openai' | 'claude' | '9router', boolean>>({
+  gemini: false,
+  openai: false,
+  claude: false,
+  '9router': false,
+});
+
+const detectedModels = ref<Record<'gemini' | 'openai' | 'claude' | '9router', DetectedModelItem[]>>({
+  gemini: [],
+  openai: [],
+  claude: [],
+  '9router': [],
+});
+
+const modelDetectionMessages = ref<Record<'gemini' | 'openai' | 'claude' | '9router', { success: boolean; text: string } | null>>({
+  gemini: null,
+  openai: null,
+  claude: null,
+  '9router': null,
+});
+
+async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router') {
+  detectingModels.value[provider] = true;
+  modelDetectionMessages.value[provider] = null;
+  const cfg = aiForm.value[provider];
+
+  try {
+    const res = await secureFetch('/admin/ai/models', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        provider,
+        api_endpoint: cfg.api_endpoint || undefined,
+        api_key: cfg.api_key || undefined,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data.success && Array.isArray(data.models)) {
+      detectedModels.value[provider] = data.models;
+      modelDetectionMessages.value[provider] = {
+        success: true,
+        text: data.message || `Ditemukan ${data.models.length} model yang tersedia.`,
+      };
+      if (!cfg.model && data.models.length > 0) {
+        cfg.model = data.models[0].id;
+      }
+    } else {
+      modelDetectionMessages.value[provider] = {
+        success: false,
+        text: data.message || 'Gagal mendeteksi model. Pastikan API key dan URL endpoint valid.',
+      };
+    }
+  } catch (err: any) {
+    modelDetectionMessages.value[provider] = {
+      success: false,
+      text: 'Gangguan jaringan saat mendeteksi model: ' + (err.message || 'Koneksi gagal'),
+    };
+  } finally {
+    detectingModels.value[provider] = false;
+  }
+}
 </script>
 
 <template>
@@ -656,16 +729,29 @@ async function runAiTest() {
                 <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan Google Gemini</h4>
                 <p class="text-xs text-slate-500">Integrasi resmi model Gemini Flash & Gemini Pro dari Google AI Studio</p>
               </div>
-              <RdButton
-                type="button"
-                variant="outline"
-                size="sm"
-                class="w-full sm:w-auto"
-                :disabled="isAiTesting || (!aiForm.gemini.api_key && !props.aiSettings?.providers?.gemini?.has_api_key)"
-                @click="openAiTestModal('gemini')"
-              >
-                Uji Koneksi Gemini
-              </RdButton>
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <RdButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="w-full sm:w-auto"
+                  :disabled="detectingModels['gemini'] || (!aiForm.gemini.api_key && !props.aiSettings?.providers?.gemini?.has_api_key)"
+                  @click="detectModels('gemini')"
+                >
+                  <span v-if="detectingModels['gemini']">Mendeteksi Model...</span>
+                  <span v-else>Deteksi Model Otomatis</span>
+                </RdButton>
+                <RdButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="w-full sm:w-auto"
+                  :disabled="isAiTesting || (!aiForm.gemini.api_key && !props.aiSettings?.providers?.gemini?.has_api_key)"
+                  @click="openAiTestModal('gemini')"
+                >
+                  Uji Koneksi Gemini
+                </RdButton>
+              </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
@@ -687,13 +773,39 @@ async function runAiTest() {
                 :hint="props.aiSettings?.providers?.gemini?.has_api_key ? 'Kunci tersimpan aman dan terenkripsi di basis data platform.' : 'Dapatkan token otentikasi dari Google AI Studio (aistudio.google.com)'"
               />
 
-              <RdInput
-                v-model="aiForm.gemini.model"
-                label="Model Default Gemini"
-                placeholder="gemini-1.5-flash"
-                hint="Nama model Gemini (contoh: gemini-1.5-flash, gemini-1.5-pro)"
-                required
-              />
+              <div class="space-y-2">
+                <div v-if="detectedModels['gemini'].length > 0">
+                  <RdSelect
+                    v-model="aiForm.gemini.model"
+                    label="Pilih dari Model Terdeteksi"
+                    :options="[
+                      { label: '-- Pilih dari ' + detectedModels['gemini'].length + ' Model Gemini Tersedia --', value: '' },
+                      ...detectedModels['gemini'].map(m => ({ label: m.name, value: m.id }))
+                    ]"
+                    hint="Pilih untuk mengisi kolom model default secara otomatis"
+                  />
+                </div>
+
+                <RdInput
+                  v-model="aiForm.gemini.model"
+                  label="Model Default Gemini"
+                  placeholder="gemini-1.5-flash"
+                  hint="Nama model Gemini (contoh: gemini-1.5-flash, gemini-1.5-pro)"
+                  required
+                />
+
+                <p
+                  v-if="modelDetectionMessages['gemini']"
+                  :class="[
+                    'text-xs mt-1',
+                    modelDetectionMessages['gemini'].success
+                      ? 'text-teal-600 dark:text-teal-400 font-medium'
+                      : 'text-red-600 dark:text-red-400'
+                  ]"
+                >
+                  {{ modelDetectionMessages['gemini'].text }}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -704,16 +816,29 @@ async function runAiTest() {
                 <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan OpenAI ChatGPT</h4>
                 <p class="text-xs text-slate-500">Integrasi model OpenAI GPT-4o, GPT-4o-mini, atau gateway kompatibel</p>
               </div>
-              <RdButton
-                type="button"
-                variant="outline"
-                size="sm"
-                class="w-full sm:w-auto"
-                :disabled="isAiTesting || (!aiForm.openai.api_key && !props.aiSettings?.providers?.openai?.has_api_key)"
-                @click="openAiTestModal('openai')"
-              >
-                Uji Koneksi OpenAI
-              </RdButton>
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <RdButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="w-full sm:w-auto"
+                  :disabled="detectingModels['openai'] || (!aiForm.openai.api_key && !props.aiSettings?.providers?.openai?.has_api_key)"
+                  @click="detectModels('openai')"
+                >
+                  <span v-if="detectingModels['openai']">Mendeteksi Model...</span>
+                  <span v-else>Deteksi Model Otomatis</span>
+                </RdButton>
+                <RdButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="w-full sm:w-auto"
+                  :disabled="isAiTesting || (!aiForm.openai.api_key && !props.aiSettings?.providers?.openai?.has_api_key)"
+                  @click="openAiTestModal('openai')"
+                >
+                  Uji Koneksi OpenAI
+                </RdButton>
+              </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
@@ -735,13 +860,39 @@ async function runAiTest() {
                 :hint="props.aiSettings?.providers?.openai?.has_api_key ? 'Kunci tersimpan aman dan terenkripsi di basis data platform.' : 'Dapatkan API key dari platform.openai.com/api-keys'"
               />
 
-              <RdInput
-                v-model="aiForm.openai.model"
-                label="Model Default OpenAI"
-                placeholder="gpt-4o-mini"
-                hint="Nama model OpenAI (contoh: gpt-4o-mini, gpt-4o, gpt-3.5-turbo)"
-                required
-              />
+              <div class="space-y-2">
+                <div v-if="detectedModels['openai'].length > 0">
+                  <RdSelect
+                    v-model="aiForm.openai.model"
+                    label="Pilih dari Model Terdeteksi"
+                    :options="[
+                      { label: '-- Pilih dari ' + detectedModels['openai'].length + ' Model OpenAI Tersedia --', value: '' },
+                      ...detectedModels['openai'].map(m => ({ label: m.name, value: m.id }))
+                    ]"
+                    hint="Pilih untuk mengisi kolom model default secara otomatis"
+                  />
+                </div>
+
+                <RdInput
+                  v-model="aiForm.openai.model"
+                  label="Model Default OpenAI"
+                  placeholder="gpt-4o-mini"
+                  hint="Nama model OpenAI (contoh: gpt-4o-mini, gpt-4o, gpt-3.5-turbo)"
+                  required
+                />
+
+                <p
+                  v-if="modelDetectionMessages['openai']"
+                  :class="[
+                    'text-xs mt-1',
+                    modelDetectionMessages['openai'].success
+                      ? 'text-teal-600 dark:text-teal-400 font-medium'
+                      : 'text-red-600 dark:text-red-400'
+                  ]"
+                >
+                  {{ modelDetectionMessages['openai'].text }}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -752,16 +903,29 @@ async function runAiTest() {
                 <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan Anthropic Claude</h4>
                 <p class="text-xs text-slate-500">Integrasi model Claude 3.5 Sonnet, Claude 3 Opus, dan Claude 3.5 Haiku</p>
               </div>
-              <RdButton
-                type="button"
-                variant="outline"
-                size="sm"
-                class="w-full sm:w-auto"
-                :disabled="isAiTesting || (!aiForm.claude.api_key && !props.aiSettings?.providers?.claude?.has_api_key)"
-                @click="openAiTestModal('claude')"
-              >
-                Uji Koneksi Claude
-              </RdButton>
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <RdButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="w-full sm:w-auto"
+                  :disabled="detectingModels['claude'] || (!aiForm.claude.api_key && !props.aiSettings?.providers?.claude?.has_api_key)"
+                  @click="detectModels('claude')"
+                >
+                  <span v-if="detectingModels['claude']">Mendeteksi Model...</span>
+                  <span v-else>Deteksi Model Otomatis</span>
+                </RdButton>
+                <RdButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="w-full sm:w-auto"
+                  :disabled="isAiTesting || (!aiForm.claude.api_key && !props.aiSettings?.providers?.claude?.has_api_key)"
+                  @click="openAiTestModal('claude')"
+                >
+                  Uji Koneksi Claude
+                </RdButton>
+              </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
@@ -783,13 +947,39 @@ async function runAiTest() {
                 :hint="props.aiSettings?.providers?.claude?.has_api_key ? 'Kunci tersimpan aman dan terenkripsi di basis data platform.' : 'Dapatkan token otentikasi dari console.anthropic.com'"
               />
 
-              <RdInput
-                v-model="aiForm.claude.model"
-                label="Model Default Claude"
-                placeholder="claude-3-5-sonnet-20241022"
-                hint="Nama model Claude (contoh: claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022)"
-                required
-              />
+              <div class="space-y-2">
+                <div v-if="detectedModels['claude'].length > 0">
+                  <RdSelect
+                    v-model="aiForm.claude.model"
+                    label="Pilih dari Model Terdeteksi"
+                    :options="[
+                      { label: '-- Pilih dari ' + detectedModels['claude'].length + ' Model Claude Tersedia --', value: '' },
+                      ...detectedModels['claude'].map(m => ({ label: m.name, value: m.id }))
+                    ]"
+                    hint="Pilih untuk mengisi kolom model default secara otomatis"
+                  />
+                </div>
+
+                <RdInput
+                  v-model="aiForm.claude.model"
+                  label="Model Default Claude"
+                  placeholder="claude-3-5-sonnet-20241022"
+                  hint="Nama model Claude (contoh: claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022)"
+                  required
+                />
+
+                <p
+                  v-if="modelDetectionMessages['claude']"
+                  :class="[
+                    'text-xs mt-1',
+                    modelDetectionMessages['claude'].success
+                      ? 'text-teal-600 dark:text-teal-400 font-medium'
+                      : 'text-red-600 dark:text-red-400'
+                  ]"
+                >
+                  {{ modelDetectionMessages['claude'].text }}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -800,16 +990,29 @@ async function runAiTest() {
                 <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan 9Router AI Gateway</h4>
                 <p class="text-xs text-slate-500">Integrasi gateway terpadu multi-penyedia AI dengan protokol kompatibel OpenAI</p>
               </div>
-              <RdButton
-                type="button"
-                variant="outline"
-                size="sm"
-                class="w-full sm:w-auto"
-                :disabled="isAiTesting || (!aiForm['9router'].api_key && !props.aiSettings?.providers?.['9router']?.has_api_key)"
-                @click="openAiTestModal('9router')"
-              >
-                Uji Koneksi 9Router
-              </RdButton>
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <RdButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="w-full sm:w-auto"
+                  :disabled="detectingModels['9router'] || (!aiForm['9router'].api_key && !props.aiSettings?.providers?.['9router']?.has_api_key)"
+                  @click="detectModels('9router')"
+                >
+                  <span v-if="detectingModels['9router']">Mendeteksi Model...</span>
+                  <span v-else>Deteksi Model Otomatis</span>
+                </RdButton>
+                <RdButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="w-full sm:w-auto"
+                  :disabled="isAiTesting || (!aiForm['9router'].api_key && !props.aiSettings?.providers?.['9router']?.has_api_key)"
+                  @click="openAiTestModal('9router')"
+                >
+                  Uji Koneksi 9Router
+                </RdButton>
+              </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
@@ -831,13 +1034,39 @@ async function runAiTest() {
                 :hint="props.aiSettings?.providers?.['9router']?.has_api_key ? 'Token tersimpan aman dan terenkripsi di basis data platform.' : 'Dapatkan token otentikasi dari panel 9Router'"
               />
 
-              <RdInput
-                v-model="aiForm['9router'].model"
-                label="Model Default 9Router"
-                placeholder="gpt-4o-mini"
-                hint="Nama model tujuan di 9Router (misal: gpt-4o-mini, claude-3-5-sonnet, gemini-1.5-flash)"
-                required
-              />
+              <div class="space-y-2">
+                <div v-if="detectedModels['9router'].length > 0">
+                  <RdSelect
+                    v-model="aiForm['9router'].model"
+                    label="Pilih dari Model Terdeteksi"
+                    :options="[
+                      { label: '-- Pilih dari ' + detectedModels['9router'].length + ' Model 9Router Tersedia --', value: '' },
+                      ...detectedModels['9router'].map(m => ({ label: m.name, value: m.id }))
+                    ]"
+                    hint="Pilih untuk mengisi kolom model default secara otomatis"
+                  />
+                </div>
+
+                <RdInput
+                  v-model="aiForm['9router'].model"
+                  label="Model Default 9Router"
+                  placeholder="gpt-4o-mini"
+                  hint="Nama model tujuan di 9Router (misal: gpt-4o-mini, claude-3-5-sonnet, gemini-1.5-flash)"
+                  required
+                />
+
+                <p
+                  v-if="modelDetectionMessages['9router']"
+                  :class="[
+                    'text-xs mt-1',
+                    modelDetectionMessages['9router'].success
+                      ? 'text-teal-600 dark:text-teal-400 font-medium'
+                      : 'text-red-600 dark:text-red-400'
+                  ]"
+                >
+                  {{ modelDetectionMessages['9router'].text }}
+                </p>
+              </div>
             </div>
           </div>
 

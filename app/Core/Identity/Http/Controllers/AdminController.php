@@ -7,6 +7,7 @@ use App\Core\Applications\AppRegistry;
 use App\Core\Identity\Models\User;
 use App\Core\Notifications\Services\PlatformNotificationService;
 use App\Core\Tenancy\Models\Tenant;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -247,5 +248,30 @@ class AdminController
         }
 
         return back()->with('error', $res['message']);
+    }
+
+    /**
+     * Deteksi daftar model yang tersedia untuk penyedia AI tertentu.
+     */
+    public function detectAiModels(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->is_super_admin) {
+            abort(403, 'Hanya Administrator Platform yang memiliki izin mendeteksi model AI.');
+        }
+
+        $validated = $request->validate([
+            'provider' => 'required|string|in:gemini,openai,claude,9router',
+            'api_endpoint' => 'nullable|string|max:255',
+            'api_key' => 'nullable|string|max:255',
+        ]);
+
+        $res = PlatformAiService::fetchAvailableModels(
+            $validated['provider'],
+            $validated['api_endpoint'] ?? null,
+            $validated['api_key'] ?? null
+        );
+
+        return response()->json($res, $res['success'] ? 200 : 422);
     }
 }
