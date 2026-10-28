@@ -71,15 +71,19 @@ class TenantFinancialContextBuilder
                 $remindersSummary[] = "- {$r->title}{$tenorInfo}: jatuh tempo {$dueDateStr}, nominal " . MoneyHelper::formatIdr((int) ($r->amount_minor ?? 0)) . "{$statusLabel}";
             }
 
-            // 5. Transaksi Terbaru (5 terakhir)
-            $recentTransactions = FinanceTransaction::where('tenant_id', $tenantId)
-                ->orderBy('transaction_date', 'desc')
-                ->limit(5)
+            // 5. Transaksi Terbaru (10 mutasi terakhir, diurutkan dari pencatatan paling baru)
+            $recentTransactions = FinanceTransaction::with('category')
+                ->where('tenant_id', $tenantId)
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
                 ->get();
 
             $transactionsSummary = [];
             foreach ($recentTransactions as $tx) {
-                $transactionsSummary[] = "- {$tx->transaction_date} [{$tx->type}]: " . MoneyHelper::formatIdr($tx->amount_minor) . " (" . ($tx->description ?: 'Tanpa keterangan') . ")";
+                $shortId = substr($tx->id, 0, 8);
+                $catName = $tx->category?->name ?: 'Umum';
+                $dateStr = $tx->transaction_date ? \Carbon\Carbon::parse($tx->transaction_date)->format('d M Y') : '-';
+                $transactionsSummary[] = "- ID: #{$shortId} (UUID: {$tx->id}) | Tanggal: {$tx->transaction_date} ({$dateStr}) [{$tx->type}]: " . MoneyHelper::formatIdr($tx->amount_minor) . " ({$tx->description}) | Kategori: '{$catName}'";
             }
 
             // 6. Daftar Kategori Aktif Ruang Kerja
@@ -175,13 +179,14 @@ class TenantFinancialContextBuilder
         $prompt .= "6. Bersikaplah sopan, profesional, membantu, dan gunakan Bahasa Indonesia yang baik dan ringkas.\n";
         $prompt .= "7. Semua nominal uang disajikan dalam format Rupiah (Rp).\n\n";
 
-        $prompt .= "KEMAMPUAN PENCATATAN TRANSAKSI LANGSUNG:\n";
-        $prompt .= "Jika pengguna meminta Anda untuk mencatat, memasukkan, menyimpan, atau menambahkan transaksi finansial baru (contoh: 'makan siang 24rb dan jajan pancong 30rb tolong masukin', 'catat pengeluaran bensin 50rb', 'tambah pemasukan gaji 5jt'):\n";
-        $prompt .= "- Buatlah balasan ramah yang merinci transaksi yang akan dicatat.\n";
-        $prompt .= "- Pada bagian PALING AKHIR balasan Anda, sertakan blok kode JSON khusus dengan format persis:\n";
+        $prompt .= "KEMAMPUAN AKSI TRANSAKSI (PENCATATAN, PENGUBAHAN/KOREKSI, DAN PENGHAPUSAN):\n";
+        $prompt .= "1. PENCATATAN TRANSAKSI BARU (CREATE):\n";
+        $prompt .= "   Jika pengguna meminta mencatat atau menambah transaksi baru (contoh: 'makan siang 24rb tolong masukin', 'catat bensin 50rb', 'tambah pemasukan gaji 5jt'):\n";
+        $prompt .= "   Sertakan blok JSON action pada bagian paling akhir:\n";
         $prompt .= "```json:transaction_action\n";
         $prompt .= "[\n";
         $prompt .= "  {\n";
+        $prompt .= "    \"action\": \"create\",\n";
         $prompt .= "    \"type\": \"expense\",\n";
         $prompt .= "    \"description\": \"Makan siang\",\n";
         $prompt .= "    \"amount_minor\": 24000,\n";
@@ -189,14 +194,37 @@ class TenantFinancialContextBuilder
         $prompt .= "    \"category\": \"Makanan & Minuman\"\n";
         $prompt .= "  }\n";
         $prompt .= "]\n";
+        $prompt .= "```\n\n";
+
+        $prompt .= "2. PENGUBAHAN / KOREKSI / RALAT TRANSAKSI (UPDATE - SANGAT PENTING):\n";
+        $prompt .= "   Jika pengguna meminta untuk MERALAT, MENGUBAH, MENGGANTI, MENGOEKSI, atau MEMPERBAIKI transaksi yang sudah ada atau yang baru saja dicatat (contoh: 'salah rubah menjadi tanggal 28 bukan tanggal 27', 'ralat nominalnya jadi 30rb', 'ubah tanggalnya ke 28', 'ganti kategorinya ke Hiburan', 'bukan 25rb tapi 35rb'):\n";
+        $prompt .= "   DILARANG KERAS membuat transaksi baru yang menyebabkan data duplikat! Anda WAJIB melakukan UPDATE terhadap transaksi yang dimaksud.\n";
+        $prompt .= "   Ambil UUID transaksi dari riwayat transaksi yang baru dicatat atau dari daftar TRANSAKSI TERBARU di atas, lalu sertakan blok JSON action:\n";
+        $prompt .= "```json:transaction_action\n";
+        $prompt .= "[\n";
+        $prompt .= "  {\n";
+        $prompt .= "    \"action\": \"update\",\n";
+        $prompt .= "    \"transaction_id\": \"UUID_TRANSAKSI_YANG_DIUBAH\",\n";
+        $prompt .= "    \"date\": \"2026-10-28\",\n";
+        $prompt .= "    \"amount_minor\": 25000,\n";
+        $prompt .= "    \"description\": \"Makan malam nasi goreng\",\n";
+        $prompt .= "    \"category\": \"Makan dan Jajan\"\n";
+        $prompt .= "  }\n";
+        $prompt .= "]\n";
+        $prompt .= "```\n\n";
+
+        $prompt .= "3. PENGHAPUSAN / PEMBATALAN TRANSAKSI (DELETE):\n";
+        $prompt .= "   Jika pengguna meminta menghapus atau membatalkan transaksi yang keliru dicatat (contoh: 'batalkan transaksi tadi', 'hapus transaksi nasi goreng 25rb tadi'):\n";
+        $prompt .= "```json:transaction_action\n";
+        $prompt .= "[\n";
+        $prompt .= "  {\n";
+        $prompt .= "    \"action\": \"delete\",\n";
+        $prompt .= "    \"transaction_id\": \"UUID_TRANSAKSI_YANG_DIHAPUS\",\n";
+        $prompt .= "    \"description\": \"Makan malam nasi goreng\"\n";
+        $prompt .= "  }\n";
+        $prompt .= "]\n";
         $prompt .= "```\n";
-        $prompt .= "Keterangan properti JSON:\n";
-        $prompt .= "- 'type': 'expense' (pengeluaran) atau 'income' (pemasukan).\n";
-        $prompt .= "- 'description': nama / keterangan singkat transaksi.\n";
-        $prompt .= "- 'amount_minor': nominal dalam satuan Rupiah bulat angka tanpa titik koma (contoh: 24000 untuk Rp 24.000).\n";
-        $prompt .= "- 'date': tanggal transaksi (format YYYY-MM-DD, sesuaikan jika pengguna menyebut kemarin atau tanggal lain, default ke tanggal hari ini).\n";
-        $prompt .= "- 'category': nama kategori terdekat dari daftar kategori atau pos anggaran yang tersedia (sangat penting: utamakan memilih nama kategori yang memiliki pos anggaran aktif agar pengeluaran terhitung ke anggaran).\n";
-        $prompt .= "PENTING: Blok ```json:transaction_action``` HANYA boleh disertakan jika pengguna secara eksplisit meminta memasukkan / mencatat transaksi. DILARANG menyertakannya jika pengguna hanya bertanya informasi, saldo, atau konsultasi.\n\n";
+        $prompt .= "PENTING: Blok ```json:transaction_action``` HANYA boleh disertakan jika pengguna secara eksplisit meminta membuat, mengubah, atau menghapus transaksi. DILARANG menyertakannya jika pengguna hanya bertanya informasi, saldo, atau konsultasi.\n\n";
 
         $prompt .= "=== PANDUAN MENJAWAB PERTANYAAN TAGIHAN & PENGINGAT (BILLS & REMINDERS) ===\n";
         $prompt .= "1. Jika pengguna bertanya tentang total tagihan (contoh: 'berapa total tagihan saya?', 'ada tagihan apa saja?', 'rincian tagihan', 'tagihan bulan ini'):\n";

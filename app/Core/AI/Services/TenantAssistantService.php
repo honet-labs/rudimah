@@ -8,6 +8,7 @@ use App\Core\AI\Models\AiMessage;
 use App\Core\AI\Models\TenantAiSetting;
 use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Pekan\Models\FinanceTransaction;
 use App\Modules\Pekan\Services\TransactionService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -175,9 +176,23 @@ class TenantAssistantService
         ];
 
         foreach ($pastMessages as $pm) {
+            $content = $pm->content;
+            if ($pm->role === 'assistant' && !empty($pm->metadata['recorded_transactions'])) {
+                $txList = $pm->metadata['recorded_transactions'];
+                $summaryList = [];
+                foreach ($txList as $t) {
+                    $desc = $t['description'] ?? 'Transaksi';
+                    $id = $t['id'] ?? '';
+                    $date = $t['date'] ?? '';
+                    $amt = $t['amount_minor'] ?? 0;
+                    $summaryList[] = "ID: {$id} ({$desc}, Rp {$amt}, {$date})";
+                }
+                $content .= "\n[Info Sistem: Transaksi yang baru dicatat: " . implode('; ', $summaryList) . "]";
+            }
+
             $messagesPayload[] = [
                 'role' => $pm->role,
-                'content' => $pm->content,
+                'content' => $content,
             ];
         }
 
@@ -214,17 +229,101 @@ class TenantAssistantService
             $replyContent = "Maaf, asisten tidak menghasilkan respon yang dapat ditampilkan. Silakan coba ajukan pertanyaan kembali.";
         }
 
-        // 6. Deteksi dan Eksekusi Pencatatan Transaksi Nyata ke Database
+        // 6. Deteksi dan Eksekusi Tindakan Transaksi (Pencatatan, Pengubahan/Ralat, dan Penghapusan)
         $recordedTransactions = [];
         [$parsedActions, $cleanedReply] = $this->extractTransactionActions($replyContent, $userMessageText);
+
+        $isCorrectionIntent = (bool) preg_match('/\b(salah|rubah|ubah|ralat|koreksi|ganti|edit|revisi|bukan\b.*?\btapi)\b/i', $userMessageText);
+        $isDeleteIntent = (bool) preg_match('/\b(hapus|batalkan|delete)\s+(transaksi|mutasi|catatan)\b/i', $userMessageText);
 
         if (!empty($parsedActions)) {
             foreach ($parsedActions as $action) {
                 try {
+                    $actionType = strtolower($action['action'] ?? ($isDeleteIntent ? 'delete' : ($isCorrectionIntent ? 'update' : 'create')));
+
                     $amountMinor = (int) ($action['amount_minor'] ?? 0);
                     if ($amountMinor <= 0 && !empty($action['amount'])) {
                         $amountMinor = (int) round((float) $action['amount']);
                     }
+
+                    // A. AKSI PENGHAPUSAN TRANSAKSI
+                    if ($actionType === 'delete') {
+                        $targetTx = null;
+                        if (!empty($action['transaction_id'])) {
+                            $targetTx = FinanceTransaction::where('tenant_id', $tenantId)
+                                ->where(function ($q) use ($action) {
+                                    $q->where('id', $action['transaction_id'])
+                                      ->orWhere('id', 'like', $action['transaction_id'] . '%');
+                                })->first();
+                        }
+                        if (!$targetTx) {
+                            $targetTx = $this->resolveLastRecordedTransaction($conversation->id, $tenantId, $action['description'] ?? null);
+                        }
+                        if ($targetTx) {
+                            $deletedDesc = $targetTx->description;
+                            $deletedAmount = $targetTx->amount_minor;
+                            $deletedDate = (string) $targetTx->transaction_date;
+                            $targetTx->delete();
+                            $recordedTransactions[] = [
+                                'id' => $targetTx->id,
+                                'action' => 'deleted',
+                                'type' => $targetTx->type,
+                                'description' => $deletedDesc,
+                                'amount_minor' => $deletedAmount,
+                                'date' => $deletedDate,
+                            ];
+                        }
+                        continue;
+                    }
+
+                    // B. AKSI PENGUBAHAN / KOREKSI / RALAT TRANSAKSI (UPDATE)
+                    if ($actionType === 'update') {
+                        $targetTx = null;
+                        if (!empty($action['transaction_id'])) {
+                            $targetTx = FinanceTransaction::where('tenant_id', $tenantId)
+                                ->where(function ($q) use ($action) {
+                                    $q->where('id', $action['transaction_id'])
+                                      ->orWhere('id', 'like', $action['transaction_id'] . '%');
+                                })->first();
+                        }
+                        if (!$targetTx) {
+                            $targetTx = $this->resolveLastRecordedTransaction($conversation->id, $tenantId, $action['description'] ?? null);
+                        }
+
+                        if ($targetTx) {
+                            $updatePayload = [];
+                            if (!empty($action['date'])) {
+                                $updatePayload['transaction_date'] = $action['date'];
+                            }
+                            if ($amountMinor > 0) {
+                                $updatePayload['amount_minor'] = $amountMinor;
+                            }
+                            if (!empty($action['description'])) {
+                                $updatePayload['description'] = $action['description'];
+                            }
+                            if (!empty($action['category'])) {
+                                $updatePayload['category'] = $action['category'];
+                            }
+                            if (!empty($action['type']) && in_array(strtolower($action['type']), ['income', 'expense', 'savings', 'transfer'])) {
+                                $updatePayload['type'] = strtolower($action['type']);
+                            }
+
+                            $updatedTx = $this->transactionService->updateTransaction($targetTx, $updatePayload);
+
+                            $recordedTransactions[] = [
+                                'id' => $updatedTx->id,
+                                'action' => 'updated',
+                                'type' => $updatedTx->type,
+                                'description' => $updatedTx->description,
+                                'amount_minor' => $updatedTx->amount_minor,
+                                'date' => (string) $updatedTx->transaction_date,
+                            ];
+                            continue;
+                        }
+                        // Jika targetTx tidak ditemukan sama sekali, lanjut ke fallback create
+                    }
+
+                    // C. AKSI PENCATATAN TRANSAKSI BARU (CREATE)
                     if ($amountMinor <= 0) {
                         continue;
                     }
@@ -245,20 +344,35 @@ class TenantAssistantService
 
                     $recordedTransactions[] = [
                         'id' => $tx->id,
+                        'action' => 'created',
                         'type' => $tx->type,
                         'description' => $tx->description,
                         'amount_minor' => $tx->amount_minor,
                         'date' => (string) $tx->transaction_date,
                     ];
                 } catch (\Throwable $e) {
-                    Log::error('[TenantAssistantService] Gagal mencatat transaksi dari AI: ' . $e->getMessage());
+                    Log::error('[TenantAssistantService] Gagal mengeksekusi aksi transaksi dari AI: ' . $e->getMessage());
                 }
             }
 
             if (!empty($recordedTransactions)) {
                 $meta['recorded_transactions'] = $recordedTransactions;
                 $replyContent = $cleanedReply;
-                if (empty(trim($replyContent))) {
+
+                $hasUpdate = collect($recordedTransactions)->contains('action', 'updated');
+                $hasDelete = collect($recordedTransactions)->contains('action', 'deleted');
+
+                if ($hasUpdate) {
+                    $replyContent = preg_replace('/Transaksi\s+dicatat\s*:/i', 'Transaksi berhasil diperbarui:', $replyContent);
+                    if (empty(trim($replyContent))) {
+                        $replyContent = "Transaksi berhasil diperbarui di dalam sistem.";
+                    }
+                } elseif ($hasDelete) {
+                    $replyContent = preg_replace('/Transaksi\s+dicatat\s*:/i', 'Transaksi berhasil dihapus:', $replyContent);
+                    if (empty(trim($replyContent))) {
+                        $replyContent = "Transaksi berhasil dihapus dari daftar mutasi.";
+                    }
+                } elseif (empty(trim($replyContent))) {
                     $count = count($recordedTransactions);
                     $replyContent = "Transaksi berhasil dicatat ke dalam daftar mutasi ({$count} transaksi).";
                 }
@@ -398,6 +512,52 @@ class TenantAssistantService
         }
 
         return false;
+    }
+
+    /**
+     * Mencari transaksi sasaran yang baru saja dicatat pada percakapan ini
+     * atau transaksi mutasi paling baru di ruang kerja (sebagai target update/koreksi).
+     */
+    protected function resolveLastRecordedTransaction(string $conversationId, string $tenantId, ?string $description = null): ?FinanceTransaction
+    {
+        // 1. Cari dari pesan asisten paling baru di percakapan ini yang memiliki metadata recorded_transactions
+        $lastAssistantWithTx = AiMessage::where('conversation_id', $conversationId)
+            ->where('tenant_id', $tenantId)
+            ->where('role', 'assistant')
+            ->whereNotNull('metadata')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->first(function ($msg) {
+                return !empty($msg->metadata['recorded_transactions']);
+            });
+
+        if ($lastAssistantWithTx && !empty($lastAssistantWithTx->metadata['recorded_transactions'])) {
+            $recentTxs = $lastAssistantWithTx->metadata['recorded_transactions'];
+            $lastTxMeta = end($recentTxs);
+            if (!empty($lastTxMeta['id'])) {
+                $found = FinanceTransaction::where('tenant_id', $tenantId)->find($lastTxMeta['id']);
+                if ($found) {
+                    return $found;
+                }
+            }
+        }
+
+        // 2. Jika tidak ada di metadata percakapan, cari berdasarkan deskripsi di mutasi terbaru
+        if (!empty($description)) {
+            $found = FinanceTransaction::where('tenant_id', $tenantId)
+                ->where('description', 'like', '%' . trim($description) . '%')
+                ->orderBy('created_at', 'desc')
+                ->first();
+            if ($found) {
+                return $found;
+            }
+        }
+
+        // 3. Fallback: ambil mutasi yang baru saja dibuat dalam 2 jam terakhir di ruang kerja ini
+        return FinanceTransaction::where('tenant_id', $tenantId)
+            ->where('created_at', '>=', now()->subHours(2))
+            ->orderBy('created_at', 'desc')
+            ->first();
     }
 }
 

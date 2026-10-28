@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import RdTenantSwitcher from '../design-system/RdTenantSwitcher.vue';
 import RdAppLauncher from '../design-system/RdAppLauncher.vue';
@@ -28,6 +28,34 @@ const props = withDefaults(
 
 const isMobileNavOpen = ref(false);
 const isUserMenuOpen = ref(false);
+
+const currentDateTime24H = ref('');
+let clockTimer: number | null = null;
+
+function updateClock() {
+  const now = new Date();
+  const dateStr = new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(now);
+
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+
+  currentDateTime24H.value = `${dateStr}, ${hours}:${minutes}`;
+}
+
+onMounted(() => {
+  updateClock();
+  clockTimer = window.setInterval(updateClock, 1000);
+});
+
+onUnmounted(() => {
+  if (clockTimer !== null) {
+    clearInterval(clockTimer);
+  }
+});
 
 const currentUser = computed(() => {
   return props.user || (page.props.auth as any)?.user || {
@@ -197,9 +225,17 @@ function isCurrentRoute(targetPath: string): boolean {
 
       <!-- Right Header Actions -->
       <div class="flex items-center gap-2 sm:gap-3">
-        <!-- App Indicator Badge -->
+        <!-- Tanggal dan Jam 24H di samping label Aplikasi -->
+        <div class="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono">
+          <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>{{ currentDateTime24H }}</span>
+        </div>
+
+        <!-- App Indicator Badge (Aplikasi: PEKAN) -->
         <span class="hidden md:inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-          Modul: {{ appName }}
+          Aplikasi: {{ appName }}
         </span>
 
         <!-- Tombol Beralih Mode Terang / Gelap -->

@@ -537,7 +537,7 @@ onMounted(() => {
                 {{ msg.content }}
               </div>
 
-              <!-- Kartu Status Transaksi Berhasil Dicatat (Jika Ada) -->
+              <!-- Kartu Status Transaksi Berhasil Dicatat / Diperbarui (Jika Ada) -->
               <div
                 v-if="msg.metadata && msg.metadata.recorded_transactions && msg.metadata.recorded_transactions.length > 0"
                 class="mt-2 p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 w-full text-xs shadow-sm"
@@ -547,7 +547,15 @@ onMounted(() => {
                     <svg class="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
-                    <span>{{ msg.metadata.recorded_transactions.length }} Transaksi Berhasil Dicatat ke Sistem</span>
+                    <span>
+                      {{
+                        msg.metadata.recorded_transactions.some((t: any) => t.action === 'updated')
+                          ? `${msg.metadata.recorded_transactions.length} Transaksi Berhasil Diperbarui di Sistem`
+                          : msg.metadata.recorded_transactions.some((t: any) => t.action === 'deleted')
+                          ? `${msg.metadata.recorded_transactions.length} Transaksi Berhasil Dihapus dari Sistem`
+                          : `${msg.metadata.recorded_transactions.length} Transaksi Berhasil Dicatat ke Sistem`
+                      }}
+                    </span>
                   </div>
                   <a
                     :href="`/t/${tenant.slug}/apps/pekan/transactions`"
@@ -567,10 +575,26 @@ onMounted(() => {
                     class="py-1.5 flex items-center justify-between text-[11px]"
                   >
                     <div class="flex items-center gap-2 truncate pr-2">
-                      <span class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      <span
+                        v-if="tx.action === 'updated'"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
+                      >
+                        Diperbarui
+                      </span>
+                      <span
+                        v-else-if="tx.action === 'deleted'"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300"
+                      >
+                        Dihapus
+                      </span>
+                      <span
+                        v-else
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                      >
                         {{ tx.type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}
                       </span>
                       <span class="text-slate-800 dark:text-slate-200 font-medium truncate">{{ tx.description }}</span>
+                      <span v-if="tx.date" class="text-[10px] text-slate-400 shrink-0 font-mono">({{ tx.date }})</span>
                     </div>
                     <div class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">
                       Rp {{ Number(tx.amount_minor || 0).toLocaleString('id-ID') }}

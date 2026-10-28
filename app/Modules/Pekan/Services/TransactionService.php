@@ -130,8 +130,19 @@ class TransactionService
                 }
             }
 
+            $resolvedCategoryId = $data['category_id'] ?? null;
+            if (!$resolvedCategoryId && !empty($data['category'])) {
+                $resolvedCategoryId = $this->resolveCategoryId(
+                    $tenantId,
+                    null,
+                    $data['category'],
+                    $data['description'] ?? $transaction->description,
+                    $data['type'] ?? $transaction->type
+                );
+            }
+
             $updatePayload = [
-                'category_id' => $data['category_id'] ?? $transaction->category_id,
+                'category_id' => $resolvedCategoryId ?? $transaction->category_id,
                 'type' => $data['type'] ?? $transaction->type,
                 'amount_minor' => (int) ($data['amount_minor'] ?? $transaction->amount_minor),
                 'transaction_date' => $data['transaction_date'] ?? $transaction->transaction_date,
