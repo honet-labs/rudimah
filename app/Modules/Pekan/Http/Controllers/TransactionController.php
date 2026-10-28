@@ -24,7 +24,7 @@ class TransactionController
         $tenant = TenantContext::get();
         $user = $request->user();
 
-        $query = FinanceTransaction::with(['category'])
+        $query = FinanceTransaction::with(['category', 'items'])
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at');
 
@@ -33,12 +33,7 @@ class TransactionController
         }
 
         if ($request->filled('search')) {
-            $term = '%' . $request->search . '%';
-            $query->where(function ($q) use ($term) {
-                $q->where('description', 'like', $term)
-                  ->orWhere('merchant_name', 'like', $term)
-                  ->orWhere('id', 'like', $term);
-            });
+            $query->where('description', 'like', '%' . $request->search . '%');
         }
 
         $transactions = $query->paginate(20)->withQueryString();

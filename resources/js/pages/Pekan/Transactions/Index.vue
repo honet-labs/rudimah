@@ -46,26 +46,25 @@ const props = withDefaults(
 const searchQuery = ref(props.filters?.search || '');
 const selectedType = ref(props.filters?.type || 'all');
 const previewModalOpen = ref(false);
-const previewImage = ref<{ url: string; title: string; images?: any[] }>({ url: '', title: '' });
-
+const previewImage = ref<{ url: string; title: string; images?: any[] }>({ url: '', title: '', images: [] });
 const isDeleteDialogOpen = ref(false);
 const isDeleting = ref(false);
 const transactionToDelete = ref<Transaction | null>(null);
 
 function openPreview(url: string, title: string, images?: any[]) {
-  previewImage.value = { url, title, images };
+  previewImage.value = { url, title, images: images || [] };
   previewModalOpen.value = true;
 }
 
-function confirmDelete(item: Transaction) {
-  transactionToDelete.value = item;
+function confirmDelete(tx: Transaction) {
+  transactionToDelete.value = tx;
   isDeleteDialogOpen.value = true;
 }
 
 function handleDelete() {
   if (!transactionToDelete.value) return;
   isDeleting.value = true;
-  router.delete(`/t/${props.tenant.slug}/apps/pekan/transactions/${transactionToDelete.value.id}`, {
+  router.delete(`/t/${tenantSlug.value}/apps/pekan/transactions/${transactionToDelete.value.id}`, {
     preserveScroll: true,
     onSuccess: () => {
       isDeleteDialogOpen.value = false;
@@ -107,13 +106,15 @@ const typeOptions = [
 ];
 
 const columns = [
-  { key: 'id', label: 'ID Transaksi', width: '130px' },
-  { key: 'transaction_date', label: 'Tanggal Transaksi', width: '140px' },
+  { key: 'id', label: 'ID Transaksi', width: '120px' },
+  { key: 'transaction_date', label: 'Tanggal', width: '120px' },
   { key: 'merchant_name', label: 'Nama Merchant' },
-  { key: 'category_name', label: 'Kategori', width: '120px' },
+  { key: 'category_name', label: 'Kategori', width: '130px' },
   { key: 'type', label: 'Jenis Transaksi', width: '130px' },
-  { key: 'amount_minor', label: 'Nominal', align: 'right' as const, width: '130px' },
-  { key: 'images', label: 'Lampiran', align: 'center' as const, width: '110px' },
+  { key: 'items', label: 'Item' },
+  { key: 'quantity', label: 'Quantity', width: '80px', align: 'center' as const },
+  { key: 'amount_minor', label: 'Nominal', width: '130px', align: 'right' as const },
+  { key: 'images', label: 'Lampiran', width: '110px', align: 'center' as const },
   { key: 'actions', label: 'Aksi', width: '210px', align: 'center' as const },
 ];
 </script>
@@ -169,8 +170,8 @@ const columns = [
     <RdTable :columns="columns" :items="transactions">
       <template #id="{ item }">
         <span
-          class="font-mono text-[11px] text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700/60 select-all inline-block max-w-[110px] truncate"
-          :title="`ID Transaksi: ${item.id}`"
+          class="font-mono text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors select-all"
+          :title="item.id"
         >
           #{{ item.id ? item.id.substring(0, 8) : '-' }}
         </span>
@@ -181,28 +182,40 @@ const columns = [
       </template>
 
       <template #merchant_name="{ item }">
-        <div class="space-y-0.5">
-          <span class="text-xs font-semibold text-slate-800 dark:text-slate-100 block">
-            {{ item.merchant_name || item.description || '-' }}
-          </span>
-          <span
-            v-if="item.merchant_name && item.description && item.merchant_name !== item.description"
-            class="text-[11px] text-slate-500 block truncate max-w-xs"
-            :title="item.description"
-          >
-            {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : '' }}
-          </span>
-        </div>
+        <span class="font-medium text-slate-800 dark:text-slate-100 text-xs block truncate max-w-[160px]" :title="item.merchant_name || item.description">
+          {{ item.merchant_name || item.description?.replace(/^Struk Belanja:\s*/i, '') || '-' }}
+        </span>
       </template>
 
       <template #category_name="{ value }">
         <RdBadge variant="neutral">{{ value || 'Tanpa Kategori' }}</RdBadge>
       </template>
 
-      <template #type="{ item }">
-        <RdBadge :variant="item.type === 'income' ? 'success' : (item.type === 'savings' ? 'info' : 'neutral')">
-          {{ item.type === 'income' ? 'Pemasukan' : (item.type === 'savings' ? 'Tabungan' : 'Pengeluaran') }}
+      <template #type="{ value }">
+        <RdBadge :variant="value === 'income' ? 'success' : (value === 'savings' ? 'info' : 'neutral')">
+          {{ value === 'income' ? 'Pemasukan' : (value === 'savings' ? 'Tabungan' : 'Pengeluaran') }}
         </RdBadge>
+      </template>
+
+      <template #items="{ item }">
+        <div v-if="item.items && item.items.length > 0" class="text-xs space-y-0.5 max-w-[180px]">
+          <span class="text-slate-800 dark:text-slate-200 block truncate" :title="item.items[0].item_name">
+            {{ item.items[0].item_name }}
+          </span>
+          <span v-if="item.items.length > 1" class="text-[11px] text-slate-400 block">
+            +{{ item.items.length - 1 }} item lainnya
+          </span>
+        </div>
+        <span v-else class="text-xs text-slate-600 dark:text-slate-400 block truncate max-w-[180px]" :title="item.description">
+          {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : '-' }}
+        </span>
+      </template>
+
+      <template #quantity="{ item }">
+        <span v-if="item.items && item.items.length > 0" class="text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
+          {{ item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) }}
+        </span>
+        <span v-else class="text-xs text-slate-400 font-mono">1</span>
       </template>
 
       <template #amount_minor="{ item }">
@@ -212,37 +225,42 @@ const columns = [
       </template>
 
       <template #images="{ item }">
-        <div class="flex items-center justify-center">
+        <div v-if="item.images && item.images.length > 0" class="flex items-center justify-center">
           <button
-            v-if="item.images && item.images.length > 0"
             type="button"
             @click.stop="openPreview(item.images[0].url, `${item.merchant_name || item.description || 'Transaksi'} - Lampiran Struk`, item.images)"
-            class="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-colors"
-            title="Klik untuk melihat berkas bukti/struk transaksi"
+            class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 transition-colors border border-slate-200 dark:border-slate-700 hover:border-teal-500 cursor-pointer"
+            title="Klik untuk melihat berkas lampiran"
           >
-            <svg class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
             <span>Lihat{{ item.images.length > 1 ? ` (${item.images.length})` : '' }}</span>
           </button>
-          <span v-else class="text-xs text-slate-400">-</span>
         </div>
+        <span v-else class="text-xs text-slate-400">-</span>
       </template>
 
       <template #actions="{ item }">
-        <div class="flex items-center justify-center gap-1.5">
-          <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`">
+        <div class="flex items-center justify-center gap-1.5 flex-nowrap">
+          <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" title="Rincian Transaksi">
             <RdButton variant="outline" size="sm" type="button">
               Rincian
             </RdButton>
           </a>
-          <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`">
+          <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" title="Ubah Transaksi">
             <RdButton variant="outline" size="sm" type="button">
               Ubah
             </RdButton>
           </a>
-          <RdButton variant="danger" size="sm" type="button" @click="confirmDelete(item)">
+          <RdButton
+            variant="danger"
+            size="sm"
+            type="button"
+            title="Hapus Transaksi"
+            @click.stop="confirmDelete(item)"
+          >
             Hapus
           </RdButton>
         </div>
@@ -305,7 +323,7 @@ const columns = [
             type="button"
             @click="previewImage.url = subImg.url"
             :class="[
-              'w-14 h-14 rounded border-2 overflow-hidden flex-shrink-0 transition-all',
+              'w-14 h-14 rounded border-2 overflow-hidden shrink-0 transition-all cursor-pointer',
               previewImage.url === subImg.url ? 'border-teal-600 scale-105' : 'border-slate-200 dark:border-slate-700 opacity-60 hover:opacity-100'
             ]"
             :title="subImg.name || `Lampiran ${sIdx + 1}`"
@@ -334,7 +352,7 @@ const columns = [
     <RdConfirmDialog
       v-model="isDeleteDialogOpen"
       title="Hapus Transaksi Ini?"
-      :message="`Data mutasi transaksi '${transactionToDelete?.merchant_name || transactionToDelete?.description || 'Transaksi'}' akan dihapus dari buku kas. Tindakan ini tidak dapat dibatalkan.`"
+      :message="`Data mutasi transaksi '${transactionToDelete?.merchant_name || transactionToDelete?.description || 'ini'}' akan dihapus dari buku kas. Tindakan ini tidak dapat dibatalkan.`"
       danger
       confirm-text="Ya, Hapus Transaksi"
       :loading="isDeleting"
