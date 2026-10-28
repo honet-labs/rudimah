@@ -71,6 +71,7 @@ class ReminderController
         $tenant = TenantContext::get();
 
         $validated = $request->validate([
+            'is_installment' => 'nullable|boolean',
             'title' => 'required|string|max:150',
             'amount_minor' => 'required|integer|min:1',
             'due_date' => 'required|date',
@@ -87,6 +88,8 @@ class ReminderController
             $uploadedImages = $this->uploadService->uploadMultiple($request->file('images'), 'reminders');
         }
 
+        $isInstallment = $request->boolean('is_installment');
+
         $reminder = new FinanceReminder();
         $reminder->id = (string) Str::uuid();
         $reminder->tenant_id = $tenant->id;
@@ -95,8 +98,8 @@ class ReminderController
         $reminder->currency = 'Rp';
         $reminder->due_date = $validated['due_date'];
         $reminder->repeat_interval = $validated['repeat_interval'];
-        $reminder->total_tenor = $validated['total_tenor'] ?? null;
-        $reminder->current_tenor = $validated['current_tenor'] ?? 1;
+        $reminder->total_tenor = $isInstallment ? ($validated['total_tenor'] ?? null) : null;
+        $reminder->current_tenor = $isInstallment ? ($validated['current_tenor'] ?? 1) : null;
         $reminder->description = $validated['description'] ?? null;
         $reminder->images = $uploadedImages;
         $reminder->status = 'pending';
@@ -148,6 +151,7 @@ class ReminderController
         $reminder = FinanceReminder::findOrFail($reminderId);
 
         $validated = $request->validate([
+            'is_installment' => 'nullable|boolean',
             'title' => 'required|string|max:150',
             'amount_minor' => 'required|integer|min:1',
             'due_date' => 'required|date',
@@ -175,13 +179,15 @@ class ReminderController
 
         $allImages = array_merge($existingImages, $newImages);
 
+        $isInstallment = $request->boolean('is_installment');
+
         $reminderData = [
             'title' => $validated['title'],
             'amount_minor' => $validated['amount_minor'],
             'due_date' => $validated['due_date'],
             'repeat_interval' => $validated['repeat_interval'],
-            'total_tenor' => $validated['total_tenor'] ?? null,
-            'current_tenor' => $validated['current_tenor'] ?? 1,
+            'total_tenor' => $isInstallment ? ($validated['total_tenor'] ?? null) : null,
+            'current_tenor' => $isInstallment ? ($validated['current_tenor'] ?? 1) : null,
             'description' => $validated['description'] ?? null,
             'images' => $allImages,
         ];

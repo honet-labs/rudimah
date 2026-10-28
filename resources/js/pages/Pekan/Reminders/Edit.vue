@@ -25,7 +25,8 @@ const title = ref(props.reminder.title || '');
 const amountMinor = ref(props.reminder.amount_minor || 100000);
 const dueDate = ref(props.reminder.due_date ? props.reminder.due_date.substring(0, 10) : new Date().toISOString().substring(0, 10));
 const repeatInterval = ref(props.reminder.repeat_interval || 'monthly');
-const totalTenor = ref(props.reminder.total_tenor || '');
+const isInstallment = ref(!!props.reminder.total_tenor);
+const totalTenor = ref(props.reminder.total_tenor || 12);
 const currentTenor = ref(props.reminder.current_tenor || 1);
 const description = ref(props.reminder.description || '');
 const existingImages = ref<any[]>(props.reminder.images || []);
@@ -49,8 +50,9 @@ function handleSubmit() {
     amount_minor: Number(amountMinor.value),
     due_date: dueDate.value,
     repeat_interval: repeatInterval.value,
-    total_tenor: totalTenor.value ? Number(totalTenor.value) : null,
-    current_tenor: currentTenor.value ? Number(currentTenor.value) : 1,
+    is_installment: isInstallment.value,
+    total_tenor: isInstallment.value && totalTenor.value ? Number(totalTenor.value) : null,
+    current_tenor: isInstallment.value && currentTenor.value ? Number(currentTenor.value) : null,
     description: description.value,
     existing_images: JSON.stringify(existingImages.value),
     images: newFiles.value,
@@ -113,24 +115,50 @@ function handleSubmit() {
             required
           />
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <RdInput
-              id="current_tenor"
-              v-model.number="currentTenor"
-              type="number"
-              min="1"
-              label="Tenor Berjalan Saat Ini"
-              placeholder="Contoh: 1"
-            />
+          <!-- Pilihan Cicilan / Tenor -->
+          <div class="p-3 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-900/50 space-y-3">
+            <div class="flex items-center gap-2">
+              <input
+                id="is_installment"
+                v-model="isInstallment"
+                type="checkbox"
+                class="rounded border-slate-300 dark:border-slate-700 text-teal-600 focus:ring-teal-500"
+                @change="() => {
+                  if (isInstallment && !totalTenor) {
+                    totalTenor = 12;
+                    currentTenor = 1;
+                  }
+                }"
+              />
+              <label for="is_installment" class="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                Ini adalah cicilan dengan batas tenor (misal: kredit laptop, KPR)
+              </label>
+            </div>
 
-            <RdInput
-              id="total_tenor"
-              v-model.number="totalTenor"
-              type="number"
-              min="1"
-              label="Total Tenor (Opsional)"
-              placeholder="Contoh: 12 (kosongkan jika rutin tanpa batas)"
-            />
+            <div v-if="isInstallment" class="grid grid-cols-2 gap-4 pt-1">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Tenor Berjalan Saat Ini
+                </label>
+                <RdInput
+                  id="current_tenor"
+                  v-model.number="currentTenor"
+                  type="number"
+                  min="1"
+                />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Total Seluruh Tenor
+                </label>
+                <RdInput
+                  id="total_tenor"
+                  v-model.number="totalTenor"
+                  type="number"
+                  min="1"
+                />
+              </div>
+            </div>
           </div>
 
           <RdTextarea

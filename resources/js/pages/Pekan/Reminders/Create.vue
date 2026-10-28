@@ -23,8 +23,8 @@ const form = useForm({
   due_date: new Date().toISOString().substring(0, 10),
   repeat_interval: 'monthly',
   is_installment: false,
-  total_tenor: 12,
-  current_tenor: 1,
+  total_tenor: null as number | null,
+  current_tenor: null as number | null,
   description: '',
   images: [] as File[],
 });
@@ -37,6 +37,10 @@ const repeatOptions = [
 ];
 
 function submit() {
+  if (!form.is_installment) {
+    form.total_tenor = null;
+    form.current_tenor = null;
+  }
   form.post(`/t/${props.tenant.slug}/apps/pekan/reminders`);
 }
 </script>
@@ -122,6 +126,15 @@ function submit() {
                 v-model="form.is_installment"
                 type="checkbox"
                 class="rounded border-slate-300 dark:border-slate-700 text-teal-600 focus:ring-teal-500"
+                @change="() => {
+                  if (form.is_installment && !form.total_tenor) {
+                    form.total_tenor = 12;
+                    form.current_tenor = 1;
+                  } else if (!form.is_installment) {
+                    form.total_tenor = null;
+                    form.current_tenor = null;
+                  }
+                }"
               />
               <label for="is_installment" class="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                 Ini adalah cicilan dengan batas tenor (misal: kredit laptop, KPR)
