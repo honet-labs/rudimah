@@ -66,6 +66,7 @@ class ReceiptScanController
                     'success' => true,
                     'scan_id' => $scan->id,
                     'extracted' => $scan->extracted_json,
+                    'images' => $scan->images ?: ($scan->extracted_json['_receipt_images'] ?? []),
                 ]);
             }
 
@@ -107,6 +108,7 @@ class ReceiptScanController
             'items.*.price_minor' => 'nullable|integer|min:0',
             'items.*.discount_minor' => 'nullable|integer|min:0',
             'items.*.total_minor' => 'nullable|integer|min:0',
+            'images' => 'nullable|array',
         ]);
 
         $tenant = TenantContext::get();
@@ -157,7 +159,16 @@ class ReceiptScanController
 
         $items = $validated['items'] ?? [];
 
-        $transaction = $this->transactionService->createTransaction($txData, $items);
+        // Ambil lampiran berkas foto struk asli dari payload atau riwayat scan OCR
+        $receiptImages = $validated['images'] ?? [];
+        if (empty($receiptImages) && !empty($validated['scan_id'])) {
+            $scanRecord = FinanceReceiptScan::find($validated['scan_id']);
+            if ($scanRecord) {
+                $receiptImages = $scanRecord->images ?: ($scanRecord->extracted_json['_receipt_images'] ?? []);
+            }
+        }
+
+        $transaction = $this->transactionService->createTransaction($txData, $items, $receiptImages);
 
         // 3. Tandai status scan OCR sebagai confirmed
         if (!empty($validated['scan_id'])) {

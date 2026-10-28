@@ -39,6 +39,7 @@ export interface Transaction {
   created_at: string;
   items?: TransactionItem[];
   attachments?: { id: string; filename: string; url: string }[];
+  images?: AttachmentImage[];
 }
 
 export interface FinanceBudget {

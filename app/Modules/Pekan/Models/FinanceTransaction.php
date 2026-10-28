@@ -37,6 +37,7 @@ class FinanceTransaction extends Model
         'service_charge_minor',
         'receipt_discount_minor',
         'notes',
+        'images',
         'created_by',
         'updated_by',
     ];
@@ -49,6 +50,7 @@ class FinanceTransaction extends Model
         'receipt_discount_minor' => 'integer',
         'transaction_date' => 'date',
         'input_date' => 'date',
+        'images' => 'array',
     ];
 
     protected $appends = [

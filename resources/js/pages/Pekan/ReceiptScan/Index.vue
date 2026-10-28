@@ -10,9 +10,10 @@ import RdInput from '../../../design-system/RdInput.vue';
 import RdSelect from '../../../design-system/RdSelect.vue';
 import RdMoney from '../../../design-system/RdMoney.vue';
 import RdAlert from '../../../design-system/RdAlert.vue';
+import RdModal from '../../../design-system/RdModal.vue';
 import { secureFetch } from '../../../utils/csrf';
 import type { User, Tenant, AppManifest } from '../../../types/core';
-import type { ReceiptExtraction } from '../../../types/pekan';
+import type { ReceiptExtraction, AttachmentImage } from '../../../types/pekan';
 
 interface CategoryOption {
   id: string;
@@ -32,6 +33,14 @@ const isSaving = ref(false);
 const hasResult = ref(false);
 const errorMessage = ref<string | null>(null);
 const scanId = ref<string | null>(null);
+const scannedImages = ref<AttachmentImage[]>([]);
+const previewModalOpen = ref(false);
+const previewImage = ref<{ url: string; title: string }>({ url: '', title: '' });
+
+function openPreview(url: string, title: string) {
+  previewImage.value = { url, title };
+  previewModalOpen.value = true;
+}
 
 const selectedCategoryId = ref(props.categories?.[0]?.id || '');
 
@@ -74,6 +83,7 @@ async function handleFileSelected(file: File) {
 
     if (res.ok && data.success) {
       scanId.value = data.scan_id;
+      scannedImages.value = Array.isArray(data.images) ? data.images : (data.extracted?._receipt_images || []);
       const ext = data.extracted || {};
       extraction.value = {
         description: ext.description || ext.merchant_name || 'Belanja',
@@ -189,6 +199,7 @@ async function saveConfirmedTransaction() {
         discount_minor: extraction.value.discount_minor,
         total_minor: extraction.value.total_minor,
         items: extraction.value.items,
+        images: scannedImages.value,
       }),
     });
 
@@ -253,6 +264,42 @@ const categoryOptions = computed(() => {
         <RdAlert variant="info" title="Konfirmasi & Tinjauan Diperlukan">
           Data berikut diekstraksi secara langsung oleh model AI. Silakan periksa, sesuaikan nominal atau rincian item bila diperlukan sebelum mengesahkannya ke buku kas.
         </RdAlert>
+
+        <!-- Pratinjau Foto Struk yang Dipindai -->
+        <RdCard v-if="scannedImages.length > 0" title="Foto Struk yang Dipindai">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div
+              v-for="(img, idx) in scannedImages"
+              :key="idx"
+              class="group relative cursor-pointer border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-900 hover:border-teal-600 transition-colors"
+              @click="openPreview(img.url, `Foto Struk - ${extraction.merchant_name || 'Kuitansi'}`)"
+            >
+              <img
+                :src="img.url"
+                :alt="img.name"
+                class="w-28 h-28 sm:w-36 sm:h-36 object-cover rounded"
+              />
+              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium gap-1">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span>Perbesar</span>
+              </div>
+            </div>
+            <div class="text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
+              <div class="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-medium">
+                <svg class="w-4 h-4 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Berkas foto struk berhasil disimpan dan akan dilampirkan ke transaksi ini.</span>
+              </div>
+              <p class="text-slate-500">
+                Klik pada foto struk untuk memperbesar tampilan dan mencocokkan rincian item atau nominal dengan fisik struk.
+              </p>
+            </div>
+          </div>
+        </RdCard>
 
         <RdCard title="Hasil Ekstraksi Kuitansi">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -408,7 +455,7 @@ const categoryOptions = computed(() => {
 
         <!-- Aksi Simpan Final -->
         <div class="flex items-center justify-end gap-3">
-          <RdButton variant="outline" :disabled="isSaving" @click="hasResult = false">
+          <RdButton variant="outline" :disabled="isSaving" @click="hasResult = false; scannedImages = []">
             Batalkan Ekstraksi
           </RdButton>
           <RdButton
@@ -423,5 +470,36 @@ const categoryOptions = computed(() => {
         </div>
       </div>
     </div>
+
+    <!-- Modal Lightbox Pratinjau Foto Struk -->
+    <RdModal
+      v-model="previewModalOpen"
+      :title="previewImage.title"
+      max-width="lg"
+    >
+      <div class="space-y-4">
+        <div class="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-black/5 dark:bg-black/30 flex items-center justify-center min-h-[260px]">
+          <img
+            :src="previewImage.url"
+            :alt="previewImage.title"
+            class="max-h-[70vh] w-auto max-w-full object-contain mx-auto rounded"
+          />
+        </div>
+        <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <span>Foto Asli Kuitansi / Struk Belanja</span>
+          <a
+            :href="previewImage.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 dark:text-teal-400 font-medium hover:underline"
+          >
+            <span>Buka Gambar Penuh</span>
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </RdModal>
   </RudimahAppShell>
 </template>

@@ -29,7 +29,7 @@ class AttachmentUploadService
             }
 
             $ext = strtolower($file->getClientOriginalExtension());
-            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf'])) {
                 continue;
             }
 

@@ -21,6 +21,7 @@ class FinanceReceiptScan extends Model
         'status',
         'original_filename',
         'mime_type',
+        'images',
         'extracted_json',
         'error_message',
         'created_by',
@@ -28,6 +29,7 @@ class FinanceReceiptScan extends Model
 
     protected $casts = [
         'extracted_json' => 'array',
+        'images' => 'array',
     ];
 
     protected static function booted(): void

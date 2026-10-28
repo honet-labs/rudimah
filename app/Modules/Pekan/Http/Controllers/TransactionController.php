@@ -101,6 +101,7 @@ class TransactionController
             'receipt_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
             'items' => 'nullable|array',
+            'images' => 'nullable|array',
         ]);
 
         if (empty($validated['account_id'])) {
@@ -109,8 +110,9 @@ class TransactionController
         }
 
         $items = $request->input('items', []);
+        $images = $request->input('images');
 
-        $this->transactionService->createTransaction($validated, $items);
+        $this->transactionService->createTransaction($validated, $items, $images);
 
         $tenant = TenantContext::get();
         $slug = $tenant?->slug ?: $tenantSlug;

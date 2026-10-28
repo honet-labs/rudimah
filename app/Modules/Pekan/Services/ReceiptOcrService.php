@@ -67,6 +67,10 @@ class ReceiptOcrService
         // Ekstraksi via AI Vision Provider dengan pra-optimasi resolusi gambar
         [$fileBase64, $preparedMime] = $this->prepareImageForOcr($file, $mimeType);
 
+        // Simpan salinan berkas fisik kuitansi/struk di public/uploads/receipts agar terlampir permanen
+        $uploadService = new AttachmentUploadService();
+        $savedImages = $uploadService->uploadMultiple([$file], 'receipts');
+
         try {
             $extractedDraft = $provider->extractReceipt($fileBase64, $preparedMime, [
                 'model' => $modelName,
@@ -83,12 +87,17 @@ class ReceiptOcrService
                 'status' => 'failed',
                 'original_filename' => $file->getClientOriginalName(),
                 'mime_type' => $mimeType,
+                'images' => $savedImages,
                 'extracted_json' => null,
                 'error_message' => $e->getMessage(),
                 'created_by' => auth()->id() ?? 'system',
             ]);
 
             throw new \RuntimeException("Gagal memproses struk dengan model AI {$providerCode}: " . $e->getMessage());
+        }
+
+        if (is_array($extractedDraft)) {
+            $extractedDraft['_receipt_images'] = $savedImages;
         }
 
         $scan = FinanceReceiptScan::create([
@@ -99,6 +108,7 @@ class ReceiptOcrService
             'status' => 'pending_review',
             'original_filename' => $file->getClientOriginalName(),
             'mime_type' => $mimeType,
+            'images' => $savedImages,
             'extracted_json' => $extractedDraft,
             'created_by' => auth()->id() ?? 'system',
         ]);

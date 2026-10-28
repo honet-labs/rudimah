@@ -14,14 +14,14 @@ use Illuminate\Support\Str;
 
 class TransactionService
 {
-    public function createTransaction(array $data, array $items = []): FinanceTransaction
+    public function createTransaction(array $data, array $items = [], ?array $images = null): FinanceTransaction
     {
         $tenantId = TenantContext::id();
         if (!$tenantId) {
             throw new \RuntimeException('Konteks ruang kerja belum aktif.');
         }
 
-        return DB::connection('pekan')->transaction(function () use ($data, $items, $tenantId) {
+        return DB::connection('pekan')->transaction(function () use ($data, $items, $images, $tenantId) {
             $accountId = $data['account_id'] ?? null;
             $account = $accountId ? FinanceAccount::find($accountId) : FinanceAccount::first();
 
@@ -70,6 +70,7 @@ class TransactionService
                 'service_charge_minor' => (int) ($data['service_charge_minor'] ?? 0),
                 'receipt_discount_minor' => (int) ($data['receipt_discount_minor'] ?? 0),
                 'notes' => $data['notes'] ?? null,
+                'images' => $images ?? ($data['images'] ?? null),
                 'created_by' => auth()->id() ?? 'system',
                 'updated_by' => auth()->id() ?? 'system',
             ]);
@@ -111,11 +112,11 @@ class TransactionService
         });
     }
 
-    public function updateTransaction(FinanceTransaction $transaction, array $data, array $items = []): FinanceTransaction
+    public function updateTransaction(FinanceTransaction $transaction, array $data, array $items = [], ?array $images = null): FinanceTransaction
     {
         $tenantId = TenantContext::id();
 
-        return DB::connection('pekan')->transaction(function () use ($transaction, $data, $items, $tenantId) {
+        return DB::connection('pekan')->transaction(function () use ($transaction, $data, $items, $images, $tenantId) {
             $oldAmount = $transaction->amount_minor;
             $oldType = $transaction->type;
             $account = FinanceAccount::find($transaction->account_id);
@@ -129,7 +130,7 @@ class TransactionService
                 }
             }
 
-            $transaction->update([
+            $updatePayload = [
                 'category_id' => $data['category_id'] ?? $transaction->category_id,
                 'type' => $data['type'] ?? $transaction->type,
                 'amount_minor' => (int) ($data['amount_minor'] ?? $transaction->amount_minor),
@@ -139,7 +140,13 @@ class TransactionService
                 'receipt_number' => $data['receipt_number'] ?? $transaction->receipt_number,
                 'notes' => $data['notes'] ?? $transaction->notes,
                 'updated_by' => auth()->id() ?? 'system',
-            ]);
+            ];
+
+            if ($images !== null || array_key_exists('images', $data)) {
+                $updatePayload['images'] = $images ?? ($data['images'] ?? null);
+            }
+
+            $transaction->update($updatePayload);
 
             // Perbarui item jika disertakan
             if (!empty($items)) {
