@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
@@ -12,16 +12,23 @@ import RdImageUploadMultiple from '../../../design-system/RdImageUploadMultiple.
 import type { User, Tenant, AppManifest } from '../../../types/core';
 import type { FinanceReminder } from '../../../types/pekan';
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
 const props = defineProps<{
   user: User;
   tenant: Tenant;
   tenants?: Tenant[];
   apps?: AppManifest[];
   reminder: FinanceReminder;
+  categories?: CategoryOption[];
 }>();
 
 const isSubmitting = ref(false);
 const title = ref(props.reminder.title || '');
+const categoryId = ref(props.reminder.category_id || '');
 const amountMinor = ref(props.reminder.amount_minor || 100000);
 const dueDate = ref(props.reminder.due_date ? props.reminder.due_date.substring(0, 10) : new Date().toISOString().substring(0, 10));
 const repeatInterval = ref(props.reminder.repeat_interval || 'monthly');
@@ -31,6 +38,11 @@ const currentTenor = ref(props.reminder.current_tenor || 1);
 const description = ref(props.reminder.description || '');
 const existingImages = ref<any[]>(props.reminder.images || []);
 const newFiles = ref<File[]>([]);
+
+const categoryOptions = computed(() => [
+  { label: 'Tanpa Kategori', value: '' },
+  ...(props.categories || []).map(c => ({ label: c.name, value: c.id })),
+]);
 
 const repeatOptions = [
   { label: 'Satu Kali (Once)', value: 'once' },
@@ -46,6 +58,7 @@ function handleSubmit() {
 
   router.post(`/t/${props.tenant.slug}/apps/pekan/reminders/${props.reminder.id}`, {
     _method: 'PUT',
+    category_id: categoryId.value || null,
     title: title.value,
     amount_minor: Number(amountMinor.value),
     due_date: dueDate.value,
@@ -107,13 +120,30 @@ function handleSubmit() {
             />
           </div>
 
-          <RdSelect
-            id="repeat_interval"
-            v-model="repeatInterval"
-            label="Frekuensi Berulang"
-            :options="repeatOptions"
-            required
-          />
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Kategori Tagihan
+              </label>
+              <RdSelect
+                id="category_id"
+                v-model="categoryId"
+                :options="categoryOptions"
+              />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Frekuensi Berulang
+              </label>
+              <RdSelect
+                id="repeat_interval"
+                v-model="repeatInterval"
+                :options="repeatOptions"
+                required
+              />
+            </div>
+          </div>
 
           <!-- Pilihan Cicilan / Tenor -->
           <div class="p-3 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-900/50 space-y-3">

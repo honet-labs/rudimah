@@ -78,8 +78,24 @@ export interface FinanceSavings {
   status: 'active' | 'completed' | 'cancelled';
 }
 
+export interface FinanceReminderPayment {
+  id: string;
+  reminder_id: string;
+  transaction_id?: string;
+  amount_minor: number;
+  currency?: string;
+  payment_date: string;
+  tenor_number?: number | null;
+  notes?: string | null;
+  images?: AttachmentImage[];
+  created_at?: string;
+}
+
 export interface FinanceReminder {
   id: string;
+  category_id?: string | null;
+  category_name?: string | null;
+  category?: FinanceCategory | null;
   title: string;
   description?: string;
   amount_minor: number;
@@ -89,6 +105,7 @@ export interface FinanceReminder {
   total_tenor?: number;
   current_tenor?: number;
   images?: AttachmentImage[];
+  payments?: FinanceReminderPayment[];
 }
 
 export interface ReceiptExtraction {

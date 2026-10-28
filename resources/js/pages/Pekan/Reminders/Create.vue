@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
@@ -10,15 +11,22 @@ import RdTextarea from '../../../design-system/RdTextarea.vue';
 import RdImageUploadMultiple from '../../../design-system/RdImageUploadMultiple.vue';
 import type { User, Tenant, AppManifest } from '../../../types/core';
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
 const props = defineProps<{
   user: User;
   tenant: Tenant;
   tenants?: Tenant[];
   apps?: AppManifest[];
+  categories?: CategoryOption[];
 }>();
 
 const form = useForm({
   title: '',
+  category_id: '',
   amount_minor: 500000,
   due_date: new Date().toISOString().substring(0, 10),
   repeat_interval: 'monthly',
@@ -28,6 +36,11 @@ const form = useForm({
   description: '',
   images: [] as File[],
 });
+
+const categoryOptions = computed(() => [
+  { label: 'Tanpa Kategori', value: '' },
+  ...(props.categories || []).map(c => ({ label: c.name, value: c.id })),
+]);
 
 const repeatOptions = [
   { label: 'Bulanan (Setiap Bulan)', value: 'monthly' },
@@ -107,15 +120,27 @@ function submit() {
             </div>
           </div>
 
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Siklus Perulangan
-            </label>
-            <RdSelect
-              v-model="form.repeat_interval"
-              :options="repeatOptions"
-              required
-            />
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Kategori Tagihan
+              </label>
+              <RdSelect
+                v-model="form.category_id"
+                :options="categoryOptions"
+              />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Siklus Perulangan
+              </label>
+              <RdSelect
+                v-model="form.repeat_interval"
+                :options="repeatOptions"
+                required
+              />
+            </div>
           </div>
 
           <!-- Pilihan Cicilan / Tenor -->
