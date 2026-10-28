@@ -24,6 +24,16 @@ const isDeleteDialogOpen = ref(false);
 const previewModalOpen = ref(false);
 const previewImage = ref<{ url: string; title: string }>({ url: '', title: '' });
 
+const copiedId = ref<string | null>(null);
+function copyId(id: string) {
+  if (!id) return;
+  navigator.clipboard.writeText(id);
+  copiedId.value = id;
+  setTimeout(() => {
+    if (copiedId.value === id) copiedId.value = null;
+  }, 2000);
+}
+
 function openPreview(url: string, title: string) {
   previewImage.value = { url, title };
   previewModalOpen.value = true;
@@ -70,6 +80,21 @@ const itemColumns = [
       <div class="lg:col-span-2 space-y-6">
         <RdCard title="Informasi Faktur & Pembayaran">
           <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-xs">
+            <div class="sm:col-span-2 pb-2 mb-1 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+              <div>
+                <dt class="text-slate-500 font-medium">ID Transaksi (Primary Key)</dt>
+                <dd class="font-mono font-medium text-slate-800 dark:text-slate-100 select-all mt-0.5">
+                  {{ transaction.id }}
+                </dd>
+              </div>
+              <button
+                type="button"
+                @click="copyId(transaction.id)"
+                class="text-teal-700 dark:text-teal-300 font-medium text-xs px-2.5 py-1 rounded border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-950/30 transition-colors cursor-pointer shrink-0"
+              >
+                {{ copiedId === transaction.id ? 'Tersalin' : 'Salin ID' }}
+              </button>
+            </div>
             <div>
               <dt class="text-slate-500 font-medium">Tanggal Transaksi</dt>
               <dd class="text-slate-800 dark:text-slate-100 font-semibold mt-0.5">

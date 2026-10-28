@@ -28,6 +28,16 @@ const notes = ref(props.saving.notes || '');
 const existingImages = ref<any[]>(props.saving.images || []);
 const newFiles = ref<File[]>([]);
 
+const copiedId = ref<string | null>(null);
+function copyId(id: string) {
+  if (!id) return;
+  navigator.clipboard.writeText(id);
+  copiedId.value = id;
+  setTimeout(() => {
+    if (copiedId.value === id) copiedId.value = null;
+  }, 2000);
+}
+
 function handleSubmit() {
   if (isSubmitting.value) return;
   isSubmitting.value = true;
@@ -65,6 +75,17 @@ function handleSubmit() {
     <form @submit.prevent="handleSubmit" class="max-w-2xl">
       <RdCard title="Informasi Target Tabungan">
         <div class="space-y-4">
+          <!-- ID Pos Tabungan (Primary Key) -->
+          <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-md border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <span class="block text-[11px] font-medium text-slate-500 dark:text-slate-400">ID Pos Tabungan (Primary Key)</span>
+              <span class="font-mono text-xs font-semibold text-slate-800 dark:text-slate-100 select-all truncate block">{{ saving.id }}</span>
+            </div>
+            <RdButton type="button" variant="outline" size="sm" class="shrink-0" @click="copyId(saving.id)">
+              {{ copiedId === saving.id ? 'Tersalin' : 'Salin ID' }}
+            </RdButton>
+          </div>
+
           <RdInput
             id="name"
             v-model="name"
