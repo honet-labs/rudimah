@@ -13,6 +13,7 @@ import RdDateTime from '../../../design-system/RdDateTime.vue';
 import RdBadge from '../../../design-system/RdBadge.vue';
 import RdModal from '../../../design-system/RdModal.vue';
 import RdConfirmDialog from '../../../design-system/RdConfirmDialog.vue';
+import RdEmptyState from '../../../design-system/RdEmptyState.vue';
 import type { User, Tenant } from '../../../types/core';
 import type { Transaction } from '../../../types/pekan';
 
@@ -50,6 +51,16 @@ const previewImage = ref<{ url: string; title: string; images?: any[] }>({ url: 
 const isDeleteDialogOpen = ref(false);
 const isDeleting = ref(false);
 const transactionToDelete = ref<Transaction | null>(null);
+
+const copiedId = ref<string | null>(null);
+function copyId(id: string) {
+  if (!id) return;
+  navigator.clipboard.writeText(id);
+  copiedId.value = id;
+  setTimeout(() => {
+    if (copiedId.value === id) copiedId.value = null;
+  }, 2000);
+}
 
 function openPreview(url: string, title: string, images?: any[]) {
   previewImage.value = { url, title, images: images || [] };
@@ -166,106 +177,247 @@ const columns = [
       </form>
     </RdCard>
 
-    <!-- Tabel Data Mutasi -->
-    <RdTable :columns="columns" :items="transactions">
-      <template #id="{ item }">
-        <span
-          class="font-mono text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors select-all"
-          :title="item.id"
+    <!-- Konten Data Mutasi Transaksi -->
+    <div v-if="transactions && transactions.length > 0">
+      <!-- 1. Tampilan Layar Lebar & Desktop (Tabel Komprehensif 10 Kolom) -->
+      <div class="hidden lg:block">
+        <RdTable :columns="columns" :items="transactions">
+          <template #id="{ item }">
+            <button
+              type="button"
+              @click.stop="copyId(item.id)"
+              class="font-mono text-[11px] text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 transition-colors select-all cursor-pointer inline-flex items-center gap-1 group text-left"
+              :title="`Klik untuk menyalin: ${item.id}`"
+            >
+              <span>#{{ item.id ? item.id.substring(0, 8) : '-' }}</span>
+              <span v-if="copiedId === item.id" class="text-[10px] text-teal-600 font-sans font-semibold">Tersalin</span>
+              <svg v-else class="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+          </template>
+
+          <template #transaction_date="{ value }">
+            <RdDateTime :value="value" format="date" />
+          </template>
+
+          <template #merchant_name="{ item }">
+            <span class="font-medium text-slate-800 dark:text-slate-100 text-xs block truncate max-w-[160px]" :title="item.merchant_name || item.description">
+              {{ item.merchant_name || item.description?.replace(/^Struk Belanja:\s*/i, '') || '-' }}
+            </span>
+          </template>
+
+          <template #category_name="{ value }">
+            <RdBadge variant="neutral">{{ value || 'Tanpa Kategori' }}</RdBadge>
+          </template>
+
+          <template #type="{ value }">
+            <RdBadge :variant="value === 'income' ? 'success' : (value === 'savings' ? 'info' : 'neutral')">
+              {{ value === 'income' ? 'Pemasukan' : (value === 'savings' ? 'Tabungan' : 'Pengeluaran') }}
+            </RdBadge>
+          </template>
+
+          <template #items="{ item }">
+            <div v-if="item.items && item.items.length > 0" class="text-xs space-y-0.5 max-w-[180px]">
+              <span class="text-slate-800 dark:text-slate-200 block truncate" :title="item.items[0].item_name">
+                {{ item.items[0].item_name }}
+              </span>
+              <span v-if="item.items.length > 1" class="text-[11px] text-slate-400 block">
+                +{{ item.items.length - 1 }} item lainnya
+              </span>
+            </div>
+            <span v-else class="text-xs text-slate-600 dark:text-slate-400 block truncate max-w-[180px]" :title="item.description">
+              {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : '-' }}
+            </span>
+          </template>
+
+          <template #quantity="{ item }">
+            <span v-if="item.items && item.items.length > 0" class="text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
+              {{ item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) }}
+            </span>
+            <span v-else class="text-xs text-slate-400 font-mono">1</span>
+          </template>
+
+          <template #amount_minor="{ item }">
+            <span :class="item.type === 'income' ? 'text-teal-800 dark:text-teal-300 font-bold' : 'text-slate-800 dark:text-slate-100 font-semibold'">
+              <RdMoney :amount-minor="item.amount_minor" :show-sign="item.type === 'income'" />
+            </span>
+          </template>
+
+          <template #images="{ item }">
+            <div v-if="item.images && item.images.length > 0" class="flex items-center justify-center">
+              <button
+                type="button"
+                @click.stop="openPreview(item.images[0].url, `${item.merchant_name || item.description || 'Transaksi'} - Lampiran Struk`, item.images)"
+                class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 transition-colors border border-slate-200 dark:border-slate-700 hover:border-teal-500 cursor-pointer"
+                title="Klik untuk melihat berkas lampiran"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span>Lihat{{ item.images.length > 1 ? ` (${item.images.length})` : '' }}</span>
+              </button>
+            </div>
+            <span v-else class="text-xs text-slate-400">-</span>
+          </template>
+
+          <template #actions="{ item }">
+            <div class="flex items-center justify-center gap-1.5 flex-nowrap">
+              <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" title="Rincian Transaksi">
+                <RdButton variant="outline" size="sm" type="button">
+                  Rincian
+                </RdButton>
+              </a>
+              <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" title="Ubah Transaksi">
+                <RdButton variant="outline" size="sm" type="button">
+                  Ubah
+                </RdButton>
+              </a>
+              <RdButton
+                variant="danger"
+                size="sm"
+                type="button"
+                title="Hapus Transaksi"
+                @click.stop="confirmDelete(item)"
+              >
+                Hapus
+              </RdButton>
+            </div>
+          </template>
+        </RdTable>
+      </div>
+
+      <!-- 2. Tampilan Khusus Mobile & Tablet (Kartu Responsif Bebas Scroll Horizontal) -->
+      <div class="lg:hidden space-y-3 w-full">
+        <div
+          v-for="item in transactions"
+          :key="item.id"
+          class="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-3 w-full"
         >
-          #{{ item.id ? item.id.substring(0, 8) : '-' }}
-        </span>
-      </template>
+          <!-- Baris 1: ID, Tanggal & Badge Jenis & Kategori -->
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0 space-y-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  @click.stop="copyId(item.id)"
+                  class="font-mono text-[11px] text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 select-all inline-flex items-center gap-1 cursor-pointer"
+                  :title="item.id"
+                >
+                  <span>#{{ item.id ? item.id.substring(0, 8) : '-' }}</span>
+                  <span v-if="copiedId === item.id" class="text-[10px] text-teal-600 font-sans font-semibold">Tersalin</span>
+                </button>
+                <span class="text-slate-300 dark:text-slate-700">·</span>
+                <span class="text-xs text-slate-500 font-medium">
+                  <RdDateTime :value="item.transaction_date" format="date" />
+                </span>
+              </div>
+              <h4 class="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                {{ item.merchant_name || item.description?.replace(/^Struk Belanja:\s*/i, '') || '-' }}
+              </h4>
+            </div>
+            <div class="flex flex-col items-end gap-1 shrink-0">
+              <RdBadge :variant="item.type === 'income' ? 'success' : (item.type === 'savings' ? 'info' : 'neutral')" class="text-[10px] py-0 px-1.5">
+                {{ item.type === 'income' ? 'Pemasukan' : (item.type === 'savings' ? 'Tabungan' : 'Pengeluaran') }}
+              </RdBadge>
+              <RdBadge variant="neutral" class="text-[10px] py-0 px-1.5">
+                {{ item.category_name || 'Tanpa Kategori' }}
+              </RdBadge>
+            </div>
+          </div>
 
-      <template #transaction_date="{ value }">
-        <RdDateTime :value="value" format="date" />
-      </template>
+          <!-- Baris 2: Rincian Barang / Keterangan Belanja -->
+          <div v-if="item.items && item.items.length > 0" class="p-2.5 rounded bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs space-y-1">
+            <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+              Item Belanja ({{ item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) }} pcs)
+            </div>
+            <div
+              v-for="(it, idx) in item.items.slice(0, 3)"
+              :key="idx"
+              class="flex justify-between items-center text-xs"
+            >
+              <span class="text-slate-700 dark:text-slate-300 truncate max-w-[200px]" :title="it.item_name">
+                {{ it.item_name }} <span class="text-slate-400">×{{ it.quantity || 1 }}</span>
+              </span>
+              <span class="font-medium text-slate-800 dark:text-slate-200">
+                <RdMoney :amount-minor="it.total_minor || ((it.price_minor || 0) * (it.quantity || 1))" />
+              </span>
+            </div>
+            <div v-if="item.items.length > 3" class="text-[11px] text-slate-400 font-medium pt-1 border-t border-slate-200 dark:border-slate-700">
+              +{{ item.items.length - 3 }} item lainnya
+            </div>
+          </div>
+          <div v-else-if="item.description && item.description !== item.merchant_name" class="text-xs text-slate-500 dark:text-slate-400">
+            {{ item.description }}
+          </div>
 
-      <template #merchant_name="{ item }">
-        <span class="font-medium text-slate-800 dark:text-slate-100 text-xs block truncate max-w-[160px]" :title="item.merchant_name || item.description">
-          {{ item.merchant_name || item.description?.replace(/^Struk Belanja:\s*/i, '') || '-' }}
-        </span>
-      </template>
+          <!-- Baris 3: Lampiran Bukti Foto & Nominal Akhir -->
+          <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div>
+              <button
+                v-if="item.images && item.images.length > 0"
+                type="button"
+                @click.stop="openPreview(item.images[0].url, `${item.merchant_name || item.description || 'Transaksi'} - Lampiran Struk`, item.images)"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span>Lihat Struk ({{ item.images.length }})</span>
+              </button>
+              <span v-else class="text-[11px] text-slate-400">Tanpa lampiran</span>
+            </div>
 
-      <template #category_name="{ value }">
-        <RdBadge variant="neutral">{{ value || 'Tanpa Kategori' }}</RdBadge>
-      </template>
+            <div class="text-right">
+              <span class="block text-[10px] text-slate-400 font-semibold uppercase">Total Mutasi</span>
+              <span :class="item.type === 'income' ? 'text-teal-800 dark:text-teal-300 font-bold text-base' : 'text-slate-900 dark:text-slate-100 font-bold text-base'">
+                <RdMoney :amount-minor="item.amount_minor" :show-sign="item.type === 'income'" />
+              </span>
+            </div>
+          </div>
 
-      <template #type="{ value }">
-        <RdBadge :variant="value === 'income' ? 'success' : (value === 'savings' ? 'info' : 'neutral')">
-          {{ value === 'income' ? 'Pemasukan' : (value === 'savings' ? 'Tabungan' : 'Pengeluaran') }}
-        </RdBadge>
-      </template>
-
-      <template #items="{ item }">
-        <div v-if="item.items && item.items.length > 0" class="text-xs space-y-0.5 max-w-[180px]">
-          <span class="text-slate-800 dark:text-slate-200 block truncate" :title="item.items[0].item_name">
-            {{ item.items[0].item_name }}
-          </span>
-          <span v-if="item.items.length > 1" class="text-[11px] text-slate-400 block">
-            +{{ item.items.length - 1 }} item lainnya
-          </span>
-        </div>
-        <span v-else class="text-xs text-slate-600 dark:text-slate-400 block truncate max-w-[180px]" :title="item.description">
-          {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : '-' }}
-        </span>
-      </template>
-
-      <template #quantity="{ item }">
-        <span v-if="item.items && item.items.length > 0" class="text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
-          {{ item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) }}
-        </span>
-        <span v-else class="text-xs text-slate-400 font-mono">1</span>
-      </template>
-
-      <template #amount_minor="{ item }">
-        <span :class="item.type === 'income' ? 'text-teal-800 dark:text-teal-300 font-bold' : 'text-slate-800 dark:text-slate-100 font-semibold'">
-          <RdMoney :amount-minor="item.amount_minor" :show-sign="item.type === 'income'" />
-        </span>
-      </template>
-
-      <template #images="{ item }">
-        <div v-if="item.images && item.images.length > 0" class="flex items-center justify-center">
-          <button
-            type="button"
-            @click.stop="openPreview(item.images[0].url, `${item.merchant_name || item.description || 'Transaksi'} - Lampiran Struk`, item.images)"
-            class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 transition-colors border border-slate-200 dark:border-slate-700 hover:border-teal-500 cursor-pointer"
-            title="Klik untuk melihat berkas lampiran"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-            <span>Lihat{{ item.images.length > 1 ? ` (${item.images.length})` : '' }}</span>
-          </button>
-        </div>
-        <span v-else class="text-xs text-slate-400">-</span>
-      </template>
-
-      <template #actions="{ item }">
-        <div class="flex items-center justify-center gap-1.5 flex-nowrap">
-          <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" title="Rincian Transaksi">
-            <RdButton variant="outline" size="sm" type="button">
-              Rincian
+          <!-- Baris 4: Aksi Mobile (Rincian, Ubah, Hapus) -->
+          <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" class="block w-full">
+              <RdButton variant="outline" size="sm" type="button" class="w-full justify-center">
+                Rincian
+              </RdButton>
+            </a>
+            <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" class="block w-full">
+              <RdButton variant="outline" size="sm" type="button" class="w-full justify-center">
+                Ubah
+              </RdButton>
+            </a>
+            <RdButton
+              variant="danger"
+              size="sm"
+              type="button"
+              class="w-full justify-center"
+              @click.stop="confirmDelete(item)"
+            >
+              Hapus
             </RdButton>
-          </a>
-          <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" title="Ubah Transaksi">
-            <RdButton variant="outline" size="sm" type="button">
-              Ubah
-            </RdButton>
-          </a>
-          <RdButton
-            variant="danger"
-            size="sm"
-            type="button"
-            title="Hapus Transaksi"
-            @click.stop="confirmDelete(item)"
-          >
-            Hapus
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State Jika Tidak Ada Transaksi -->
+    <RdEmptyState
+      v-else
+      title="Belum Ada Transaksi"
+      description="Tidak ditemukan riwayat mutasi transaksi sesuai dengan kriteria filter pencarian Anda."
+    >
+      <template #actions>
+        <a :href="`/t/${tenant.slug}/apps/pekan/transactions/create`">
+          <RdButton variant="primary" size="sm">
+            Tambah Transaksi Baru
           </RdButton>
-        </div>
+        </a>
       </template>
-    </RdTable>
+    </RdEmptyState>
 
     <!-- Kontrol Pagination Transaksi (Batas 20 per Halaman) -->
     <div
