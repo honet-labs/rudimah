@@ -247,7 +247,7 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
 
         try {
             $response = Http::withToken($this->apiKey)
-                ->timeout(45)
+                ->timeout(90)
                 ->post($url, $payload);
         } catch (\Throwable $e) {
             Log::error('9Router OCR API connection exception', ['error' => $e->getMessage()]);

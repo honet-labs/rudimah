@@ -23,6 +23,7 @@ class ReceiptOcrService
 
     public function processUpload(UploadedFile $file): FinanceReceiptScan
     {
+        @set_time_limit(180);
         PlatformAiService::applyRuntimeConfig();
 
         $tenantId = TenantContext::id();

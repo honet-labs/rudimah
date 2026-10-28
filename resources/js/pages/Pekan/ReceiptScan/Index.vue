@@ -58,16 +58,102 @@ const extraction = ref<ReceiptExtraction>({
   items: [],
 });
 
+async function compressImageForUpload(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) {
+    return file;
+  }
+
+  // Jika ukuran sudah di bawah 400KB, lewati kompresi
+  if (file.size <= 400 * 1024) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+
+        const maxDim = 1500;
+        let width = img.width;
+        let height = img.height;
+
+        if (width <= maxDim && height <= maxDim && file.size <= 800 * 1024) {
+          resolve(file);
+          return;
+        }
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        // Latar belakang putih bersih
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            const cleanName = file.name.replace(/\.[^/.]+$/, '') + '.jpg';
+            const compressed = new File([blob], cleanName, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressed);
+          },
+          'image/jpeg',
+          0.82
+        );
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+      };
+
+      img.src = objectUrl;
+    } catch {
+      resolve(file);
+    }
+  });
+}
+
 async function handleFileSelected(file: File) {
   isProcessing.value = true;
   errorMessage.value = null;
   hasResult.value = false;
 
+  const fileToUpload = await compressImageForUpload(file);
+
   const formData = new FormData();
-  formData.append('receipt_file', file);
+  formData.append('receipt_file', fileToUpload);
 
   const abortCtrl = new AbortController();
-  const timeoutId = setTimeout(() => abortCtrl.abort(), 45000);
+  const timeoutId = setTimeout(() => abortCtrl.abort(), 90000);
 
   try {
     const res = await secureFetch(`/t/${props.tenant.slug}/apps/pekan/receipt-scan/upload`, {
@@ -126,7 +212,7 @@ async function handleFileSelected(file: File) {
     }
   } catch (err: any) {
     if (err?.name === 'AbortError') {
-      errorMessage.value = 'Waktu proses pemindaian struk melebihi batas (timeout 45 detik). Silakan coba unggah kembali dengan foto struk yang lebih fokus atau terang.';
+      errorMessage.value = 'Waktu proses pemindaian struk melebihi batas (timeout 90 detik). Silakan coba unggah kembali dengan foto struk yang lebih fokus atau terang.';
     } else {
       errorMessage.value = 'Terjadi gangguan jaringan saat mengunggah struk: ' + (err.message || 'Koneksi gagal');
     }

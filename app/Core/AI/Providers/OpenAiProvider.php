@@ -169,7 +169,7 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
 
         try {
             $response = Http::withToken($this->apiKey)
-                ->timeout(45)
+                ->timeout(90)
                 ->post("{$this->apiBaseUrl}/chat/completions", [
                     'model' => $model,
                     'messages' => [
