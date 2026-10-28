@@ -19,18 +19,12 @@ interface CategoryOption {
   name: string;
 }
 
-interface AccountOption {
-  id: string;
-  name: string;
-}
-
 const props = defineProps<{
   user?: User;
   tenant: Tenant;
   tenants?: Tenant[];
   apps?: AppManifest[];
   categories?: CategoryOption[];
-  accounts?: AccountOption[];
 }>();
 
 const isProcessing = ref(false);
@@ -39,10 +33,10 @@ const hasResult = ref(false);
 const errorMessage = ref<string | null>(null);
 const scanId = ref<string | null>(null);
 
-const selectedAccountId = ref(props.accounts?.[0]?.id || '');
 const selectedCategoryId = ref(props.categories?.[0]?.id || '');
 
 const extraction = ref<ReceiptExtraction>({
+  description: '',
   merchant_name: '',
   receipt_number: '',
   transaction_date: new Date().toISOString().substring(0, 10),
@@ -78,6 +72,7 @@ async function handleFileSelected(file: File) {
       scanId.value = data.scan_id;
       const ext = data.extracted || {};
       extraction.value = {
+        description: ext.description || ext.merchant_name || 'Belanja',
         merchant_name: ext.merchant_name || 'Toko Belanja',
         receipt_number: ext.receipt_number || '',
         transaction_date: ext.transaction_date || new Date().toISOString().substring(0, 10),
@@ -170,10 +165,10 @@ async function saveConfirmedTransaction() {
       },
       body: JSON.stringify({
         scan_id: scanId.value,
+        description: extraction.value.description || extraction.value.merchant_name || 'Belanja',
         merchant_name: extraction.value.merchant_name,
         receipt_number: extraction.value.receipt_number,
         transaction_date: extraction.value.transaction_date,
-        account_id: selectedAccountId.value || undefined,
         category_id: selectedCategoryId.value || undefined,
         subtotal_minor: extraction.value.subtotal_minor,
         tax_minor: extraction.value.tax_minor,
@@ -195,12 +190,6 @@ async function saveConfirmedTransaction() {
   } finally {
     isSaving.value = false;
   }
-}
-
-const accountOptions = computed(() => {
-  return (props.accounts || []).map(a => ({ label: a.name, value: a.id }));
-});
-
 const categoryOptions = computed(() => {
   return (props.categories || []).map(c => ({ label: c.name, value: c.id }));
 });
@@ -251,13 +240,23 @@ const categoryOptions = computed(() => {
         </RdAlert>
 
         <RdCard title="Hasil Ekstraksi Kuitansi">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <RdInput
+              id="ocr_description"
+              v-model="extraction.description"
+              label="Keterangan Transaksi"
+              placeholder="Contoh: Makan siang, Belanja ATK, dsb."
+              required
+            />
             <RdInput
               id="ocr_merchant"
               v-model="extraction.merchant_name"
               label="Nama Merchant / Toko"
               required
             />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <RdInput
               id="ocr_receipt_no"
               v-model="extraction.receipt_number"
@@ -270,16 +269,6 @@ const categoryOptions = computed(() => {
               label="Tanggal Transaksi"
               required
             />
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <div v-if="accountOptions.length > 0">
-              <RdSelect
-                v-model="selectedAccountId"
-                label="Sumber Rekening Kas"
-                :options="accountOptions"
-              />
-            </div>
             <div v-if="categoryOptions.length > 0">
               <RdSelect
                 v-model="selectedCategoryId"

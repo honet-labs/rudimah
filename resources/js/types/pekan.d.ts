@@ -91,6 +91,7 @@ export interface FinanceReminder {
 }
 
 export interface ReceiptExtraction {
+  description?: string;
   merchant_name: string;
   receipt_number?: string;
   transaction_date?: string;

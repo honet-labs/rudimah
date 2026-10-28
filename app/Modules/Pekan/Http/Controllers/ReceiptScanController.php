@@ -38,14 +38,6 @@ class ReceiptScanController
             $categories = collect();
         }
 
-        try {
-            $accounts = FinanceAccount::where('is_active', true)
-                ->orderBy('name')
-                ->get();
-        } catch (\Throwable) {
-            $accounts = collect();
-        }
-
         return Inertia::render('Pekan/ReceiptScan/Index', [
             'user' => $user ? [
                 'id' => $user->id,
@@ -57,7 +49,6 @@ class ReceiptScanController
             'tenants' => $user ? $user->getActiveTenants() : [],
             'apps' => AppRegistry::all(),
             'categories' => $categories,
-            'accounts' => $accounts,
         ]);
     }
 
@@ -98,6 +89,7 @@ class ReceiptScanController
     {
         $validated = $request->validate([
             'scan_id' => 'nullable|string',
+            'description' => 'nullable|string|max:255',
             'merchant_name' => 'required|string|max:200',
             'receipt_number' => 'nullable|string|max:100',
             'transaction_date' => 'required|date',
@@ -120,10 +112,10 @@ class ReceiptScanController
         $tenant = TenantContext::get();
         $slug = $tenant?->slug ?: $tenantSlug;
 
-        // 1. Resolve Rekening Akun
+        // 1. Resolve Rekening Akun di latar belakang
         $accountId = $validated['account_id'] ?? null;
         if (empty($accountId)) {
-            $defaultAccount = FinanceAccount::where('is_active', true)->first();
+            $defaultAccount = FinanceAccount::where('is_active', true)->first() ?: FinanceAccount::first();
             $accountId = $defaultAccount ? $defaultAccount->id : 'default-account';
         }
 
@@ -142,6 +134,10 @@ class ReceiptScanController
         $discountMinor = (int) ($validated['discount_minor'] ?? 0);
         $serviceChargeMinor = (int) ($validated['service_charge_minor'] ?? 0);
 
+        $description = !empty($validated['description'])
+            ? trim($validated['description'])
+            : trim($validated['merchant_name']);
+
         $txData = [
             'account_id' => $accountId,
             'category_id' => $categoryId,
@@ -149,7 +145,7 @@ class ReceiptScanController
             'amount_minor' => $totalMinor,
             'currency' => 'Rp',
             'transaction_date' => $validated['transaction_date'],
-            'description' => 'Struk Belanja: ' . $validated['merchant_name'],
+            'description' => $description,
             'merchant_name' => $validated['merchant_name'],
             'receipt_number' => $validated['receipt_number'] ?? null,
             'subtotal_minor' => $subtotalMinor,
