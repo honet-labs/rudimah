@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
@@ -43,6 +43,8 @@ const props = withDefaults(
 
 const searchQuery = ref(props.filters?.search || '');
 const selectedType = ref(props.filters?.type || 'all');
+
+const tenantSlug = computed(() => props.tenant?.slug || (props.tenant as any)?.code || '');
 
 function applyFilter(page = 1) {
   router.get(
@@ -152,9 +154,13 @@ const columns = [
         </span>
       </template>
       <template #actions="{ item }">
-        <a :href="`/t/${tenant.slug}/apps/pekan/transactions/${item.id}`" class="text-xs text-teal-700 hover:underline font-medium">
-          Rincian
-        </a>
+        <div class="flex items-center justify-center">
+          <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" class="inline-block">
+            <RdButton variant="outline" size="sm" type="button">
+              Rincian
+            </RdButton>
+          </a>
+        </div>
       </template>
     </RdTable>
 

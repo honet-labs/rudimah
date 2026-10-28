@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
 import RdCard from '../../../design-system/RdCard.vue';
@@ -19,6 +20,10 @@ const props = defineProps<{
 }>();
 
 const isDeleteDialogOpen = ref(false);
+
+function handleDelete() {
+  router.delete(`/t/${props.tenant.slug}/apps/pekan/transactions/${props.transaction.id}`);
+}
 
 const itemColumns = [
   { key: 'item_name', label: 'Nama Barang' },
@@ -158,7 +163,7 @@ const itemColumns = [
       message="Data mutasi transaksi akan dihapus dari buku kas. Tindakan ini tidak dapat dibatalkan."
       danger
       confirm-text="Ya, Hapus Transaksi"
-      @confirm="() => {}"
+      @confirm="handleDelete"
     />
   </RudimahAppShell>
 </template>

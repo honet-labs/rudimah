@@ -118,12 +118,13 @@ class TransactionController
             ->with('status', 'Transaksi berhasil disimpan.');
     }
 
-    public function show(Request $request, string $tenantSlug, string $id): Response
+    public function show(Request $request, ?string $tenantSlug = null, ?string $id = null): Response
     {
         $tenant = TenantContext::get();
         $user = $request->user();
+        $resolvedId = $id ?: $request->route('id') ?: $tenantSlug;
         $transaction = FinanceTransaction::with(['category', 'items', 'attachments'])
-            ->findOrFail($id);
+            ->findOrFail($resolvedId);
 
         $tenants = $user ? $user->getActiveTenants() : [];
 
@@ -140,11 +141,12 @@ class TransactionController
         ]);
     }
 
-    public function edit(Request $request, string $tenantSlug, string $id): Response
+    public function edit(Request $request, ?string $tenantSlug = null, ?string $id = null): Response
     {
         $tenant = TenantContext::get();
         $user = $request->user();
-        $transaction = FinanceTransaction::with(['category', 'items'])->findOrFail($id);
+        $resolvedId = $id ?: $request->route('id') ?: $tenantSlug;
+        $transaction = FinanceTransaction::with(['category', 'items'])->findOrFail($resolvedId);
 
         $categories = FinanceCategory::where('is_active', true)->get();
         $tenants = $user ? $user->getActiveTenants() : [];
@@ -163,9 +165,10 @@ class TransactionController
         ]);
     }
 
-    public function update(Request $request, string $tenantSlug, string $id): RedirectResponse
+    public function update(Request $request, ?string $tenantSlug = null, ?string $id = null): RedirectResponse
     {
-        $transaction = FinanceTransaction::findOrFail($id);
+        $resolvedId = $id ?: $request->route('id') ?: $tenantSlug;
+        $transaction = FinanceTransaction::findOrFail($resolvedId);
 
         $validated = $request->validate([
             'category_id' => 'nullable|string',
@@ -183,21 +186,22 @@ class TransactionController
         $this->transactionService->updateTransaction($transaction, $validated, $items);
 
         $tenant = TenantContext::get();
-        $slug = $tenant?->slug ?: $tenantSlug;
+        $slug = $tenant?->slug ?: $tenantSlug ?: session('current_tenant_slug');
         return redirect("/t/{$slug}/apps/pekan/transactions/{$transaction->id}")
             ->with('status', 'Transaksi berhasil diperbarui.');
     }
 
-    public function destroy(Request $request, string $tenantSlug, string $id): RedirectResponse
+    public function destroy(Request $request, ?string $tenantSlug = null, ?string $id = null): RedirectResponse
     {
-        $transaction = FinanceTransaction::findOrFail($id);
+        $resolvedId = $id ?: $request->route('id') ?: $tenantSlug;
+        $transaction = FinanceTransaction::findOrFail($resolvedId);
         $tenantId = $transaction->tenant_id;
         $transaction->delete();
 
         $this->transactionService->syncActiveBudgets($tenantId);
 
         $tenant = TenantContext::get();
-        $slug = $tenant?->slug ?: $tenantSlug;
+        $slug = $tenant?->slug ?: $tenantSlug ?: session('current_tenant_slug');
         return redirect("/t/{$slug}/apps/pekan/transactions")
             ->with('status', 'Transaksi berhasil dihapus.');
     }
