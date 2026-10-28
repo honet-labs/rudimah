@@ -146,7 +146,7 @@ class PlatformAiService
             $routerModel = $settings->get('ai_9router_model', 'high-models-agent');
 
             $activeOcrModel = match ($activeProvider) {
-                '9router' => (!empty($routerModel) && $routerModel !== 'high-models-agent') ? $routerModel : 'gpt-4o-mini',
+                '9router' => $routerModel ?: 'high-models-agent',
                 'openai' => $openaiModel ?: 'gpt-4o-mini',
                 'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
                 default => $geminiModel ?: 'gemini-1.5-flash',

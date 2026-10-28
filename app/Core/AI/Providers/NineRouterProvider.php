@@ -189,9 +189,8 @@ class NineRouterProvider implements AiProviderInterface
     public function extractReceipt(string $fileBase64, string $mimeType, array $options = []): array
     {
         $model = !empty($options['model']) ? $options['model'] : $this->defaultModel;
-        // Jika model masih berupa agent router teks 'high-models-agent', alihkan ke model multimodal vision 'gpt-4o-mini'
-        if ($model === 'high-models-agent' || empty($model)) {
-            $model = 'gpt-4o-mini';
+        if (empty($model)) {
+            $model = 'high-models-agent';
         }
 
         $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;

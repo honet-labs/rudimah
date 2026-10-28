@@ -123,7 +123,8 @@ Format JSON wajib:
   ]
 }";
 
-        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$this->apiKey}";
+        $baseEndpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : 'https://generativelanguage.googleapis.com';
+        $endpoint = "{$baseEndpoint}/v1beta/models/{$model}:generateContent?key={$this->apiKey}";
 
         try {
             $response = Http::timeout(45)->post($endpoint, [

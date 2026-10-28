@@ -3,6 +3,7 @@
 namespace App\Modules\Pekan\Services;
 
 use App\Core\AI\AiProviderManager;
+use App\Core\AI\Models\TenantAiSetting;
 use App\Core\AI\Services\PlatformAiService;
 use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\TenantContext;
@@ -41,10 +42,27 @@ class ReceiptOcrService
             throw new \InvalidArgumentException('Tipe berkas tidak didukung untuk pemindaian OCR. Gunakan gambar JPG, PNG, WEBP, atau berkas PDF.');
         }
 
+        // Ambil konfigurasi AI ruang kerja atau platform global (100% sinkron dengan Chat AI)
+        $tenantSetting = TenantAiSetting::where('tenant_id', $tenantId)->first();
+        if ($tenantSetting && !$tenantSetting->is_enabled) {
+            throw new \RuntimeException('Layanan AI dinonaktifkan untuk ruang kerja ini.');
+        }
+
+        $hasCustomKey = !empty($tenantSetting?->api_key);
+        $providerCode = $hasCustomKey
+            ? ($tenantSetting->provider ?: config('rudimah.ai.default_provider', '9router'))
+            : config('rudimah.ai.default_provider', '9router');
+
+        $modelName = $hasCustomKey
+            ? ($tenantSetting->model ?: config("rudimah.ai.{$providerCode}_model", 'high-models-agent'))
+            : config("rudimah.ai.{$providerCode}_model", 'high-models-agent');
+
+        $endpoint = $hasCustomKey && !empty($tenantSetting?->api_endpoint)
+            ? $tenantSetting->api_endpoint
+            : config("rudimah.ai.{$providerCode}_endpoint");
+
         $scanId = (string) Str::uuid();
-        $providerCode = config('rudimah.ocr.provider', config('rudimah.ai.default_provider', 'gemini'));
-        $modelName = config('rudimah.ocr.model', config("rudimah.ai.{$providerCode}_model", 'gpt-4o-mini'));
-        $provider = $this->providerManager->resolve($providerCode);
+        $provider = $this->providerManager->resolve($providerCode, $tenantSetting);
 
         // Ekstraksi via AI Vision Provider dengan pra-optimasi resolusi gambar
         [$fileBase64, $preparedMime] = $this->prepareImageForOcr($file, $mimeType);
@@ -52,6 +70,7 @@ class ReceiptOcrService
         try {
             $extractedDraft = $provider->extractReceipt($fileBase64, $preparedMime, [
                 'model' => $modelName,
+                'api_endpoint' => $endpoint,
             ]);
         } catch (\Throwable $e) {
             Log::error("[ReceiptOcrService] Ekstraksi OCR gagal ({$providerCode}): " . $e->getMessage());
