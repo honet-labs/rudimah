@@ -60,6 +60,19 @@ class FinanceTransaction extends Model
         return $this->category?->name;
     }
 
+    public function getDescriptionAttribute(?string $value): ?string
+    {
+        if ($value && str_starts_with($value, 'Struk Belanja: ')) {
+            return substr($value, 15);
+        }
+        return $value;
+    }
+
+    public function setDescriptionAttribute(?string $value): void
+    {
+        $this->attributes['description'] = $value ? preg_replace('/^Struk Belanja:\s*/i', '', $value) : $value;
+    }
+
     protected static function booted(): void
     {
         static::addGlobalScope(new TenantScope);

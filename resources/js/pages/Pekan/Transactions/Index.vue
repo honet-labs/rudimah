@@ -133,6 +133,11 @@ const columns = [
       <template #transaction_date="{ value }">
         <RdDateTime :value="value" format="date" />
       </template>
+      <template #description="{ value }">
+        <span class="text-xs text-slate-800 dark:text-slate-200">
+          {{ value ? value.replace(/^Struk Belanja:\s*/i, '') : '-' }}
+        </span>
+      </template>
       <template #category_name="{ value }">
         <RdBadge variant="neutral">{{ value || 'Tanpa Kategori' }}</RdBadge>
       </template>
