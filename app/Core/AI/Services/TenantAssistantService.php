@@ -107,7 +107,24 @@ class TenantAssistantService
             ]);
         }
 
-        // 2. Ambil konfigurasi AI Ruang Kerja atau Platform Global
+        // 2. Evaluasi Perlindungan Keamanan & Anti-Injeksi Prompt Cepat
+        if ($this->isExplicitOutOfScopeOrInjection($userMessageText)) {
+            $refusalText = "Maaf, sebagai Asisten Cerdas RUDIMAH, peran saya dikhususkan untuk membantu manajemen keuangan harian (PEKAN), pencatatan transaksi, pos anggaran, target tabungan, dan pengingat tagihan pada ruang kerja ini. Saya tidak dapat melayani permintaan penulisan kode program/skrip atau topik di luar manajemen keuangan platform RUDIMAH. Ada transaksi atau data keuangan yang ingin saya bantu catat?";
+
+            return AiMessage::create([
+                'id' => (string) Str::uuid(),
+                'conversation_id' => $conversation->id,
+                'tenant_id' => $tenantId,
+                'role' => 'assistant',
+                'content' => $refusalText,
+                'metadata' => [
+                    'guarded' => true,
+                    'reason' => 'prompt_injection_or_out_of_scope',
+                ],
+            ]);
+        }
+
+        // 3. Ambil konfigurasi AI Ruang Kerja atau Platform Global
         $setting = TenantAiSetting::where('tenant_id', $tenantId)->first();
         if ($setting && !$setting->is_enabled) {
             return AiMessage::create([
@@ -331,6 +348,42 @@ class TenantAssistantService
         }
 
         return [[], $replyContent];
+    }
+
+    /**
+     * Mendeteksi upaya injeksi prompt atau permintaan yang jelas di luar domain keuangan.
+     */
+    protected function isExplicitOutOfScopeOrInjection(string $text): bool
+    {
+        $normalized = strtolower(trim($text));
+
+        // 1. Pola eksplisit pembuatan/penulisan skrip atau kode program
+        if (preg_match('/\b(buatkan|bikin|tulis|generate|create)\s+(script|skrip|koding|coding|code|fungsi|function|source\s*code|program|algoritma)\b/i', $normalized)) {
+            // Kecuali jika jelas sedang meminta catat transaksi (misal: "buatkan catatan transaksi...", "catat pengeluaran...")
+            if (!preg_match('/\b(transaksi|anggaran|budget|tabungan|pengingat|tagihan|catat|pemasukan|pengeluaran)\b/i', $normalized)) {
+                return true;
+            }
+        }
+
+        // 2. Pola skrip atau kode bahasa pemrograman spesifik (seperti "script login form dari python")
+        if (preg_match('/\b(script|skrip|koding|kode)\b.*\b(python|javascript|php|golang|java|c\+\+|html|css|bash|powershell|sql|react|vue|node)\b/i', $normalized)) {
+            return true;
+        }
+
+        // 3. Pola jailbreak / manipulasi peran / prompt injection eksplisit
+        if (preg_match('/\b(ignore|abaikan)\s+(all|semua)?\s*(previous|prior|sebelumnya)?\s*(instructions|instruksi|rules|aturan)\b/i', $normalized)) {
+            return true;
+        }
+
+        if (preg_match('/\b(developer\s*mode|dan\s*mode|jailbreak|unrestricted\s*mode|mode\s*pengembang|system\s*prompt)\b/i', $normalized)) {
+            return true;
+        }
+
+        if (preg_match('/\b(kamu\s+sekarang\s+adalah|you\s+are\s+now|act\s+as|berperanlah\s+sebagai)\s+(bukan|programmer|hacker|bot|developer|ai\s+bebas|dan)\b/i', $normalized)) {
+            return true;
+        }
+
+        return false;
     }
 }
 
