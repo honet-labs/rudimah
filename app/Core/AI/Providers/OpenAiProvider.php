@@ -169,7 +169,7 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
 
         try {
             $response = Http::withToken($this->apiKey)
-                ->timeout(60)
+                ->timeout(45)
                 ->post("{$this->apiBaseUrl}/chat/completions", [
                     'model' => $model,
                     'messages' => [
@@ -188,6 +188,8 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
                     ],
                     'response_format' => ['type' => 'json_object'],
                     'temperature' => 0.1,
+                    'max_tokens' => 2048,
+                    'stream' => false,
                 ]);
         } catch (\Throwable $e) {
             Log::error('OpenAI Vision exception', ['error' => $e->getMessage()]);

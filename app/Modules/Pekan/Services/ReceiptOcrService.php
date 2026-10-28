@@ -43,14 +43,14 @@ class ReceiptOcrService
 
         $scanId = (string) Str::uuid();
         $providerCode = config('rudimah.ocr.provider', config('rudimah.ai.default_provider', 'gemini'));
-        $modelName = config('rudimah.ocr.model', config("rudimah.ai.{$providerCode}_model", 'high-models-agent'));
+        $modelName = config('rudimah.ocr.model', config("rudimah.ai.{$providerCode}_model", 'gpt-4o-mini'));
         $provider = $this->providerManager->resolve($providerCode);
 
-        // Ekstraksi via AI Vision Provider
-        $fileBase64 = base64_encode($file->getContent());
+        // Ekstraksi via AI Vision Provider dengan pra-optimasi resolusi gambar
+        [$fileBase64, $preparedMime] = $this->prepareImageForOcr($file, $mimeType);
 
         try {
-            $extractedDraft = $provider->extractReceipt($fileBase64, $mimeType, [
+            $extractedDraft = $provider->extractReceipt($fileBase64, $preparedMime, [
                 'model' => $modelName,
             ]);
         } catch (\Throwable $e) {
@@ -91,5 +91,69 @@ class ReceiptOcrService
         ]);
 
         return $scan;
+    }
+
+    /**
+     * Mengoptimasi ukuran gambar struk belanja sebelum dikirim ke gateway Vision AI.
+     * Mengubah resolusi gambar ultra-besar menjadi maksimal 1600px dan mengompres ke JPEG
+     * agar payload cepat terunggah dan model vision memprosesnya tanpa timeout.
+     */
+    protected function prepareImageForOcr(UploadedFile $file, string $mimeType): array
+    {
+        if ($mimeType === 'application/pdf' || !extension_loaded('gd')) {
+            return [base64_encode($file->getContent()), $mimeType];
+        }
+
+        try {
+            $path = $file->getRealPath();
+            if (!$path || !file_exists($path)) {
+                return [base64_encode($file->getContent()), $mimeType];
+            }
+
+            $img = match ($mimeType) {
+                'image/jpeg' => @imagecreatefromjpeg($path),
+                'image/png' => @imagecreatefrompng($path),
+                'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($path) : null,
+                default => null,
+            };
+
+            if (!$img) {
+                return [base64_encode($file->getContent()), $mimeType];
+            }
+
+            $width = imagesx($img);
+            $height = imagesy($img);
+
+            $maxDim = 1600;
+            if ($width > $maxDim || $height > $maxDim) {
+                if ($width >= $height) {
+                    $newWidth = $maxDim;
+                    $newHeight = (int) round($height * ($maxDim / $width));
+                } else {
+                    $newHeight = $maxDim;
+                    $newWidth = (int) round($width * ($maxDim / $height));
+                }
+
+                $resized = imagecreatetruecolor($newWidth, $newHeight);
+                imagealphablending($resized, false);
+                imagesavealpha($resized, true);
+                imagecopyresampled($resized, $img, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+                imagedestroy($img);
+                $img = $resized;
+            }
+
+            ob_start();
+            imagejpeg($img, null, 85);
+            $compressedData = ob_get_clean();
+            imagedestroy($img);
+
+            if (!empty($compressedData)) {
+                return [base64_encode($compressedData), 'image/jpeg'];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[ReceiptOcrService] Gagal kompresi gambar pra-OCR, menggunakan berkas asli: ' . $e->getMessage());
+        }
+
+        return [base64_encode($file->getContent()), $mimeType];
     }
 }

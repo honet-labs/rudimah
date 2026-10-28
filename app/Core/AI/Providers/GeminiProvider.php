@@ -126,7 +126,7 @@ Format JSON wajib:
         $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$this->apiKey}";
 
         try {
-            $response = Http::timeout(60)->post($endpoint, [
+            $response = Http::timeout(45)->post($endpoint, [
                 'contents' => [
                     [
                         'role' => 'user',

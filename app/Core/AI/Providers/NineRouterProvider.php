@@ -189,6 +189,11 @@ class NineRouterProvider implements AiProviderInterface
     public function extractReceipt(string $fileBase64, string $mimeType, array $options = []): array
     {
         $model = !empty($options['model']) ? $options['model'] : $this->defaultModel;
+        // Jika model masih berupa agent router teks 'high-models-agent', alihkan ke model multimodal vision 'gpt-4o-mini'
+        if ($model === 'high-models-agent' || empty($model)) {
+            $model = 'gpt-4o-mini';
+        }
+
         $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;
 
         if (empty($endpoint)) {
@@ -225,21 +230,26 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
 
         $dataUrl = "data:{$mimeType};base64,{$fileBase64}";
 
+        $payload = [
+            'model' => $model,
+            'messages' => [
+                [
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => $prompt],
+                        ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]],
+                    ],
+                ],
+            ],
+            'temperature' => 0.1,
+            'max_tokens' => 2048,
+            'stream' => false,
+        ];
+
         try {
             $response = Http::withToken($this->apiKey)
-                ->timeout(60)
-                ->post($url, [
-                    'model' => $model,
-                    'messages' => [
-                        [
-                            'role' => 'user',
-                            'content' => [
-                                ['type' => 'text', 'text' => $prompt],
-                                ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]],
-                            ],
-                        ],
-                    ],
-                ]);
+                ->timeout(45)
+                ->post($url, $payload);
         } catch (\Throwable $e) {
             Log::error('9Router OCR API connection exception', ['error' => $e->getMessage()]);
             throw new \RuntimeException("Gagal menghubungi layanan OCR 9Router ({$url}): " . $e->getMessage());
@@ -247,7 +257,64 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
 
         if ($response->successful()) {
             $data = $response->json();
-            $rawText = $data['choices'][0]['message']['content'] ?? '';
+            $rawText = '';
+
+            // 1. Ekstraksi format standar OpenAI choices[0].message.content
+            if (isset($data['choices'][0]['message']['content'])) {
+                $rawContent = $data['choices'][0]['message']['content'];
+                if (is_array($rawContent)) {
+                    $parts = [];
+                    foreach ($rawContent as $part) {
+                        if (is_string($part)) {
+                            $parts[] = $part;
+                        } elseif (is_array($part) && isset($part['text'])) {
+                            $parts[] = $part['text'];
+                        }
+                    }
+                    $rawText = implode("\n", $parts);
+                } else {
+                    $rawText = (string) $rawContent;
+                }
+            }
+
+            // 2. Format reasoning_content (DeepSeek-R1 / QwQ / thinking vision)
+            if (empty(trim($rawText)) && !empty($data['choices'][0]['message']['reasoning_content'])) {
+                $rawText = (string) $data['choices'][0]['message']['reasoning_content'];
+            }
+
+            // 3. Format reasoning alternatif
+            if (empty(trim($rawText)) && !empty($data['choices'][0]['message']['reasoning'])) {
+                $rawText = (string) $data['choices'][0]['message']['reasoning'];
+            }
+
+            // 4. Format delta content
+            if (empty(trim($rawText)) && !empty($data['choices'][0]['delta']['content'])) {
+                $rawText = (string) $data['choices'][0]['delta']['content'];
+            }
+
+            // 5. Format streaming SSE chunk text fallback
+            if (empty(trim($rawText))) {
+                $rawBody = $response->body();
+                if (str_contains($rawBody, 'data:')) {
+                    $lines = explode("\n", $rawBody);
+                    $streamText = '';
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if (str_starts_with($line, 'data:') && !str_contains($line, '[DONE]')) {
+                            $chunkJson = json_decode(trim(substr($line, 5)), true);
+                            if (!empty($chunkJson['choices'][0]['delta']['content'])) {
+                                $streamText .= $chunkJson['choices'][0]['delta']['content'];
+                            } elseif (!empty($chunkJson['choices'][0]['message']['content'])) {
+                                $streamText .= $chunkJson['choices'][0]['message']['content'];
+                            }
+                        }
+                    }
+                    if (!empty(trim($streamText))) {
+                        $rawText = $streamText;
+                    }
+                }
+            }
+
             $cleanJson = preg_replace('/```(?:json)?\s*([\s\S]*?)\s*```/', '$1', trim($rawText));
             if (preg_match('/\{[\s\S]*\}/', $cleanJson, $matches)) {
                 $parsed = json_decode($matches[0], true);

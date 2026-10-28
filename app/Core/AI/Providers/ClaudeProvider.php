@@ -183,7 +183,7 @@ Format JSON wajib:
                 'x-api-key' => $this->apiKey,
                 'anthropic-version' => '2023-06-01',
                 'content-type' => 'application/json',
-            ])->timeout(60)->post($url, $payload);
+            ])->timeout(45)->post($url, $payload);
         } catch (\Throwable $e) {
             Log::error('Claude Vision exception', ['error' => $e->getMessage()]);
             throw new \RuntimeException("Gagal menghubungi model Vision Anthropic Claude: " . $e->getMessage());

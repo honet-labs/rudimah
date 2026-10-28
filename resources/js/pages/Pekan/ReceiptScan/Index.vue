@@ -57,6 +57,9 @@ async function handleFileSelected(file: File) {
   const formData = new FormData();
   formData.append('receipt_file', file);
 
+  const abortCtrl = new AbortController();
+  const timeoutId = setTimeout(() => abortCtrl.abort(), 45000);
+
   try {
     const res = await secureFetch(`/t/${props.tenant.slug}/apps/pekan/receipt-scan/upload`, {
       method: 'POST',
@@ -64,9 +67,10 @@ async function handleFileSelected(file: File) {
         Accept: 'application/json',
       },
       body: formData,
+      signal: abortCtrl.signal,
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
     if (res.ok && data.success) {
       scanId.value = data.scan_id;
@@ -104,11 +108,20 @@ async function handleFileSelected(file: File) {
       recalculateGrandTotal();
       hasResult.value = true;
     } else {
-      errorMessage.value = data.message || 'Gagal memproses pemindaian berkas struk.';
+      errorMessage.value =
+        data.message ||
+        data.error ||
+        (data.errors ? Object.values(data.errors).flat().join(', ') : '') ||
+        'Gagal memproses pemindaian berkas struk. Pastikan berkas struk terbaca jelas.';
     }
   } catch (err: any) {
-    errorMessage.value = 'Terjadi gangguan jaringan saat mengunggah struk: ' + (err.message || 'Koneksi gagal');
+    if (err?.name === 'AbortError') {
+      errorMessage.value = 'Waktu proses pemindaian struk melebihi batas (timeout 45 detik). Silakan coba unggah kembali dengan foto struk yang lebih fokus atau terang.';
+    } else {
+      errorMessage.value = 'Terjadi gangguan jaringan saat mengunggah struk: ' + (err.message || 'Koneksi gagal');
+    }
   } finally {
+    clearTimeout(timeoutId);
     isProcessing.value = false;
   }
 }
