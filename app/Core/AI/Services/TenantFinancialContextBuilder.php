@@ -54,16 +54,21 @@ class TenantFinancialContextBuilder
                 $savingsSummary[] = "- {$s->name}: " . MoneyHelper::formatIdr($s->current_amount_minor) . " dari target " . MoneyHelper::formatIdr($s->target_amount_minor) . " ({$pct}%)";
             }
 
-            // 4. Pengingat Mendatang
-            $reminders = FinanceReminder::where('tenant_id', $tenantId)
-                ->where('status', 'pending')
+            // 4. Pengingat & Tagihan Mendatang / Tertunda
+            $unpaidReminders = FinanceReminder::where('tenant_id', $tenantId)
+                ->whereIn('status', ['pending', 'overdue'])
                 ->orderBy('due_date', 'asc')
-                ->limit(5)
                 ->get();
 
+            $totalPendingTagihanMinor = (int) $unpaidReminders->sum('amount_minor');
+            $totalTagihanCount = $unpaidReminders->count();
+
             $remindersSummary = [];
-            foreach ($reminders as $r) {
-                $remindersSummary[] = "- {$r->title}: jatuh tempo {$r->due_date}, nominal " . MoneyHelper::formatIdr($r->amount_minor ?? 0);
+            foreach ($unpaidReminders as $r) {
+                $dueDateStr = $r->due_date ? \Carbon\Carbon::parse($r->due_date)->format('d M Y') : 'Tanpa tanggal';
+                $tenorInfo = ($r->total_tenor && $r->current_tenor) ? " (Cicilan {$r->current_tenor}/{$r->total_tenor})" : '';
+                $statusLabel = $r->status === 'overdue' ? ' [Jatuh Tempo Terlewat]' : ' [Belum Dibayar]';
+                $remindersSummary[] = "- {$r->title}{$tenorInfo}: jatuh tempo {$dueDateStr}, nominal " . MoneyHelper::formatIdr((int) ($r->amount_minor ?? 0)) . "{$statusLabel}";
             }
 
             // 5. Transaksi Terbaru (5 terakhir)
@@ -120,8 +125,11 @@ class TenantFinancialContextBuilder
             $contextText .= "TARGET TABUNGAN AKTIF:\n";
             $contextText .= empty($savingsSummary) ? "Belum ada pos tabungan.\n\n" : implode("\n", $savingsSummary) . "\n\n";
 
-            $contextText .= "PENGINGAT JATUH TEMPO:\n";
-            $contextText .= empty($remindersSummary) ? "Tidak ada tagihan tertunda.\n\n" : implode("\n", $remindersSummary) . "\n\n";
+            $contextText .= "RINGKASAN TOTAL TAGIHAN & PENGINGAT (BILLS & REMINDERS):\n";
+            $contextText .= "- Total Tagihan Tertunda/Belum Dibayar: " . MoneyHelper::formatIdr($totalPendingTagihanMinor) . "\n";
+            $contextText .= "- Jumlah Tagihan Menunggu Pembayaran: {$totalTagihanCount} tagihan\n";
+            $contextText .= "Rincian Tagihan:\n";
+            $contextText .= empty($remindersSummary) ? "Tidak ada tagihan tertunda (seluruh tagihan lunas atau belum ada jadwal tagihan).\n\n" : implode("\n", $remindersSummary) . "\n\n";
 
             $contextText .= "TRANSAKSI TERBARU:\n";
             $contextText .= empty($transactionsSummary) ? "Belum ada riwayat transaksi.\n" : implode("\n", $transactionsSummary) . "\n";
@@ -189,6 +197,13 @@ class TenantFinancialContextBuilder
         $prompt .= "- 'date': tanggal transaksi (format YYYY-MM-DD, sesuaikan jika pengguna menyebut kemarin atau tanggal lain, default ke tanggal hari ini).\n";
         $prompt .= "- 'category': nama kategori terdekat dari daftar kategori atau pos anggaran yang tersedia (sangat penting: utamakan memilih nama kategori yang memiliki pos anggaran aktif agar pengeluaran terhitung ke anggaran).\n";
         $prompt .= "PENTING: Blok ```json:transaction_action``` HANYA boleh disertakan jika pengguna secara eksplisit meminta memasukkan / mencatat transaksi. DILARANG menyertakannya jika pengguna hanya bertanya informasi, saldo, atau konsultasi.\n\n";
+
+        $prompt .= "=== PANDUAN MENJAWAB PERTANYAAN TAGIHAN & PENGINGAT (BILLS & REMINDERS) ===\n";
+        $prompt .= "1. Jika pengguna bertanya tentang total tagihan (contoh: 'berapa total tagihan saya?', 'ada tagihan apa saja?', 'rincian tagihan', 'tagihan bulan ini'):\n";
+        $prompt .= "   - Jawablah dengan menyebutkan angka Total Tagihan Belum Dibayar yang tertera di bagian 'RINGKASAN TOTAL TAGIHAN & PENGINGAT' secara jelas dalam format Rupiah (Rp).\n";
+        $prompt .= "   - Rincikan masing-masing tagihan dengan nama tagihan, tanggal jatuh tempo, dan nominalnya.\n";
+        $prompt .= "   - Jika tidak ada tagihan yang tertunda, sampaikan secara ramah bahwa seluruh tagihan sudah lunas atau belum ada pengingat tagihan yang dijadwalkan.\n";
+        $prompt .= "2. LARANGAN: Pertanyaan seputar tagihan ('berapa total tagihan', 'ada tagihan apa saja') adalah konsultasi informasi. DILARANG KERAS menyertakan blok ```json:transaction_action``` saat menjawab pertanyaan seputar tagihan, KECUALI pengguna secara eksplisit menginstruksikan untuk mencatat pembayaran/pelunasan tagihan tersebut ke sistem mutasi pengeluaran.\n\n";
 
         if ($customInstructions) {
             $prompt .= "INSTRUKSI KHUSUS RUANG KERJA:\n" . trim($customInstructions) . "\n\n";

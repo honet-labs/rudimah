@@ -221,12 +221,18 @@ async function handleSendMessage(promptText?: string) {
         conv.title = text.slice(0, 35) + (text.length > 35 ? '...' : '');
       }
     } else {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({}));
+      const errorMsg =
+        err?.message ||
+        err?.error ||
+        err?.detail ||
+        (err?.errors ? Object.values(err.errors).flat().join(', ') : '') ||
+        'Terjadi kesalahan saat memproses jawaban asisten.';
       messages.value.push({
         id: 'err-' + Date.now(),
         conversation_id: currentConvId,
         role: 'assistant',
-        content: err.message || 'Terjadi kesalahan saat memproses jawaban asisten.',
+        content: errorMsg,
         created_at: new Date().toISOString(),
       });
     }

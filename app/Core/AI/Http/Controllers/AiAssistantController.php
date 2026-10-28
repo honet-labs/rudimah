@@ -219,9 +219,16 @@ class AiAssistantController
                 'reply' => $assistantMessage,
             ]);
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('[AiAssistantController] sendMessage exception: ' . $e->getMessage(), [
+                'exception' => $e,
+                'conversation_id' => $id,
+                'message' => $validated['message'] ?? null,
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memproses pesan: ' . $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 422);
         }
     }

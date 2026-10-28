@@ -210,6 +210,10 @@ class TenantAssistantService
             ];
         }
 
+        if (empty(trim($replyContent))) {
+            $replyContent = "Maaf, asisten tidak menghasilkan respon yang dapat ditampilkan. Silakan coba ajukan pertanyaan kembali.";
+        }
+
         // 6. Deteksi dan Eksekusi Pencatatan Transaksi Nyata ke Database
         $recordedTransactions = [];
         [$parsedActions, $cleanedReply] = $this->extractTransactionActions($replyContent, $userMessageText);
@@ -282,6 +286,16 @@ class TenantAssistantService
      */
     protected function extractTransactionActions(string $replyContent, string $userMessageText): array
     {
+        // 0. Cegah pencatatan mutasi transaksi jika pesan pengguna jelas berupa pertanyaan informasional (misal: "berapa tagihan...", "apa saja...", "info...", "daftar...")
+        $isInformationalQuery = (bool) preg_match('/^\s*(berapa|apa|apakah|kapan|cek|info|lihat|tampilkan|daftar)\b/i', $userMessageText)
+            && !preg_match('/\b(catat|masuk|simpan|input|buatkan mutasi|bayar)\b/i', $userMessageText);
+
+        if ($isInformationalQuery) {
+            // Bersihkan blok kode JSON action jika model AI keliru menyertakannya saat menjawab pertanyaan informasi
+            $cleaned = preg_replace('/```(?:json:transaction_action|json)?\s*(\[\s*\{.*?\}\s*\]|\{\s*"type"\s*:.*?\}\s*)\s*```/is', '', $replyContent);
+            return [[], trim($cleaned ?: $replyContent)];
+        }
+
         // 1. Ekstraksi Primer: Blok ```json:transaction_action ... ``` atau ```json ... ```
         if (preg_match('/```(?:json:transaction_action|json)?\s*(\[\s*\{.*?\}\s*\])\s*```/is', $replyContent, $matches)) {
             $parsed = json_decode($matches[1], true);
@@ -366,7 +380,7 @@ class TenantAssistantService
         }
 
         // 2. Pola skrip atau kode bahasa pemrograman spesifik (seperti "script login form dari python")
-        if (preg_match('/\b(script|skrip|koding|kode)\b.*\b(python|javascript|php|golang|java|c\+\+|html|css|bash|powershell|sql|react|vue|node)\b/i', $normalized)) {
+        if (preg_match('/\b(script|skrip|koding|kode)\b.*(?:\b(python|javascript|php|golang|java|html|css|bash|powershell|sql|react|vue|node)\b|c\+\+)/i', $normalized)) {
             return true;
         }
 
