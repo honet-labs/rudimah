@@ -190,6 +190,8 @@ async function saveConfirmedTransaction() {
   } finally {
     isSaving.value = false;
   }
+}
+
 const categoryOptions = computed(() => {
   return (props.categories || []).map(c => ({ label: c.name, value: c.id }));
 });
