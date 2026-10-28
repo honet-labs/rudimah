@@ -355,13 +355,13 @@ onMounted(() => {
     :no-padding="true"
   >
     <div class="flex-1 min-h-0 flex flex-col h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
-      <!-- Top Subheader (Compact h-12) -->
-      <div class="h-12 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+      <!-- Top Subheader -->
+      <div class="min-h-12 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0">
+        <div class="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
           <!-- Mobile toggle riwayat percakapan -->
           <button
             type="button"
-            class="md:hidden p-1.5 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
+            class="md:hidden p-1.5 rounded-md text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
             @click="isHistoryDrawerOpen = !isHistoryDrawerOpen"
             title="Buka Riwayat Percakapan"
           >
@@ -370,37 +370,48 @@ onMounted(() => {
             </svg>
           </button>
 
-          <h1 class="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 truncate flex items-center gap-2">
-            <span>Asisten Cerdas Ruang Kerja</span>
+          <h1 class="text-xs sm:text-sm md:text-base font-bold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
+            <span class="sm:hidden">Asisten AI</span>
+            <span class="hidden sm:inline">Asisten Cerdas Ruang Kerja</span>
             <RdInfoTooltip
               text="Konsultasi finansial interaktif, ringkasan arus kas, dan analisis keuangan cerdas terisolasi khusus ruang kerja ini"
               size="sm"
               title="Informasi Asisten AI"
             />
           </h1>
-          <RdBadge variant="neutral" size="sm" class="hidden sm:inline-flex shrink-0">
+
+          <RdBadge variant="neutral" size="sm" class="hidden lg:inline-flex shrink-0">
             Konteks: {{ tenant.name }}
           </RdBadge>
-          <RdBadge :variant="settings.is_custom ? 'warning' : 'neutral'" size="sm" class="hidden md:inline-flex shrink-0">
+          <RdBadge :variant="settings.is_custom ? 'warning' : 'neutral'" size="sm" class="hidden xl:inline-flex shrink-0">
             {{ settings.is_custom ? `Kredensial Kustom: ${formSettings.provider.toUpperCase()}` : `AI: Administrasi Sistem (${(platform_config?.provider || formSettings.provider).toUpperCase()})` }}
           </RdBadge>
         </div>
 
-        <div class="flex items-center gap-2 shrink-0">
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <RdButton
             v-if="can_manage_settings"
             variant="outline"
             size="sm"
             @click="isSettingsModalOpen = true"
+            class="text-xs"
+            title="Pengaturan Integrasi AI"
           >
-            Pengaturan AI
+            <svg class="w-3.5 h-3.5 sm:mr-1 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span class="hidden sm:inline">Pengaturan AI</span>
           </RdButton>
+
           <RdButton
             variant="primary"
             size="sm"
             @click="startNewConversation"
+            class="text-xs"
           >
-            + Percakapan Baru
+            <span>+ Baru</span>
+            <span class="hidden sm:inline">&nbsp;Percakapan</span>
           </RdButton>
         </div>
       </div>
@@ -441,7 +452,7 @@ onMounted(() => {
               v-if="conversationsList.length === 0"
               class="p-4 text-center text-xs text-slate-400"
             >
-              Belum ada percakapan aktif. Klik tombol "+ Percakapan Baru" untuk memulai.
+              Belum ada percakapan aktif. Klik tombol "+ Baru" untuk memulai.
             </div>
 
             <div
@@ -474,13 +485,13 @@ onMounted(() => {
 
         <!-- Area Pesan & Dialog -->
         <section aria-label="Percakapan Asisten AI" class="flex-1 min-w-0 flex flex-col bg-slate-50 dark:bg-slate-950 h-full overflow-hidden">
-          <!-- Banner Keamanan Tenant (Compact) -->
-          <div class="p-2.5 px-4 bg-slate-100/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between shrink-0">
-            <div class="truncate mr-2">
+          <!-- Banner Keamanan Tenant (Compact & Responsive) -->
+          <div class="py-2 px-3 sm:px-4 bg-slate-100/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between shrink-0">
+            <div class="leading-normal">
               <span class="font-semibold text-slate-800 dark:text-slate-200">Proteksi Keamanan Aktif:</span>
-              Asisten dibatasi ketat dan terisolasi pada konteks ruang kerja ini.
+              Asisten dibatasi ketat pada konteks ruang kerja ini.
             </div>
-            <span class="text-[11px] text-slate-400 shrink-0 hidden sm:inline">Fail-Closed Context</span>
+            <span class="text-[10px] text-slate-400 shrink-0 hidden md:inline ml-2">Fail-Closed Context</span>
           </div>
 
           <!-- Message List -->
