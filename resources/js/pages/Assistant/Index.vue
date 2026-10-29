@@ -384,7 +384,7 @@ onMounted(() => {
             Konteks: {{ tenant.name }}
           </RdBadge>
           <RdBadge :variant="settings.is_custom ? 'warning' : 'neutral'" size="sm" class="hidden xl:inline-flex shrink-0">
-            {{ settings.is_custom ? `Kredensial Kustom: ${formSettings.provider.toUpperCase()}` : `AI: Administrasi Sistem (${(platform_config?.provider || formSettings.provider).toUpperCase()})` }}
+            {{ settings.is_custom ? 'Konfigurasi: Mandiri Ruang Kerja' : 'Konfigurasi: Administrasi Sistem' }}
           </RdBadge>
         </div>
 
@@ -535,7 +535,7 @@ onMounted(() => {
               ]"
             >
               <div class="text-[11px] font-medium text-slate-400 mb-1 px-1">
-                {{ msg.role === 'user' ? 'Anda' : 'Asisten RUDIMAH (' + formSettings.provider.toUpperCase() + ')' }}
+                {{ msg.role === 'user' ? 'Anda' : 'Asisten RUDIMAH' }}
               </div>
               <div
                 :class="[
