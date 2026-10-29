@@ -172,7 +172,7 @@ const txColumns = [
               <RdDateTime :value="value" format="date" />
             </template>
             <template #category_name="{ value }">
-              <RdBadge variant="neutral">{{ value }}</RdBadge>
+              <span class="text-xs text-slate-600 dark:text-slate-400">{{ value }}</span>
             </template>
             <template #amount_minor="{ item }">
               <span :class="item.type === 'income' ? 'text-teal-800 dark:text-teal-300 font-bold' : 'text-slate-800 dark:text-slate-100 font-semibold'">

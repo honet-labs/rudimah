@@ -173,12 +173,12 @@ const columns = [
           :options="typeOptions"
           @update:model-value="applyFilter(1)"
         />
-        <div class="flex items-center gap-2">
-          <RdButton type="submit" variant="secondary" size="md" class="w-full">
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+          <RdButton type="submit" variant="secondary" size="md" class="w-full h-10 whitespace-nowrap justify-center">
             Terapkan Filter
           </RdButton>
-          <a :href="`/t/${tenant.slug}/apps/pekan/reports`">
-            <RdButton type="button" variant="outline" size="md">
+          <a :href="`/t/${tenant.slug}/apps/pekan/reports`" class="w-full flex">
+            <RdButton type="button" variant="outline" size="md" class="w-full h-10 whitespace-nowrap justify-center">
               Ekspor
             </RdButton>
           </a>
@@ -223,13 +223,18 @@ const columns = [
           </template>
 
           <template #category_name="{ value }">
-            <RdBadge variant="neutral">{{ value || 'Tanpa Kategori' }}</RdBadge>
+            <span class="text-xs text-slate-700 dark:text-slate-300">
+              {{ value || 'Tanpa Kategori' }}
+            </span>
           </template>
 
           <template #type="{ value }">
-            <RdBadge :variant="value === 'income' ? 'success' : (value === 'savings' ? 'info' : 'neutral')">
+            <span
+              class="text-xs font-medium"
+              :class="value === 'income' ? 'text-teal-700 dark:text-teal-400' : (value === 'savings' ? 'text-sky-700 dark:text-sky-400' : 'text-slate-700 dark:text-slate-300')"
+            >
               {{ value === 'income' ? 'Pemasukan' : (value === 'savings' ? 'Tabungan' : 'Pengeluaran') }}
-            </RdBadge>
+            </span>
           </template>
 
           <template #items="{ item }">
@@ -344,20 +349,23 @@ const columns = [
                 {{ item.merchant_name }}
               </div>
             </div>
-            <div class="flex flex-col items-end gap-1 shrink-0">
-              <RdBadge :variant="item.type === 'income' ? 'success' : (item.type === 'savings' ? 'info' : 'neutral')" class="text-[10px] py-0 px-1.5">
+            <div class="flex flex-col items-end shrink-0 text-right space-y-0.5">
+              <span
+                class="text-xs font-semibold"
+                :class="item.type === 'income' ? 'text-teal-700 dark:text-teal-400' : (item.type === 'savings' ? 'text-sky-700 dark:text-sky-400' : 'text-slate-800 dark:text-slate-200')"
+              >
                 {{ item.type === 'income' ? 'Pemasukan' : (item.type === 'savings' ? 'Tabungan' : 'Pengeluaran') }}
-              </RdBadge>
-              <RdBadge variant="neutral" class="text-[10px] py-0 px-1.5">
+              </span>
+              <span class="text-[11px] text-slate-500 dark:text-slate-400">
                 {{ item.category_name || 'Tanpa Kategori' }}
-              </RdBadge>
+              </span>
             </div>
           </div>
 
           <!-- Baris 2: Rincian Barang / Keterangan Belanja -->
           <div v-if="item.items && item.items.length > 0" class="p-2.5 rounded bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs space-y-1">
             <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-              <span>Item Belanja ({{ item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) }} pcs)</span>
+              <span>Item Belanja ({{ Math.round(item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0)) }} pcs)</span>
               <button
                 v-if="item.items.length > 1"
                 type="button"
@@ -376,7 +384,7 @@ const columns = [
               class="flex justify-between items-center text-xs"
             >
               <span class="text-slate-700 dark:text-slate-300 truncate max-w-[200px]" :title="it.item_name">
-                {{ it.item_name }} <span class="text-slate-400">×{{ it.quantity || 1 }}</span>
+                {{ it.item_name }} <span class="text-slate-400">×{{ parseFloat(it.quantity) || 1 }}</span>
               </span>
               <span class="font-medium text-slate-800 dark:text-slate-200">
                 <RdMoney :amount-minor="it.total_minor || ((it.price_minor || 0) * (it.quantity || 1))" />
@@ -425,13 +433,13 @@ const columns = [
 
           <!-- Baris 4: Aksi Mobile (Rincian, Ubah, Hapus) -->
           <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" class="block w-full">
-              <RdButton variant="outline" size="sm" type="button" class="w-full justify-center">
+            <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" class="w-full flex h-8">
+              <RdButton variant="outline" size="sm" type="button" class="w-full h-8 justify-center text-xs">
                 Rincian
               </RdButton>
             </a>
-            <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" class="block w-full">
-              <RdButton variant="outline" size="sm" type="button" class="w-full justify-center">
+            <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" class="w-full flex h-8">
+              <RdButton variant="outline" size="sm" type="button" class="w-full h-8 justify-center text-xs">
                 Ubah
               </RdButton>
             </a>
@@ -439,7 +447,8 @@ const columns = [
               variant="danger"
               size="sm"
               type="button"
-              class="w-full justify-center"
+              class="w-full h-8 justify-center text-xs"
+              title="Hapus Transaksi"
               @click.stop="confirmDelete(item)"
             >
               Hapus

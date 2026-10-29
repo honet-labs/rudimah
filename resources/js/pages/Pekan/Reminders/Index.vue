@@ -212,8 +212,8 @@ function statusLabel(status?: string): string {
 
     <!-- Konten Daftar Pengingat -->
     <div v-if="reminders && reminders.length > 0">
-      <!-- 1. Tampilan Desktop & Tablet (Tabel Lengkap) -->
-      <div class="hidden sm:block">
+      <!-- 1. Tampilan Desktop & Tablet Lebar (Tabel Lengkap) -->
+      <div class="hidden lg:block">
         <RdCard padding>
           <RdTable :columns="columns" :items="reminders">
             <!-- 1. ID Tagihan -->
@@ -262,9 +262,9 @@ function statusLabel(status?: string): string {
 
             <!-- 3. Kategori -->
             <template #category_name="{ item }">
-              <RdBadge variant="neutral">
+              <span class="text-xs text-slate-700 dark:text-slate-300">
                 {{ item.category_name || item.category?.name || 'Tanpa Kategori' }}
-              </RdBadge>
+              </span>
             </template>
 
             <!-- 4. Tanggal Jatuh Tempo -->
@@ -338,7 +338,7 @@ function statusLabel(status?: string): string {
       </div>
 
       <!-- 2. Tampilan Khusus Ponsel / Mobile (Stack Card) -->
-      <div class="sm:hidden space-y-3 w-full">
+      <div class="lg:hidden space-y-3 w-full">
         <div
           v-for="rem in reminders"
           :key="rem.id"
@@ -350,14 +350,15 @@ function statusLabel(status?: string): string {
                 <button
                   type="button"
                   @click.stop="copyId(rem.id)"
-                  class="font-mono text-[11px] text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 select-all"
+                  class="font-mono text-[11px] text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 select-all cursor-pointer"
                   :title="rem.id"
                 >
                   #{{ rem.id ? rem.id.substring(0, 8) : '-' }}
                 </button>
-                <RdBadge variant="neutral" class="text-[10px] py-0 px-1.5">
+                <span class="text-slate-300 dark:text-slate-700">·</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400 font-normal">
                   {{ rem.category_name || rem.category?.name || 'Tanpa Kategori' }}
-                </RdBadge>
+                </span>
               </div>
               <h4 class="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
                 {{ rem.title }}
@@ -375,7 +376,7 @@ function statusLabel(status?: string): string {
               :key="idx"
               type="button"
               @click="openPreview(img.url, `${rem.title} - Berkas ${idx + 1}`)"
-              class="relative rounded border border-slate-200 dark:border-slate-700 overflow-hidden w-11 h-11 bg-slate-100 dark:bg-slate-800 shrink-0 hover:opacity-90 transition-opacity"
+              class="relative rounded border border-slate-200 dark:border-slate-700 overflow-hidden w-11 h-11 bg-slate-100 dark:bg-slate-800 shrink-0 hover:opacity-90 transition-opacity cursor-pointer"
             >
               <img :src="img.url" :alt="img.name || 'Bukti tagihan'" class="w-full h-full object-cover" />
             </button>
@@ -406,23 +407,23 @@ function statusLabel(status?: string): string {
 
           <!-- Aksi Mobile: Ubah, Delete, Rincian, Bayar, Riwayat -->
           <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <RdButton variant="primary" size="sm" class="w-full" @click="openPayModal(rem)">
+            <RdButton variant="primary" size="sm" class="w-full h-8 justify-center text-xs" @click="openPayModal(rem)">
               Bayar
             </RdButton>
-            <RdButton variant="secondary" size="sm" class="w-full" @click="openHistory(rem)">
+            <RdButton variant="secondary" size="sm" class="w-full h-8 justify-center text-xs" @click="openHistory(rem)">
               Riwayat{{ rem.payments && rem.payments.length > 0 ? ` (${rem.payments.length})` : '' }}
             </RdButton>
           </div>
           <div class="grid grid-cols-3 gap-2">
-            <RdButton variant="outline" size="sm" class="w-full" @click="openDetail(rem)">
+            <RdButton variant="outline" size="sm" class="w-full h-8 justify-center text-xs" @click="openDetail(rem)">
               Rincian
             </RdButton>
-            <a :href="`/t/${tenantSlug}/apps/pekan/reminders/${rem.id}/edit`" class="block w-full">
-              <RdButton variant="outline" size="sm" class="w-full">
+            <a :href="`/t/${tenantSlug}/apps/pekan/reminders/${rem.id}/edit`" class="w-full flex h-8">
+              <RdButton variant="outline" size="sm" class="w-full h-8 justify-center text-xs">
                 Ubah
               </RdButton>
             </a>
-            <RdButton variant="danger" size="sm" class="w-full" @click="confirmDelete(rem)">
+            <RdButton variant="danger" size="sm" class="w-full h-8 justify-center text-xs" @click="confirmDelete(rem)">
               Hapus
             </RdButton>
           </div>
