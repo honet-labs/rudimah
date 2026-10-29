@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import RudimahAppShell from '../../layouts/RudimahAppShell.vue';
 import RdButton from '../../design-system/RdButton.vue';
 import RdInput from '../../design-system/RdInput.vue';
@@ -91,6 +91,14 @@ const formSettings = ref({
 });
 const isSavingSettings = ref(false);
 const settingsAlert = ref<{ type: 'success' | 'error'; message: string } | null>(null);
+
+const isAiConnected = computed(() => {
+  if (props.settings.is_enabled === false) return false;
+  if (useCustom.value || props.settings.is_custom) {
+    return Boolean(props.settings.has_custom_key || formSettings.value.api_key);
+  }
+  return Boolean(props.platform_config?.is_configured || props.platform_config?.has_api_key);
+});
 
 const quickPrompts = [
   'Ringkas total pemasukan dan pengeluaran bulan ini',
@@ -383,8 +391,14 @@ onMounted(() => {
           <RdBadge variant="neutral" size="sm" class="hidden lg:inline-flex shrink-0">
             Konteks: {{ tenant.name }}
           </RdBadge>
-          <RdBadge :variant="settings.is_custom ? 'warning' : 'neutral'" size="sm" class="hidden xl:inline-flex shrink-0">
-            {{ settings.is_custom ? 'Konfigurasi: Mandiri Ruang Kerja' : 'Konfigurasi: Administrasi Sistem' }}
+          <RdBadge
+            :variant="isAiConnected ? 'success' : 'danger'"
+            size="sm"
+            class="hidden sm:inline-flex shrink-0 items-center gap-1.5"
+            :title="isAiConnected ? 'Layanan AI terhubung dan siap digunakan' : 'Layanan AI belum terhubung atau kunci API belum dikonfigurasi'"
+          >
+            <span :class="['w-1.5 h-1.5 rounded-full inline-block shrink-0', isAiConnected ? 'bg-teal-600 dark:bg-teal-400' : 'bg-red-500']"></span>
+            <span>Status AI: {{ isAiConnected ? 'Connected' : 'No Connect' }}</span>
           </RdBadge>
         </div>
 
