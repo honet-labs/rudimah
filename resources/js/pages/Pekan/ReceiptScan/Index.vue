@@ -392,7 +392,7 @@ const categoryOptions = computed(() => {
             <RdInput
               id="ocr_description"
               v-model="extraction.description"
-              label="Keterangan Transaksi"
+              label="Nama Transaksi"
               placeholder="Contoh: Makan siang, Belanja ATK, dsb."
               required
             />

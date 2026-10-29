@@ -96,6 +96,18 @@ const itemColumns = [
               </button>
             </div>
             <div>
+              <dt class="text-slate-500 font-medium">Nama Transaksi</dt>
+              <dd class="text-slate-800 dark:text-slate-100 font-semibold mt-0.5">
+                {{ transaction.description || '-' }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-slate-500 font-medium">Nama Toko / Merchant</dt>
+              <dd class="text-slate-800 dark:text-slate-100 font-medium mt-0.5">
+                {{ transaction.merchant_name || 'Tidak dicantumkan' }}
+              </dd>
+            </div>
+            <div>
               <dt class="text-slate-500 font-medium">Tanggal Transaksi</dt>
               <dd class="text-slate-800 dark:text-slate-100 font-semibold mt-0.5">
                 <RdDateTime :value="transaction.transaction_date" format="date" />
@@ -113,12 +125,6 @@ const itemColumns = [
               <dt class="text-slate-500 font-medium">Kategori</dt>
               <dd class="text-slate-800 dark:text-slate-100 font-medium mt-0.5">
                 {{ transaction.category_name || 'Tanpa Kategori' }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-slate-500 font-medium">Nama Toko / Merchant</dt>
-              <dd class="text-slate-800 dark:text-slate-100 font-medium mt-0.5">
-                {{ transaction.merchant_name || 'Tidak dicantumkan' }}
               </dd>
             </div>
             <div>

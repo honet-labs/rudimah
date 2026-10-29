@@ -33,7 +33,12 @@ class TransactionController
         }
 
         if ($request->filled('search')) {
-            $query->where('description', 'like', '%' . $request->search . '%');
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', '%' . $search . '%')
+                  ->orWhere('merchant_name', 'like', '%' . $search . '%')
+                  ->orWhere('id', 'like', '%' . $search . '%');
+            });
         }
 
         $transactions = $query->paginate(20)->withQueryString();

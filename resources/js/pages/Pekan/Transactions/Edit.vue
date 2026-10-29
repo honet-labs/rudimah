@@ -199,6 +199,16 @@ function handleSubmit() {
               </div>
             </div>
 
+            <div class="sm:col-span-2">
+              <RdInput
+                id="description"
+                v-model="description"
+                label="Nama Transaksi"
+                placeholder="Contoh: Makan Siang, Belanja Mingguan Superindo"
+                required
+              />
+            </div>
+
             <RdInput
               id="transaction_date"
               v-model="transactionDate"
@@ -213,16 +223,6 @@ function handleSubmit() {
               label="Kategori Transaksi"
               :options="categoryOptions"
             />
-
-            <div class="sm:col-span-2">
-              <RdInput
-                id="description"
-                v-model="description"
-                label="Keterangan Ringkas"
-                placeholder="Contoh: Belanja bahan dapur mingguan"
-                required
-              />
-            </div>
 
             <RdInput
               id="merchant_name"

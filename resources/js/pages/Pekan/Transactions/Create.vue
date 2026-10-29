@@ -118,7 +118,17 @@ function handleSubmit() {
 
     <form @submit.prevent="handleSubmit" class="space-y-6 max-w-4xl">
       <!-- Data Transaksi Utama -->
-      <RdCard title="Informasi Transaksi">
+      <RdCard title="Informasi Transaksi" description="Informasi inti mutasi keuangan, merchant, dan kategori transaksi">
+        <div class="mb-4">
+          <RdInput
+            id="description"
+            v-model="description"
+            label="Nama Transaksi"
+            placeholder="Contoh: Makan Siang, Belanja Mingguan Superindo, Beli Bensin Pertamax"
+            required
+          />
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <RdSelect
             v-model="transactionType"
@@ -159,16 +169,6 @@ function handleSubmit() {
             v-model="receiptNumber"
             label="Nomor Kuitansi / Struk"
             placeholder="Contoh: STR-202610-09"
-          />
-        </div>
-
-        <div class="mt-4">
-          <RdInput
-            id="description"
-            v-model="description"
-            label="Keterangan Transaksi"
-            placeholder="Catatan ringkas tujuan mutasi dana"
-            required
           />
         </div>
       </RdCard>

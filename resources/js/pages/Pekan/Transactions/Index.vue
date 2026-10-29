@@ -109,6 +109,14 @@ function goToPage(page: number) {
   applyFilter(page);
 }
 
+const itemsModalOpen = ref(false);
+const selectedTransactionForItems = ref<Transaction | null>(null);
+
+function openItemsModal(tx: Transaction) {
+  selectedTransactionForItems.value = tx;
+  itemsModalOpen.value = true;
+}
+
 const typeOptions = [
   { label: 'Semua Jenis Mutasi', value: 'all' },
   { label: 'Pemasukan (Income)', value: 'income' },
@@ -117,15 +125,16 @@ const typeOptions = [
 ];
 
 const columns = [
-  { key: 'id', label: 'ID Transaksi', width: '120px' },
-  { key: 'transaction_date', label: 'Tanggal', width: '120px' },
-  { key: 'merchant_name', label: 'Nama Merchant' },
-  { key: 'category_name', label: 'Kategori', width: '130px' },
-  { key: 'type', label: 'Jenis Transaksi', width: '130px' },
-  { key: 'items', label: 'Item' },
+  { key: 'id', label: 'ID Transaksi', width: '100px' },
+  { key: 'transaction_date', label: 'Tanggal Transaksi', width: '130px' },
+  { key: 'merchant_name', label: 'Nama Merchant', width: '150px' },
+  { key: 'description', label: 'Nama Transaksi' },
+  { key: 'category_name', label: 'Kategori', width: '120px' },
+  { key: 'type', label: 'Jenis Transaksi', width: '120px' },
+  { key: 'items', label: 'Item', width: '170px' },
   { key: 'quantity', label: 'Quantity', width: '80px', align: 'center' as const },
   { key: 'amount_minor', label: 'Nominal', width: '130px', align: 'right' as const },
-  { key: 'images', label: 'Lampiran', width: '110px', align: 'center' as const },
+  { key: 'images', label: 'Lampiran', width: '100px', align: 'center' as const },
   { key: 'actions', label: 'Aksi', width: '210px', align: 'center' as const },
 ];
 </script>
@@ -202,8 +211,14 @@ const columns = [
           </template>
 
           <template #merchant_name="{ item }">
-            <span class="font-medium text-slate-800 dark:text-slate-100 text-xs block truncate max-w-[160px]" :title="item.merchant_name || item.description">
-              {{ item.merchant_name || item.description?.replace(/^Struk Belanja:\s*/i, '') || '-' }}
+            <span class="text-slate-700 dark:text-slate-300 text-xs block truncate max-w-[150px]" :title="item.merchant_name || '-'">
+              {{ item.merchant_name || '-' }}
+            </span>
+          </template>
+
+          <template #description="{ item }">
+            <span class="font-medium text-slate-800 dark:text-slate-100 text-xs block truncate max-w-[200px]" :title="item.description || '-'">
+              {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : '-' }}
             </span>
           </template>
 
@@ -218,16 +233,25 @@ const columns = [
           </template>
 
           <template #items="{ item }">
-            <div v-if="item.items && item.items.length > 0" class="text-xs space-y-0.5 max-w-[180px]">
+            <div v-if="item.items && item.items.length > 0" class="text-xs space-y-0.5 max-w-[170px]">
               <span class="text-slate-800 dark:text-slate-200 block truncate" :title="item.items[0].item_name">
                 {{ item.items[0].item_name }}
               </span>
-              <span v-if="item.items.length > 1" class="text-[11px] text-slate-400 block">
-                +{{ item.items.length - 1 }} item lainnya
-              </span>
+              <button
+                v-if="item.items.length > 1"
+                type="button"
+                @click.stop="openItemsModal(item)"
+                class="text-[11px] text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 font-medium inline-flex items-center gap-1 hover:underline cursor-pointer group"
+                title="Klik untuk melihat rincian seluruh item belanja"
+              >
+                <span>+{{ item.items.length - 1 }} item lainnya</span>
+                <svg class="w-3 h-3 text-teal-600 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
             </div>
-            <span v-else class="text-xs text-slate-600 dark:text-slate-400 block truncate max-w-[180px]" :title="item.description">
-              {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : '-' }}
+            <span v-else class="text-xs text-slate-400 block truncate max-w-[170px]">
+              -
             </span>
           </template>
 
@@ -314,8 +338,11 @@ const columns = [
                 </span>
               </div>
               <h4 class="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
-                {{ item.merchant_name || item.description?.replace(/^Struk Belanja:\s*/i, '') || '-' }}
+                {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : (item.merchant_name || '-') }}
               </h4>
+              <div v-if="item.merchant_name && item.merchant_name !== item.description" class="text-xs text-slate-500 font-medium">
+                {{ item.merchant_name }}
+              </div>
             </div>
             <div class="flex flex-col items-end gap-1 shrink-0">
               <RdBadge :variant="item.type === 'income' ? 'success' : (item.type === 'savings' ? 'info' : 'neutral')" class="text-[10px] py-0 px-1.5">
@@ -329,8 +356,19 @@ const columns = [
 
           <!-- Baris 2: Rincian Barang / Keterangan Belanja -->
           <div v-if="item.items && item.items.length > 0" class="p-2.5 rounded bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs space-y-1">
-            <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-              Item Belanja ({{ item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) }} pcs)
+            <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+              <span>Item Belanja ({{ item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) }} pcs)</span>
+              <button
+                v-if="item.items.length > 1"
+                type="button"
+                @click.stop="openItemsModal(item)"
+                class="text-[11px] text-teal-700 dark:text-teal-400 hover:underline font-semibold lowercase cursor-pointer inline-flex items-center gap-0.5"
+              >
+                <span>lihat semua ({{ item.items.length }})</span>
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
             </div>
             <div
               v-for="(it, idx) in item.items.slice(0, 3)"
@@ -344,8 +382,15 @@ const columns = [
                 <RdMoney :amount-minor="it.total_minor || ((it.price_minor || 0) * (it.quantity || 1))" />
               </span>
             </div>
-            <div v-if="item.items.length > 3" class="text-[11px] text-slate-400 font-medium pt-1 border-t border-slate-200 dark:border-slate-700">
-              +{{ item.items.length - 3 }} item lainnya
+            <div v-if="item.items.length > 3">
+              <button
+                type="button"
+                @click.stop="openItemsModal(item)"
+                class="w-full text-left text-[11px] text-teal-700 dark:text-teal-400 hover:text-teal-800 font-medium pt-1 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between cursor-pointer"
+              >
+                <span>+{{ item.items.length - 3 }} item lainnya</span>
+                <span class="text-[10px] font-semibold">Buka Rincian →</span>
+              </button>
             </div>
           </div>
           <div v-else-if="item.description && item.description !== item.merchant_name" class="text-xs text-slate-500 dark:text-slate-400">
@@ -496,6 +541,115 @@ const columns = [
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </a>
+        </div>
+      </div>
+    </RdModal>
+
+    <!-- Modal Rincian Item Transaksi Multi-Item -->
+    <RdModal
+      v-model="itemsModalOpen"
+      :title="`Rincian Item Transaksi - #${selectedTransactionForItems?.id ? selectedTransactionForItems.id.substring(0, 8) : ''}`"
+      max-width="2xl"
+    >
+      <div v-if="selectedTransactionForItems" class="space-y-4">
+        <!-- Header Ringkasan Transaksi -->
+        <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div>
+            <span class="block text-[11px] text-slate-500 font-medium">Nama Transaksi</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-100 truncate block mt-0.5" :title="selectedTransactionForItems.description">
+              {{ selectedTransactionForItems.description || '-' }}
+            </span>
+          </div>
+          <div>
+            <span class="block text-[11px] text-slate-500 font-medium">Nama Merchant</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-100 truncate block mt-0.5" :title="selectedTransactionForItems.merchant_name">
+              {{ selectedTransactionForItems.merchant_name || '-' }}
+            </span>
+          </div>
+          <div>
+            <span class="block text-[11px] text-slate-500 font-medium">Tanggal Transaksi</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-100 block mt-0.5">
+              <RdDateTime :value="selectedTransactionForItems.transaction_date" format="date" />
+            </span>
+          </div>
+          <div>
+            <span class="block text-[11px] text-slate-500 font-medium">Total Nilai</span>
+            <span class="font-bold text-teal-800 dark:text-teal-300 block mt-0.5">
+              <RdMoney :amount-minor="selectedTransactionForItems.amount_minor" />
+            </span>
+          </div>
+        </div>
+
+        <!-- Tabel Rincian Item -->
+        <div class="border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto">
+          <table class="w-full text-xs text-left min-w-[500px]">
+            <thead class="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-700">
+              <tr>
+                <th class="py-2 px-3 text-center w-10">#</th>
+                <th class="py-2 px-3">Nama Barang / Item</th>
+                <th class="py-2 px-3 text-center w-20">Qty</th>
+                <th class="py-2 px-3 text-right w-28">Harga Satuan</th>
+                <th class="py-2 px-3 text-right w-24">Diskon</th>
+                <th class="py-2 px-3 text-right w-32">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+              <tr
+                v-for="(it, idx) in selectedTransactionForItems.items || []"
+                :key="idx"
+                class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+              >
+                <td class="py-2 px-3 text-center text-slate-400 font-mono">{{ idx + 1 }}</td>
+                <td class="py-2 px-3 font-medium text-slate-800 dark:text-slate-200">
+                  {{ it.item_name }}
+                  <span v-if="it.notes" class="block text-[11px] text-slate-400 font-normal">{{ it.notes }}</span>
+                </td>
+                <td class="py-2 px-3 text-center font-mono font-medium text-slate-700 dark:text-slate-300">
+                  {{ it.quantity || 1 }}
+                </td>
+                <td class="py-2 px-3 text-right font-mono text-slate-700 dark:text-slate-300">
+                  <RdMoney :amount-minor="it.price_minor || 0" />
+                </td>
+                <td class="py-2 px-3 text-right font-mono text-slate-500">
+                  <RdMoney v-if="it.discount_minor" :amount-minor="it.discount_minor" />
+                  <span v-else class="text-slate-400">-</span>
+                </td>
+                <td class="py-2 px-3 text-right font-mono font-semibold text-slate-800 dark:text-slate-100">
+                  <RdMoney :amount-minor="it.total_minor || ((it.price_minor || 0) * (it.quantity || 1))" />
+                </td>
+              </tr>
+            </tbody>
+            <tfoot class="bg-slate-50 dark:bg-slate-800/70 border-t border-slate-200 dark:border-slate-700 font-semibold text-xs">
+              <tr>
+                <td colspan="2" class="py-2.5 px-3 text-slate-700 dark:text-slate-300">
+                  Total ({{ selectedTransactionForItems.items?.length || 0 }} baris item)
+                </td>
+                <td class="py-2.5 px-3 text-center font-mono">
+                  {{ selectedTransactionForItems.items?.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) || 0 }}
+                </td>
+                <td colspan="2"></td>
+                <td class="py-2.5 px-3 text-right font-mono text-teal-800 dark:text-teal-300 font-bold">
+                  <RdMoney :amount-minor="selectedTransactionForItems.amount_minor" />
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Tombol Tutup & Navigasi Rincian Penuh -->
+        <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+          <a
+            :href="`/t/${tenantSlug}/apps/pekan/transactions/${selectedTransactionForItems.id}`"
+            class="text-xs text-teal-700 dark:text-teal-400 font-semibold hover:underline inline-flex items-center gap-1"
+          >
+            <span>Buka Rincian Lengkap & Faktur</span>
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </a>
+          <RdButton variant="secondary" size="sm" type="button" @click="itemsModalOpen = false">
+            Tutup
+          </RdButton>
         </div>
       </div>
     </RdModal>
