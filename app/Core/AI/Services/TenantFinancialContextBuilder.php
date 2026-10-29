@@ -153,6 +153,7 @@ class TenantFinancialContextBuilder
         $tenantName = $tenant ? $tenant->name : 'Ruang Kerja Terisolasi';
         $tenantId = $tenant ? $tenant->id : 'unknown';
         $todayDate = now()->toDateString();
+        $todayFormatted = now()->format('d M Y');
 
         $prompt = "=== IDENTITAS DAN PERAN RESMI ASISTEN ===\n";
         $prompt .= "Anda adalah Asisten Cerdas RUDIMAH resmi yang melayani Ruang Kerja '{$tenantName}' (ID: {$tenantId}).\n";
@@ -182,18 +183,23 @@ class TenantFinancialContextBuilder
         $prompt .= "=== KEMAMPUAN AKSI TRANSAKSI (CREATE vs UPDATE vs DELETE) ===\n";
         $prompt .= "ATURAN KLASIFIKASI INTENT MUTLAK:\n";
         $prompt .= "1. PENCATATAN TRANSAKSI BARU (CREATE - DEFAULT UTAMA):\n";
-        $prompt .= "   - Jika pengguna berniat mencatat, menambah, menginput, atau melaporkan pengeluaran/pemasukan baru (contoh: 'tolong catat, tadi makan siang makai soto betawi 30rb di kantin kemendagri', 'catat bensin 50rb', 'masukin belanja 100rb di indomaret', 'tambah pemasukan gaji 5jt'):\n";
+        $prompt .= "   - Jika pengguna berniat mencatat, menambah, menginput, atau melaporkan pengeluaran/pemasukan baru (contoh: 'tolong catat, tadi makan siang makai soto betawi 30rb di kantin kemendagri', 'catat bensin 50rb', 'beli mie 6 bungkus harganya 4500 beli roti 3 satuan 4000 di warung madura'):\n";
         $prompt .= "   - ANDA WAJIB MENGGUNAKAN action: \"create\".\n";
         $prompt .= "   - JANGAN PERNAH MENGGUNAKAN action \"update\" untuk instruksi pencatatan transaksi baru!\n";
         $prompt .= "   - ATURAN INTEGRITAS DATA: Seseorang wajar makan siang, membeli kopi, atau bertransaksi beberapa kali dalam sehari dengan nominal atau kategori serupa. Kemiripan nama, nominal, atau kategori dengan transaksi sebelumnya BUKANLAH duplikat dan BUKAN alasan untuk memperbarui/meng-overwrite transaksi lama! Transaksi baru WAJIB dicatat sebagai 'create'.\n";
+        $prompt .= "   - PENCATATAN MULTI-ITEM / RINCIAN BARANG:\n";
+        $prompt .= "     Jika pengguna menyebutkan beberapa item sekaligus dengan jumlah dan harga (contoh: mie 6 bungkus @ 4500, roti 3 @ 4000, stick kentang 20rb):\n";
+        $prompt .= "     * Hitung total seluruh belanjaan secara akurat dan masukkan ke 'amount_minor'.\n";
+        $prompt .= "     * Masukkan rincian setiap barang ke dalam array 'items' (item_name, quantity, price_minor, total_minor).\n";
+        $prompt .= "     * Masukkan nama toko/warung pada 'merchant_name' (misal: 'Warung Madura').\n";
         $prompt .= "   - KETENTUAN FIELD JSON:\n";
-        $prompt .= "     * \"description\": Deskripsi lengkap dan detail yang mencerminkan nama transaksi dan item secara utuh. JANGAN memotong atau menyingkat rincian penting! (contoh: \"Makan siang soto betawi di kantin kemendagri\").\n";
-        $prompt .= "     * \"merchant_name\": Nama toko, warung, vendor, penyedia, atau tempat jika disebutkan (contoh: \"Kantin Kemendagri\", \"Indomaret\"). Jika tidak disebutkan, isi null.\n";
-        $prompt .= "     * \"amount_minor\": Nominal integer Rupiah (contoh: 30000 untuk 30rb).\n";
+        $prompt .= "     * \"description\": Deskripsi lengkap dan detail yang mencerminkan nama transaksi dan keperluan secara utuh (contoh: \"Beli makanan di Warung Madura\").\n";
+        $prompt .= "     * \"merchant_name\": Nama toko, warung, vendor, penyedia, atau tempat jika disebutkan (contoh: \"Warung Madura\", \"Indomaret\"). Jika tidak disebutkan, isi null.\n";
+        $prompt .= "     * \"amount_minor\": Total nominal belanja integer Rupiah (misal: 59000).\n";
         $prompt .= "     * \"date\": Tanggal transaksi format YYYY-MM-DD (contoh: \"{$todayDate}\").\n";
         $prompt .= "     * \"type\": \"expense\" untuk pengeluaran, \"income\" untuk pemasukan.\n";
-        $prompt .= "     * \"category\": Kategori paling relevan dari daftar kategori ruang kerja.\n";
-        $prompt .= "     * \"items\": Array item jika ada rincian yang disebutkan pengguna (contoh: [{\"item_name\": \"Soto Betawi\", \"quantity\": 1, \"price_minor\": 30000, \"total_minor\": 30000}]).\n\n";
+        $prompt .= "     * \"category\": Kategori paling relevan dari daftar kategori ruang kerja (misal: \"Makanan & Minuman\" atau \"Belanja Kebutuhan\").\n";
+        $prompt .= "     * \"items\": Array item jika ada rincian yang disebutkan pengguna.\n\n";
         $prompt .= "   Format blok JSON create:\n";
         $prompt .= "```json:transaction_action\n";
         $prompt .= "[\n";

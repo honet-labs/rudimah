@@ -295,16 +295,21 @@ class TenantAssistantService
 
                     // Ekstraksi / Pembentukan Baris Item Transaksi
                     $items = [];
+                    $calculatedItemsTotal = 0;
                     if (!empty($action['items']) && is_array($action['items'])) {
                         foreach ($action['items'] as $item) {
                             $itemName = trim($item['item_name'] ?? $item['name'] ?? $item['deskripsi'] ?? '');
                             if (!empty($itemName)) {
                                 $itemQty = max(1, (int) ($item['quantity'] ?? $item['qty'] ?? 1));
                                 $itemPrice = (int) ($item['price_minor'] ?? $item['price'] ?? 0);
-                                if ($itemPrice <= 0 && $itemQty > 0) {
+                                if ($itemPrice <= 0 && $itemQty > 0 && count($action['items']) === 1) {
                                     $itemPrice = (int) round($amountMinor / $itemQty);
                                 }
                                 $itemTotal = (int) ($item['total_minor'] ?? ($itemPrice * $itemQty));
+                                if ($itemTotal <= 0 && $itemPrice > 0) {
+                                    $itemTotal = $itemPrice * $itemQty;
+                                }
+                                $calculatedItemsTotal += $itemTotal;
                                 $items[] = [
                                     'item_name' => $itemName,
                                     'quantity' => $itemQty,
@@ -314,6 +319,11 @@ class TenantAssistantService
                                 ];
                             }
                         }
+                    }
+
+                    // Sinkronisasi nominal transaksi jika model mengembalikan daftar item
+                    if ($calculatedItemsTotal > 0 && ($amountMinor <= 0 || $amountMinor < $calculatedItemsTotal)) {
+                        $amountMinor = $calculatedItemsTotal;
                     }
                     if (empty($items) && $amountMinor > 0) {
                         $cleanItemName = $description;
