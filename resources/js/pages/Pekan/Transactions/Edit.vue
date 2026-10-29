@@ -238,7 +238,8 @@ function handleSubmit() {
               placeholder="Contoh: STR-20261025-001"
             />
           </div>
-        </RdCard>
+        </div>
+      </RdCard>
 
         <!-- Baris Item Belanja -->
         <RdCard title="Rincian Baris Barang">
