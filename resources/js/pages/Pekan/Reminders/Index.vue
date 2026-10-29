@@ -43,7 +43,7 @@ const columns = [
   { key: 'due_date', label: 'Tanggal Jatuh Tempo', width: '150px' },
   { key: 'tenor', label: 'Tenor', width: '110px', align: 'center' as const },
   { key: 'amount_minor', label: 'Nominal', width: '140px', align: 'right' as const },
-  { key: 'actions', label: 'Aksi', width: '340px', align: 'center' as const },
+  { key: 'actions', label: 'Aksi', width: '180px', align: 'center' as const },
 ];
 
 // Salin ID Tagihan
@@ -287,50 +287,60 @@ function statusLabel(status?: string): string {
               </span>
             </template>
 
-            <!-- 7. Aksi (ubah, delete, rincian, bayar, riwayat) -->
+            <!-- 7. Aksi (2 baris: Baris 1 Pembayaran & Riwayat, Baris 2 Manajemen) -->
             <template #actions="{ item }">
-              <div class="flex items-center justify-center gap-1.5 flex-nowrap">
-                <a :href="`/t/${tenantSlug}/apps/pekan/reminders/${item.id}/edit`" title="Ubah Tagihan">
-                  <RdButton variant="outline" size="sm" type="button">
-                    Ubah
+              <div class="flex flex-col gap-1 w-full max-w-[170px] mx-auto py-0.5">
+                <!-- Baris 1: Aksi Utama Pembayaran (Bayar & Riwayat) -->
+                <div class="grid grid-cols-2 gap-1 w-full">
+                  <RdButton
+                    variant="primary"
+                    size="sm"
+                    type="button"
+                    class="w-full !px-1.5 !py-0.5 text-[11px] h-6 justify-center"
+                    title="Bayar Tagihan"
+                    @click.stop="openPayModal(item)"
+                  >
+                    Bayar
                   </RdButton>
-                </a>
-                <RdButton
-                  variant="danger"
-                  size="sm"
-                  type="button"
-                  title="Hapus Tagihan"
-                  @click.stop="confirmDelete(item)"
-                >
-                  Hapus
-                </RdButton>
-                <RdButton
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  title="Rincian Tagihan"
-                  @click.stop="openDetail(item)"
-                >
-                  Rincian
-                </RdButton>
-                <RdButton
-                  variant="primary"
-                  size="sm"
-                  type="button"
-                  title="Bayar Tagihan"
-                  @click.stop="openPayModal(item)"
-                >
-                  Bayar
-                </RdButton>
-                <RdButton
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  title="Riwayat Pembayaran Tagihan"
-                  @click.stop="openHistory(item)"
-                >
-                  Riwayat{{ item.payments && item.payments.length > 0 ? ` (${item.payments.length})` : '' }}
-                </RdButton>
+                  <RdButton
+                    variant="secondary"
+                    size="sm"
+                    type="button"
+                    class="w-full !px-1.5 !py-0.5 text-[11px] h-6 justify-center"
+                    title="Riwayat Pembayaran Tagihan"
+                    @click.stop="openHistory(item)"
+                  >
+                    Riwayat{{ item.payments && item.payments.length > 0 ? ` (${item.payments.length})` : '' }}
+                  </RdButton>
+                </div>
+                <!-- Baris 2: Manajemen Tagihan (Rincian, Ubah, Hapus) -->
+                <div class="grid grid-cols-3 gap-1 w-full">
+                  <RdButton
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    class="w-full !px-1 !py-0.5 text-[11px] h-6 justify-center"
+                    title="Rincian Tagihan"
+                    @click.stop="openDetail(item)"
+                  >
+                    Rincian
+                  </RdButton>
+                  <a :href="`/t/${tenantSlug}/apps/pekan/reminders/${item.id}/edit`" title="Ubah Tagihan" class="w-full flex">
+                    <RdButton variant="outline" size="sm" type="button" class="w-full !px-1 !py-0.5 text-[11px] h-6 justify-center">
+                      Ubah
+                    </RdButton>
+                  </a>
+                  <RdButton
+                    variant="danger"
+                    size="sm"
+                    type="button"
+                    class="w-full !px-1 !py-0.5 text-[11px] h-6 justify-center"
+                    title="Hapus Tagihan"
+                    @click.stop="confirmDelete(item)"
+                  >
+                    Hapus
+                  </RdButton>
+                </div>
               </div>
             </template>
           </RdTable>

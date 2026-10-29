@@ -135,7 +135,7 @@ const columns = [
   { key: 'quantity', label: 'Quantity', width: '80px', align: 'center' as const },
   { key: 'amount_minor', label: 'Nominal', width: '130px', align: 'right' as const },
   { key: 'images', label: 'Lampiran', width: '100px', align: 'center' as const },
-  { key: 'actions', label: 'Aksi', width: '210px', align: 'center' as const },
+  { key: 'actions', label: 'Aksi', width: '125px', align: 'center' as const },
 ];
 </script>
 
@@ -292,22 +292,27 @@ const columns = [
           </template>
 
           <template #actions="{ item }">
-            <div class="flex items-center justify-center gap-1.5 flex-nowrap">
-              <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" title="Rincian Transaksi">
-                <RdButton variant="outline" size="sm" type="button">
-                  Rincian
-                </RdButton>
-              </a>
-              <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" title="Ubah Transaksi">
-                <RdButton variant="outline" size="sm" type="button">
-                  Ubah
-                </RdButton>
-              </a>
+            <div class="flex flex-col gap-1 w-full max-w-[115px] mx-auto py-0.5">
+              <!-- Baris 1: Rincian & Ubah -->
+              <div class="grid grid-cols-2 gap-1 w-full">
+                <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" title="Rincian Transaksi" class="w-full flex">
+                  <RdButton variant="outline" size="sm" type="button" class="w-full !px-1 !py-0.5 text-[11px] h-6 justify-center">
+                    Rincian
+                  </RdButton>
+                </a>
+                <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" title="Ubah Transaksi" class="w-full flex">
+                  <RdButton variant="outline" size="sm" type="button" class="w-full !px-1 !py-0.5 text-[11px] h-6 justify-center">
+                    Ubah
+                  </RdButton>
+                </a>
+              </div>
+              <!-- Baris 2: Hapus -->
               <RdButton
                 variant="danger"
                 size="sm"
                 type="button"
                 title="Hapus Transaksi"
+                class="w-full !px-1.5 !py-0.5 text-[11px] h-6 justify-center"
                 @click.stop="confirmDelete(item)"
               >
                 Hapus
@@ -431,18 +436,20 @@ const columns = [
             </div>
           </div>
 
-          <!-- Baris 4: Aksi Mobile (Rincian, Ubah, Hapus) -->
-          <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" class="w-full flex h-8">
-              <RdButton variant="outline" size="sm" type="button" class="w-full h-8 justify-center text-xs">
-                Rincian
-              </RdButton>
-            </a>
-            <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" class="w-full flex h-8">
-              <RdButton variant="outline" size="sm" type="button" class="w-full h-8 justify-center text-xs">
-                Ubah
-              </RdButton>
-            </a>
+          <!-- Baris 4: Aksi Mobile (2 Baris: Rincian & Ubah di baris 1, Hapus di baris 2) -->
+          <div class="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div class="grid grid-cols-2 gap-2">
+              <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" class="w-full flex h-8">
+                <RdButton variant="outline" size="sm" type="button" class="w-full h-8 justify-center text-xs">
+                  Rincian
+                </RdButton>
+              </a>
+              <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" class="w-full flex h-8">
+                <RdButton variant="outline" size="sm" type="button" class="w-full h-8 justify-center text-xs">
+                  Ubah
+                </RdButton>
+              </a>
+            </div>
             <RdButton
               variant="danger"
               size="sm"
@@ -451,7 +458,7 @@ const columns = [
               title="Hapus Transaksi"
               @click.stop="confirmDelete(item)"
             >
-              Hapus
+              Hapus Transaksi
             </RdButton>
           </div>
         </div>
