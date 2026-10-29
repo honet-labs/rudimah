@@ -605,6 +605,7 @@ onMounted(() => {
                         {{ tx.type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}
                       </span>
                       <span class="text-slate-800 dark:text-slate-200 font-medium truncate">{{ tx.description }}</span>
+                      <span v-if="tx.merchant_name && !tx.description.toLowerCase().includes(tx.merchant_name.toLowerCase())" class="text-[10px] text-slate-500 font-normal shrink-0">({{ tx.merchant_name }})</span>
                       <span v-if="tx.date" class="text-[10px] text-slate-400 shrink-0 font-mono">({{ tx.date }})</span>
                     </div>
                     <div class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">

@@ -10,6 +10,7 @@ use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Models\FinanceTransaction;
 use App\Modules\Pekan\Services\TransactionService;
+use App\Shared\Helpers\MoneyHelper;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -184,10 +185,12 @@ class TenantAssistantService
                     $desc = $t['description'] ?? 'Transaksi';
                     $id = $t['id'] ?? '';
                     $date = $t['date'] ?? '';
-                    $amt = $t['amount_minor'] ?? 0;
-                    $summaryList[] = "ID: {$id} ({$desc}, Rp {$amt}, {$date})";
+                    $merchant = !empty($t['merchant_name']) ? " di {$t['merchant_name']}" : '';
+                    $amt = MoneyHelper::formatIdr((int) ($t['amount_minor'] ?? 0));
+                    $act = $t['action'] ?? 'dicatat';
+                    $summaryList[] = "ID: {$id} ({$desc}{$merchant}, {$amt}, {$date}, status: {$act})";
                 }
-                $content .= "\n[Info Sistem: Transaksi yang baru dicatat: " . implode('; ', $summaryList) . "]";
+                $content .= "\n[Info Sistem: Mutasi yang diproses: " . implode('; ', $summaryList) . "]";
             }
 
             $messagesPayload[] = [
@@ -233,17 +236,103 @@ class TenantAssistantService
         $recordedTransactions = [];
         [$parsedActions, $cleanedReply] = $this->extractTransactionActions($replyContent, $userMessageText);
 
-        $isCorrectionIntent = (bool) preg_match('/\b(salah|rubah|ubah|ralat|koreksi|ganti|edit|revisi|bukan\b.*?\btapi)\b/i', $userMessageText);
-        $isDeleteIntent = (bool) preg_match('/\b(hapus|batalkan|delete)\s+(transaksi|mutasi|catatan)\b/i', $userMessageText);
+        $userMessageTrimmed = trim($userMessageText);
+        $isCorrectionIntent = (bool) preg_match('/\b(salah|rubah|ubah|ralat|koreksi|ganti|edit|revisi|bukan\b.*?\btapi)\b/i', $userMessageTrimmed);
+        $isDeleteIntent = (bool) preg_match('/\b(hapus|batalkan|delete)\s+(transaksi|mutasi|catatan)\b/i', $userMessageTrimmed);
+        $isExplicitCreate = (bool) preg_match('/\b(catat|tambah|masuk(?:in|kan)?|simpan|input|buatkan|tadi\s+(?:makan|beli|minum|jajan|belanja)|beli|makan|bayar)\b/i', $userMessageTrimmed);
 
         if (!empty($parsedActions)) {
             foreach ($parsedActions as $action) {
                 try {
-                    $actionType = strtolower($action['action'] ?? ($isDeleteIntent ? 'delete' : ($isCorrectionIntent ? 'update' : 'create')));
+                    $rawAction = strtolower($action['action'] ?? '');
+                    if ($isDeleteIntent) {
+                        $actionType = 'delete';
+                    } elseif ($isCorrectionIntent && !$isExplicitCreate) {
+                        $actionType = 'update';
+                    } elseif ($isExplicitCreate && !$isCorrectionIntent) {
+                        // Pengguna secara eksplisit meminta pencatatan baru, abaikan halusinasi 'update' dari AI
+                        $actionType = 'create';
+                    } elseif (!empty($rawAction)) {
+                        $actionType = $rawAction;
+                    } else {
+                        $actionType = 'create';
+                    }
 
                     $amountMinor = (int) ($action['amount_minor'] ?? 0);
                     if ($amountMinor <= 0 && !empty($action['amount'])) {
                         $amountMinor = (int) round((float) $action['amount']);
+                    }
+
+                    // Resolusi Nama Merchant / Tempat
+                    $merchantName = $action['merchant_name'] ?? $action['merchant'] ?? $action['toko'] ?? $action['tempat'] ?? $action['store'] ?? null;
+                    if (empty($merchantName)) {
+                        $searchSource = ($action['description'] ?? '') . ' ' . $userMessageTrimmed;
+                        if (preg_match('/\bdi\s+([A-Za-z0-9\s]{2,35}?)(?:\s+(?:sebesar|seharga|senilai|\d|rp|\,|$|\.))/i', $searchSource, $mMatch)) {
+                            $candidate = trim($mMatch[1]);
+                            if (!preg_match('/^(hari|sini|situ|sana|atas|bawah|dalam|luar|kemarin|tadi)$/i', $candidate)) {
+                                $merchantName = ucwords($candidate);
+                            }
+                        }
+                    }
+
+                    // Resolusi Deskripsi Lengkap
+                    $description = trim($action['description'] ?? '');
+                    if (empty($description) || in_array(strtolower($description), ['transaksi', 'makan', 'makan siang', 'makan malam', 'makan pagi', 'pengeluaran'])) {
+                        if (preg_match('/(?:makan\s+(?:siang|pagi|malam)?\s*(?:makai|pakai|menu)?\s*)([A-Za-z0-9\s]{2,40}?)(?:\s+(?:sebesar|seharga|senilai|\d|rp|di\b|$))/i', $userMessageTrimmed, $dMatch)) {
+                            $dishName = trim($dMatch[1]);
+                            if (!empty($dishName)) {
+                                $prefix = preg_match('/makan\s+(siang|malam|pagi)/i', $userMessageTrimmed, $pm) ? ucwords($pm[0]) . ' ' : 'Makan ';
+                                $description = $prefix . $dishName;
+                            }
+                        }
+                    }
+                    if (!empty($merchantName) && stripos($description, $merchantName) === false) {
+                        $description .= ' di ' . $merchantName;
+                    }
+                    if (empty($description)) {
+                        $description = 'Pengeluaran via Asisten AI';
+                    }
+
+                    // Ekstraksi / Pembentukan Baris Item Transaksi
+                    $items = [];
+                    if (!empty($action['items']) && is_array($action['items'])) {
+                        foreach ($action['items'] as $item) {
+                            $itemName = trim($item['item_name'] ?? $item['name'] ?? $item['deskripsi'] ?? '');
+                            if (!empty($itemName)) {
+                                $itemQty = max(1, (int) ($item['quantity'] ?? $item['qty'] ?? 1));
+                                $itemPrice = (int) ($item['price_minor'] ?? $item['price'] ?? 0);
+                                if ($itemPrice <= 0 && $itemQty > 0) {
+                                    $itemPrice = (int) round($amountMinor / $itemQty);
+                                }
+                                $itemTotal = (int) ($item['total_minor'] ?? ($itemPrice * $itemQty));
+                                $items[] = [
+                                    'item_name' => $itemName,
+                                    'quantity' => $itemQty,
+                                    'price_minor' => $itemPrice,
+                                    'total_minor' => $itemTotal,
+                                    'discount_minor' => 0,
+                                ];
+                            }
+                        }
+                    }
+                    if (empty($items) && $amountMinor > 0) {
+                        $cleanItemName = $description;
+                        if ($merchantName) {
+                            $cleanItemName = trim(preg_replace('/\s+di\s+' . preg_quote($merchantName, '/') . '/i', '', $cleanItemName));
+                        }
+                        if (preg_match('/(?:makan\s+(?:siang|pagi|malam)?\s*(?:makai|pakai|menu)?\s*)([A-Za-z0-9\s]{2,35}?)(?:\s+(?:sebesar|seharga|senilai|\d|rp|di\b|$))/i', $userMessageTrimmed, $imMatch)) {
+                            $candidateItem = trim($imMatch[1]);
+                            if (!empty($candidateItem)) {
+                                $cleanItemName = ucwords($candidateItem);
+                            }
+                        }
+                        $items[] = [
+                            'item_name' => $cleanItemName ?: 'Transaksi',
+                            'quantity' => 1,
+                            'price_minor' => $amountMinor,
+                            'total_minor' => $amountMinor,
+                            'discount_minor' => 0,
+                        ];
                     }
 
                     // A. AKSI PENGHAPUSAN TRANSAKSI
@@ -257,18 +346,20 @@ class TenantAssistantService
                                 })->first();
                         }
                         if (!$targetTx) {
-                            $targetTx = $this->resolveLastRecordedTransaction($conversation->id, $tenantId, $action['description'] ?? null);
+                            $targetTx = $this->resolveLastRecordedTransaction($conversation->id, $tenantId, $description);
                         }
                         if ($targetTx) {
                             $deletedDesc = $targetTx->description;
+                            $deletedMerchant = $targetTx->merchant_name;
                             $deletedAmount = $targetTx->amount_minor;
-                            $deletedDate = (string) $targetTx->transaction_date;
+                            $deletedDate = $targetTx->transaction_date ? \Carbon\Carbon::parse($targetTx->transaction_date)->format('Y-m-d') : now()->toDateString();
                             $targetTx->delete();
                             $recordedTransactions[] = [
                                 'id' => $targetTx->id,
                                 'action' => 'deleted',
                                 'type' => $targetTx->type,
                                 'description' => $deletedDesc,
+                                'merchant_name' => $deletedMerchant,
                                 'amount_minor' => $deletedAmount,
                                 'date' => $deletedDate,
                             ];
@@ -287,7 +378,7 @@ class TenantAssistantService
                                 })->first();
                         }
                         if (!$targetTx) {
-                            $targetTx = $this->resolveLastRecordedTransaction($conversation->id, $tenantId, $action['description'] ?? null);
+                            $targetTx = $this->resolveLastRecordedTransaction($conversation->id, $tenantId, $description);
                         }
 
                         if ($targetTx) {
@@ -298,8 +389,11 @@ class TenantAssistantService
                             if ($amountMinor > 0) {
                                 $updatePayload['amount_minor'] = $amountMinor;
                             }
-                            if (!empty($action['description'])) {
-                                $updatePayload['description'] = $action['description'];
+                            if (!empty($description)) {
+                                $updatePayload['description'] = $description;
+                            }
+                            if (!empty($merchantName)) {
+                                $updatePayload['merchant_name'] = $merchantName;
                             }
                             if (!empty($action['category'])) {
                                 $updatePayload['category'] = $action['category'];
@@ -308,15 +402,17 @@ class TenantAssistantService
                                 $updatePayload['type'] = strtolower($action['type']);
                             }
 
-                            $updatedTx = $this->transactionService->updateTransaction($targetTx, $updatePayload);
+                            $updatedTx = $this->transactionService->updateTransaction($targetTx, $updatePayload, $items);
+                            $formattedDate = $updatedTx->transaction_date ? \Carbon\Carbon::parse($updatedTx->transaction_date)->format('Y-m-d') : now()->toDateString();
 
                             $recordedTransactions[] = [
                                 'id' => $updatedTx->id,
                                 'action' => 'updated',
                                 'type' => $updatedTx->type,
                                 'description' => $updatedTx->description,
+                                'merchant_name' => $updatedTx->merchant_name,
                                 'amount_minor' => $updatedTx->amount_minor,
-                                'date' => (string) $updatedTx->transaction_date,
+                                'date' => $formattedDate,
                             ];
                             continue;
                         }
@@ -336,19 +432,23 @@ class TenantAssistantService
                     $tx = $this->transactionService->createTransaction([
                         'type' => $type,
                         'amount_minor' => $amountMinor,
-                        'description' => $action['description'] ?? 'Transaksi via Asisten AI',
+                        'description' => $description,
+                        'merchant_name' => $merchantName,
                         'category' => $action['category'] ?? null,
                         'transaction_date' => $action['date'] ?? now()->toDateString(),
                         'notes' => 'Dicatat secara otomatis melalui Asisten AI',
-                    ]);
+                    ], $items);
+
+                    $formattedDate = $tx->transaction_date ? \Carbon\Carbon::parse($tx->transaction_date)->format('Y-m-d') : now()->toDateString();
 
                     $recordedTransactions[] = [
                         'id' => $tx->id,
                         'action' => 'created',
                         'type' => $tx->type,
                         'description' => $tx->description,
+                        'merchant_name' => $tx->merchant_name,
                         'amount_minor' => $tx->amount_minor,
-                        'date' => (string) $tx->transaction_date,
+                        'date' => $formattedDate,
                     ];
                 } catch (\Throwable $e) {
                     Log::error('[TenantAssistantService] Gagal mengeksekusi aksi transaksi dari AI: ' . $e->getMessage());
@@ -359,8 +459,18 @@ class TenantAssistantService
                 $meta['recorded_transactions'] = $recordedTransactions;
                 $replyContent = $cleanedReply;
 
+                $hasCreate = collect($recordedTransactions)->contains('action', 'created');
                 $hasUpdate = collect($recordedTransactions)->contains('action', 'updated');
                 $hasDelete = collect($recordedTransactions)->contains('action', 'deleted');
+
+                // Jika aksi adalah pencatatan baru (create), pastikan tidak ada teks salah "Deskripsi diperbarui" atau "diperbarui"
+                if ($hasCreate && !$hasUpdate) {
+                    $replyContent = preg_replace('/(?:Deskripsi|Transaksi)\s+diperbarui\s*:/i', 'Transaksi berhasil dicatat:', $replyContent);
+                    $replyContent = preg_replace('/berhasil\s+diperbarui/i', 'berhasil dicatat', $replyContent);
+                }
+
+                // Bersihkan kalimat matematika janggal/halusinasi jika ada (seperti "Total dua transaksi Rp 30.000 untuk hari ini")
+                $replyContent = preg_replace('/\s*Total\s+(?:dua|tiga|\d+)\s+transaksi\s+Rp\s*[\d\.,]+\s+untuk\s+hari\s+ini\.?/i', '', $replyContent);
 
                 if ($hasUpdate) {
                     $replyContent = preg_replace('/Transaksi\s+dicatat\s*:/i', 'Transaksi berhasil diperbarui:', $replyContent);
@@ -373,8 +483,9 @@ class TenantAssistantService
                         $replyContent = "Transaksi berhasil dihapus dari daftar mutasi.";
                     }
                 } elseif (empty(trim($replyContent))) {
-                    $count = count($recordedTransactions);
-                    $replyContent = "Transaksi berhasil dicatat ke dalam daftar mutasi ({$count} transaksi).";
+                    $firstTx = $recordedTransactions[0];
+                    $nominalFormatted = 'Rp ' . number_format($firstTx['amount_minor'] ?? 0, 0, ',', '.');
+                    $replyContent = "Transaksi '{$firstTx['description']}' sebesar {$nominalFormatted} telah berhasil dicatat ke dalam sistem.";
                 }
             }
         }
@@ -400,12 +511,15 @@ class TenantAssistantService
      */
     protected function extractTransactionActions(string $replyContent, string $userMessageText): array
     {
-        // 0. Cegah pencatatan mutasi transaksi jika pesan pengguna jelas berupa pertanyaan informasional (misal: "berapa tagihan...", "apa saja...", "info...", "daftar...")
+        // 0. Cegah pencatatan mutasi transaksi jika pesan pengguna jelas berupa pertanyaan informasional atau keluhan/pertanyaan klarifikasi
         $isInformationalQuery = (bool) preg_match('/^\s*(berapa|apa|apakah|kapan|cek|info|lihat|tampilkan|daftar)\b/i', $userMessageText)
             && !preg_match('/\b(catat|masuk|simpan|input|buatkan mutasi|bayar)\b/i', $userMessageText);
 
-        if ($isInformationalQuery) {
-            // Bersihkan blok kode JSON action jika model AI keliru menyertakannya saat menjawab pertanyaan informasi
+        $isNegatedOrQuestion = (bool) preg_match('/\b(belum|jangan|tidak|bukan|kok|kenapa|mengapa)\s+(?:pernah\s+)?(?:di)?(?:catat|simpan|masuk|input|perbarui|update)\b/i', $userMessageText)
+            && !preg_match('/\b(tolong\s+catat|sekarang\s+catat|catat\s+ulang|masukkan\s+ulang|buatkan\s+baru)\b/i', $userMessageText);
+
+        if ($isInformationalQuery || $isNegatedOrQuestion) {
+            // Bersihkan blok kode JSON action jika model AI keliru menyertakannya saat menjawab pertanyaan informasi atau klarifikasi
             $cleaned = preg_replace('/```(?:json:transaction_action|json)?\s*(\[\s*\{.*?\}\s*\]|\{\s*"type"\s*:.*?\}\s*)\s*```/is', '', $replyContent);
             return [[], trim($cleaned ?: $replyContent)];
         }
@@ -439,7 +553,7 @@ class TenantAssistantService
 
         // 4. Ekstraksi Kuartener (Fallback cerdas): Jika pengguna meminta pencatatan ("masukin/catat/simpan/input")
         // dan balasan asisten merinci baris-baris "- Item: Rp XX.XXX"
-        $isUserAskingToRecord = (bool) preg_match('/(masuk(?:in|kan)?|catat(?:kan)?|tambah(?:kan)?|simpan|input|buatkan mutasi)\b/i', $userMessageText);
+        $isUserAskingToRecord = !$isNegatedOrQuestion && (bool) preg_match('/(masuk(?:in|kan)?|catat(?:kan)?|tambah(?:kan)?|simpan|input|buatkan mutasi)\b/i', $userMessageText);
         if ($isUserAskingToRecord) {
             $transactions = [];
             if (preg_match_all('/^[\s*•-]*([A-Za-z0-9\s\/\(\)]+?)\s*:\s*(?:Rp\.?|IDR)?\s*([\d\.,]+)/mi', $replyContent, $lineMatches, PREG_SET_ORDER)) {
