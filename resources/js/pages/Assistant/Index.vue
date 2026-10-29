@@ -398,7 +398,7 @@ onMounted(() => {
             :title="isAiConnected ? 'Layanan AI terhubung dan siap digunakan' : 'Layanan AI belum terhubung atau kunci API belum dikonfigurasi'"
           >
             <span :class="['w-1.5 h-1.5 rounded-full inline-block shrink-0', isAiConnected ? 'bg-teal-600 dark:bg-teal-400' : 'bg-red-500']"></span>
-            <span>Status AI: {{ isAiConnected ? 'Connected' : 'No Connect' }}</span>
+            <span>Status AI: {{ isAiConnected ? 'Connected' : 'Not Connected' }}</span>
           </RdBadge>
         </div>
 
