@@ -62,7 +62,7 @@ function calculatePosition() {
 
   // Hitung posisi vertikal (buka ke bawah, atau ke atas jika ruang bawah tidak mencukupi)
   let top = rect.bottom + 8;
-  const popoverHeight = popoverRef.value ? popoverRef.value.getBoundingClientRect().height : 160;
+  const popoverHeight = popoverRef.value ? popoverRef.value.getBoundingClientRect().height : 140;
 
   if (rect.bottom + popoverHeight > screenHeight - margin && rect.top > popoverHeight + margin) {
     top = Math.max(margin, rect.top - popoverHeight - 8);
@@ -77,16 +77,25 @@ function calculatePosition() {
 }
 
 function open() {
+  if (hoverTimer) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+  }
+  calculatePosition();
   isOpen.value = true;
   nextTick(() => {
     calculatePosition();
-    nextTick(() => {
+    requestAnimationFrame(() => {
       calculatePosition();
     });
   });
 }
 
 function close() {
+  if (hoverTimer) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+  }
   isOpen.value = false;
 }
 
@@ -99,15 +108,13 @@ function toggle() {
 }
 
 function handleMouseEnter() {
-  if (window.innerWidth < 640) return; // Pada perangkat layar sentuh, gunakan interaksi tap
   if (hoverTimer) clearTimeout(hoverTimer);
   hoverTimer = setTimeout(() => {
     open();
-  }, 120);
+  }, 100);
 }
 
 function handleMouseLeave() {
-  if (window.innerWidth < 640) return;
   if (hoverTimer) clearTimeout(hoverTimer);
   hoverTimer = setTimeout(() => {
     close();
@@ -129,15 +136,20 @@ function handleKeydown(event: KeyboardEvent) {
 
 function handleScrollOrResize() {
   if (isOpen.value) {
-    if (window.innerWidth < 640) {
-      close();
-    } else {
-      calculatePosition();
-    }
+    calculatePosition();
   }
 }
 
+function handleDocumentClick(event: MouseEvent) {
+  if (!isOpen.value) return;
+  const target = event.target as Node;
+  if (triggerRef.value && triggerRef.value.contains(target)) return;
+  if (popoverRef.value && popoverRef.value.contains(target)) return;
+  close();
+}
+
 onMounted(() => {
+  document.addEventListener('click', handleDocumentClick);
   document.addEventListener('keydown', handleKeydown);
   window.addEventListener('resize', handleScrollOrResize);
   window.addEventListener('scroll', handleScrollOrResize, true);
@@ -145,6 +157,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (hoverTimer) clearTimeout(hoverTimer);
+  document.removeEventListener('click', handleDocumentClick);
   document.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('resize', handleScrollOrResize);
   window.removeEventListener('scroll', handleScrollOrResize, true);
@@ -163,8 +176,8 @@ onUnmounted(() => {
       :class="[
         'rounded-full inline-flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-700/30 shrink-0 select-none',
         size === 'sm'
-          ? 'w-4 h-4 text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800'
-          : 'w-5 h-5 text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800',
+          ? 'w-5 h-5 text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+          : 'w-6 h-6 text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800',
         isOpen ? 'text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 ring-1 ring-teal-700/30' : ''
       ]"
       :aria-label="title ? `Informasi: ${title}` : 'Informasi'"
@@ -172,7 +185,7 @@ onUnmounted(() => {
       @click.stop="toggle"
     >
       <svg
-        :class="size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'"
+        :class="size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -186,14 +199,6 @@ onUnmounted(() => {
 
     <!-- Popover Informasi (Teleported ke body untuk mencegah clipping/terpotong oleh overflow parent) -->
     <Teleport to="body">
-      <!-- Backdrop transparan untuk deteksi klik luar di mobile & desktop -->
-      <div
-        v-if="isOpen"
-        class="fixed inset-0 z-[9998] bg-transparent"
-        aria-hidden="true"
-        @click="close"
-      ></div>
-
       <Transition
         enter-active-class="transition duration-150 ease-out"
         enter-from-class="opacity-0 translate-y-1 scale-95"
@@ -206,7 +211,7 @@ onUnmounted(() => {
           v-if="isOpen"
           ref="popoverRef"
           :style="popoverStyle"
-          class="fixed z-[9999] rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-3 text-left font-normal normal-case tracking-normal cursor-default ring-1 ring-slate-950/5 dark:ring-slate-800/80"
+          class="fixed z-[99999] rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-3 text-left font-normal normal-case tracking-normal cursor-default ring-1 ring-slate-950/5 dark:ring-slate-800/80"
           role="tooltip"
           @mouseenter="cancelClose"
           @mouseleave="handleMouseLeave"
