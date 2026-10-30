@@ -13,6 +13,7 @@ import RdConfirmDialog from '../../../design-system/RdConfirmDialog.vue';
 import RdModal from '../../../design-system/RdModal.vue';
 import type { User, Tenant } from '../../../types/core';
 import type { Transaction } from '../../../types/pekan';
+import { formatQuantity } from '../../../utils/format';
 
 const props = defineProps<{
   user: User;
@@ -143,7 +144,7 @@ const itemColumns = [
         >
           <RdTable :columns="itemColumns" :items="transaction.items">
             <template #quantity="{ value }">
-              <span class="font-mono text-slate-700 dark:text-slate-300">{{ Number(value) || 1 }}</span>
+              <span class="font-mono text-slate-700 dark:text-slate-300">{{ formatQuantity(value) }}</span>
             </template>
             <template #price_minor="{ value }">
               <RdMoney :amount-minor="value" />

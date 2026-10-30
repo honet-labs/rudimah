@@ -300,14 +300,18 @@ class TenantAssistantService
                         foreach ($action['items'] as $item) {
                             $itemName = trim($item['item_name'] ?? $item['name'] ?? $item['deskripsi'] ?? '');
                             if (!empty($itemName)) {
-                                $itemQty = max(1, (int) ($item['quantity'] ?? $item['qty'] ?? 1));
+                                $rawQty = $item['quantity'] ?? $item['qty'] ?? 1;
+                                $itemQty = is_numeric($rawQty) ? (float) $rawQty : 1;
+                                if ($itemQty <= 0) {
+                                    $itemQty = 1;
+                                }
                                 $itemPrice = (int) ($item['price_minor'] ?? $item['price'] ?? 0);
                                 if ($itemPrice <= 0 && $itemQty > 0 && count($action['items']) === 1) {
                                     $itemPrice = (int) round($amountMinor / $itemQty);
                                 }
-                                $itemTotal = (int) ($item['total_minor'] ?? ($itemPrice * $itemQty));
+                                $itemTotal = (int) ($item['total_minor'] ?? round($itemPrice * $itemQty));
                                 if ($itemTotal <= 0 && $itemPrice > 0) {
-                                    $itemTotal = $itemPrice * $itemQty;
+                                    $itemTotal = (int) round($itemPrice * $itemQty);
                                 }
                                 $calculatedItemsTotal += $itemTotal;
                                 $items[] = [

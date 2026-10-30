@@ -16,6 +16,7 @@ import RdConfirmDialog from '../../../design-system/RdConfirmDialog.vue';
 import RdEmptyState from '../../../design-system/RdEmptyState.vue';
 import type { User, Tenant } from '../../../types/core';
 import type { Transaction } from '../../../types/pekan';
+import { formatQuantity } from '../../../utils/format';
 
 interface PaginationMeta {
   current_page: number;
@@ -262,7 +263,7 @@ const columns = [
 
           <template #quantity="{ item }">
             <span v-if="item.items && item.items.length > 0" class="text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
-              {{ item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) }}
+              {{ formatQuantity(item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0)) }}
             </span>
             <span v-else class="text-xs text-slate-400 font-mono">1</span>
           </template>
@@ -370,7 +371,7 @@ const columns = [
           <!-- Baris 2: Rincian Barang / Keterangan Belanja -->
           <div v-if="item.items && item.items.length > 0" class="p-2.5 rounded bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs space-y-1">
             <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-              <span>Item Belanja ({{ Math.round(item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0)) }} pcs)</span>
+              <span>Item Belanja ({{ formatQuantity(item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0)) }} item)</span>
               <button
                 v-if="item.items.length > 1"
                 type="button"
@@ -389,7 +390,7 @@ const columns = [
               class="flex justify-between items-center text-xs"
             >
               <span class="text-slate-700 dark:text-slate-300 truncate max-w-[200px]" :title="it.item_name">
-                {{ it.item_name }} <span class="text-slate-400">×{{ Number(it.quantity) || 1 }}</span>
+                {{ it.item_name }} <span class="text-slate-400">×{{ formatQuantity(it.quantity) }}</span>
               </span>
               <span class="font-medium text-slate-800 dark:text-slate-200">
                 <RdMoney :amount-minor="it.total_minor || ((it.price_minor || 0) * (Number(it.quantity) || 1))" />
@@ -621,7 +622,7 @@ const columns = [
                   <span v-if="it.notes" class="block text-[11px] text-slate-400 font-normal">{{ it.notes }}</span>
                 </td>
                 <td class="py-2 px-3 text-center font-mono font-medium text-slate-700 dark:text-slate-300">
-                  {{ Number(it.quantity) || 1 }}
+                  {{ formatQuantity(it.quantity) }}
                 </td>
                 <td class="py-2 px-3 text-right font-mono text-slate-700 dark:text-slate-300">
                   <RdMoney :amount-minor="it.price_minor || 0" />
@@ -641,7 +642,7 @@ const columns = [
                   Total ({{ selectedTransactionForItems.items?.length || 0 }} baris item)
                 </td>
                 <td class="py-2.5 px-3 text-center font-mono">
-                  {{ selectedTransactionForItems.items?.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) || 0 }}
+                  {{ formatQuantity(selectedTransactionForItems.items?.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0) || 0) }}
                 </td>
                 <td colspan="2"></td>
                 <td class="py-2.5 px-3 text-right font-mono text-teal-800 dark:text-teal-300 font-bold">

@@ -6,6 +6,9 @@ withDefaults(
     name?: string;
     label?: string;
     type?: string;
+    step?: string | number;
+    min?: string | number;
+    max?: string | number;
     placeholder?: string;
     hint?: string;
     error?: string;
@@ -40,6 +43,9 @@ defineEmits<{
       :id="id"
       :name="name || id"
       :type="type"
+      :step="step"
+      :min="min"
+      :max="max"
       :value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"

@@ -201,6 +201,8 @@ function handleSubmit() {
                 :id="`item_qty_${idx}`"
                 v-model.number="it.quantity"
                 type="number"
+                step="any"
+                min="0.0001"
                 label="Jumlah"
                 required
                 @input="updateItemTotal(it)"

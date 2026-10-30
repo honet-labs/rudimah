@@ -214,14 +214,17 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
     {
         $items = [];
         if (!empty($raw['items']) && is_array($raw['items'])) {
-            foreach ($raw['items'] as $it) {
-                $qty = (int) ($it['quantity'] ?? 1);
+                $rawQty = $it['quantity'] ?? 1;
+                $qty = is_numeric($rawQty) ? (float) $rawQty : 1;
+                if ($qty <= 0) {
+                    $qty = 1;
+                }
                 $price = (int) ($it['price_minor'] ?? ($it['price'] ?? 0));
                 $disc = (int) ($it['discount_minor'] ?? ($it['discount'] ?? 0));
-                $total = (int) ($it['total_minor'] ?? ($it['total'] ?? (($qty * $price) - $disc)));
+                $total = (int) ($it['total_minor'] ?? ($it['total'] ?? round(($qty * $price) - $disc)));
                 $items[] = [
                     'item_name' => (string) ($it['item_name'] ?? $it['name'] ?? 'Item'),
-                    'quantity' => max(1, $qty),
+                    'quantity' => $qty,
                     'price_minor' => $price,
                     'discount_minor' => $disc,
                     'total_minor' => $total,
