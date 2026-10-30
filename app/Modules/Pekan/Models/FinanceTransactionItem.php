@@ -29,7 +29,7 @@ class FinanceTransactionItem extends Model
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:4',
+        'quantity' => 'float',
         'price_minor' => 'integer',
         'discount_minor' => 'integer',
         'total_minor' => 'integer',

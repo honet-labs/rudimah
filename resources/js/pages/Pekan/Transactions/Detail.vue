@@ -142,6 +142,9 @@ const itemColumns = [
           title="Rincian Baris Barang"
         >
           <RdTable :columns="itemColumns" :items="transaction.items">
+            <template #quantity="{ value }">
+              <span class="font-mono text-slate-700 dark:text-slate-300">{{ Number(value) || 1 }}</span>
+            </template>
             <template #price_minor="{ value }">
               <RdMoney :amount-minor="value" />
             </template>

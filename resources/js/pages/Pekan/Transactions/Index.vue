@@ -389,10 +389,10 @@ const columns = [
               class="flex justify-between items-center text-xs"
             >
               <span class="text-slate-700 dark:text-slate-300 truncate max-w-[200px]" :title="it.item_name">
-                {{ it.item_name }} <span class="text-slate-400">×{{ parseFloat(it.quantity) || 1 }}</span>
+                {{ it.item_name }} <span class="text-slate-400">×{{ Number(it.quantity) || 1 }}</span>
               </span>
               <span class="font-medium text-slate-800 dark:text-slate-200">
-                <RdMoney :amount-minor="it.total_minor || ((it.price_minor || 0) * (it.quantity || 1))" />
+                <RdMoney :amount-minor="it.total_minor || ((it.price_minor || 0) * (Number(it.quantity) || 1))" />
               </span>
             </div>
             <div v-if="item.items.length > 3">
@@ -621,7 +621,7 @@ const columns = [
                   <span v-if="it.notes" class="block text-[11px] text-slate-400 font-normal">{{ it.notes }}</span>
                 </td>
                 <td class="py-2 px-3 text-center font-mono font-medium text-slate-700 dark:text-slate-300">
-                  {{ it.quantity || 1 }}
+                  {{ Number(it.quantity) || 1 }}
                 </td>
                 <td class="py-2 px-3 text-right font-mono text-slate-700 dark:text-slate-300">
                   <RdMoney :amount-minor="it.price_minor || 0" />
@@ -631,7 +631,7 @@ const columns = [
                   <span v-else class="text-slate-400">-</span>
                 </td>
                 <td class="py-2 px-3 text-right font-mono font-semibold text-slate-800 dark:text-slate-100">
-                  <RdMoney :amount-minor="it.total_minor || ((it.price_minor || 0) * (it.quantity || 1))" />
+                  <RdMoney :amount-minor="it.total_minor || ((it.price_minor || 0) * (Number(it.quantity) || 1))" />
                 </td>
               </tr>
             </tbody>

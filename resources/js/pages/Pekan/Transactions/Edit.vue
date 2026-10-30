@@ -50,7 +50,7 @@ const notes = ref(props.transaction.notes || '');
 const initialItems: TransactionItem[] = (props.transaction.items && props.transaction.items.length > 0)
   ? props.transaction.items.map(it => ({
       item_name: it.item_name,
-      quantity: it.quantity || 1,
+      quantity: Number(it.quantity) || 1,
       price_minor: it.price_minor || 0,
       discount_minor: it.discount_minor || 0,
       total_minor: it.total_minor || 0,
