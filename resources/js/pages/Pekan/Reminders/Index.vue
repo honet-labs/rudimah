@@ -287,60 +287,64 @@ function statusLabel(status?: string): string {
               </span>
             </template>
 
-            <!-- 7. Aksi (2 baris: Baris 1 Pembayaran & Riwayat, Baris 2 Manajemen) -->
+            <!-- 7. Aksi (Icon-Only Buttons) -->
             <template #actions="{ item }">
-              <div class="flex flex-col gap-1 w-full max-w-[170px] mx-auto py-0.5">
-                <!-- Baris 1: Aksi Utama Pembayaran (Bayar & Riwayat) -->
-                <div class="grid grid-cols-2 gap-1 w-full">
-                  <RdButton
-                    variant="primary"
-                    size="sm"
-                    type="button"
-                    class="w-full !px-1.5 !py-0.5 text-[11px] h-6 justify-center"
-                    title="Bayar Tagihan"
-                    @click.stop="openPayModal(item)"
-                  >
-                    Bayar
-                  </RdButton>
-                  <RdButton
-                    variant="secondary"
-                    size="sm"
-                    type="button"
-                    class="w-full !px-1.5 !py-0.5 text-[11px] h-6 justify-center"
-                    title="Riwayat Pembayaran Tagihan"
-                    @click.stop="openHistory(item)"
-                  >
-                    Riwayat{{ item.payments && item.payments.length > 0 ? ` (${item.payments.length})` : '' }}
-                  </RdButton>
-                </div>
-                <!-- Baris 2: Manajemen Tagihan (Rincian, Ubah, Hapus) -->
-                <div class="grid grid-cols-3 gap-1 w-full">
-                  <RdButton
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    class="w-full !px-1 !py-0.5 text-[11px] h-6 justify-center"
-                    title="Rincian Tagihan"
-                    @click.stop="openDetail(item)"
-                  >
-                    Rincian
-                  </RdButton>
-                  <a :href="`/t/${tenantSlug}/apps/pekan/reminders/${item.id}/edit`" title="Ubah Tagihan" class="w-full flex">
-                    <RdButton variant="outline" size="sm" type="button" class="w-full !px-1 !py-0.5 text-[11px] h-6 justify-center">
-                      Ubah
-                    </RdButton>
-                  </a>
-                  <RdButton
-                    variant="danger"
-                    size="sm"
-                    type="button"
-                    class="w-full !px-1 !py-0.5 text-[11px] h-6 justify-center"
-                    title="Hapus Tagihan"
-                    @click.stop="confirmDelete(item)"
-                  >
-                    Hapus
-                  </RdButton>
-                </div>
+              <div class="flex items-center justify-center gap-1">
+                <!-- Bayar -->
+                <button
+                  type="button"
+                  class="p-1.5 text-teal-700 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200 hover:bg-teal-50 dark:hover:bg-teal-950/30 rounded-md transition-colors inline-flex items-center justify-center cursor-pointer"
+                  title="Bayar Tagihan"
+                  @click.stop="openPayModal(item)"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </button>
+                <!-- Riwayat -->
+                <button
+                  type="button"
+                  class="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors inline-flex items-center justify-center cursor-pointer"
+                  :title="`Riwayat Pembayaran${item.payments && item.payments.length > 0 ? ` (${item.payments.length})` : ''}`"
+                  @click.stop="openHistory(item)"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+                <!-- Rincian -->
+                <button
+                  type="button"
+                  class="p-1.5 text-slate-500 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors inline-flex items-center justify-center cursor-pointer"
+                  title="Rincian Tagihan"
+                  @click.stop="openDetail(item)"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </button>
+                <!-- Ubah -->
+                <a
+                  :href="`/t/${tenantSlug}/apps/pekan/reminders/${item.id}/edit`"
+                  title="Ubah Tagihan"
+                  class="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors inline-flex items-center justify-center"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </a>
+                <!-- Hapus -->
+                <button
+                  type="button"
+                  title="Hapus Tagihan"
+                  class="p-1.5 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors inline-flex items-center justify-center cursor-pointer"
+                  @click.stop="confirmDelete(item)"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
             </template>
           </RdTable>
@@ -415,27 +419,58 @@ function statusLabel(status?: string): string {
             </div>
           </div>
 
-          <!-- Aksi Mobile: Ubah, Delete, Rincian, Bayar, Riwayat -->
-          <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <RdButton variant="primary" size="sm" class="w-full h-8 justify-center text-xs" @click="openPayModal(rem)">
-              Bayar
-            </RdButton>
-            <RdButton variant="secondary" size="sm" class="w-full h-8 justify-center text-xs" @click="openHistory(rem)">
-              Riwayat{{ rem.payments && rem.payments.length > 0 ? ` (${rem.payments.length})` : '' }}
-            </RdButton>
-          </div>
-          <div class="grid grid-cols-3 gap-2">
-            <RdButton variant="outline" size="sm" class="w-full h-8 justify-center text-xs" @click="openDetail(rem)">
-              Rincian
-            </RdButton>
-            <a :href="`/t/${tenantSlug}/apps/pekan/reminders/${rem.id}/edit`" class="w-full flex h-8">
-              <RdButton variant="outline" size="sm" class="w-full h-8 justify-center text-xs">
-                Ubah
-              </RdButton>
+          <!-- Aksi Mobile: Bayar, Riwayat, Rincian, Ubah, Hapus (Icon-Only Buttons) -->
+          <div class="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              class="p-2 text-teal-700 hover:text-teal-900 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900/50 rounded-md inline-flex items-center justify-center cursor-pointer"
+              title="Bayar Tagihan"
+              @click="openPayModal(rem)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md inline-flex items-center justify-center cursor-pointer"
+              :title="`Riwayat Pembayaran${rem.payments && rem.payments.length > 0 ? ` (${rem.payments.length})` : ''}`"
+              @click="openHistory(rem)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="p-2 text-slate-600 hover:text-teal-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md inline-flex items-center justify-center cursor-pointer"
+              title="Rincian Tagihan"
+              @click="openDetail(rem)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </button>
+            <a
+              :href="`/t/${tenantSlug}/apps/pekan/reminders/${rem.id}/edit`"
+              title="Ubah Tagihan"
+              class="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md inline-flex items-center justify-center"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
             </a>
-            <RdButton variant="danger" size="sm" class="w-full h-8 justify-center text-xs" @click="confirmDelete(rem)">
-              Hapus
-            </RdButton>
+            <button
+              type="button"
+              title="Hapus Tagihan"
+              class="p-2 text-red-600 hover:text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-md inline-flex items-center justify-center cursor-pointer"
+              @click="confirmDelete(rem)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>

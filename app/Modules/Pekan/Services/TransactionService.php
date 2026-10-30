@@ -141,7 +141,11 @@ class TransactionService
                 );
             }
 
+            $targetAccountId = $data['account_id'] ?? $transaction->account_id;
+            $newAccount = $targetAccountId ? (FinanceAccount::find($targetAccountId) ?: $account) : $account;
+
             $updatePayload = [
+                'account_id' => $targetAccountId,
                 'category_id' => $resolvedCategoryId ?? $transaction->category_id,
                 'type' => $data['type'] ?? $transaction->type,
                 'amount_minor' => (int) ($data['amount_minor'] ?? $transaction->amount_minor),
@@ -149,6 +153,7 @@ class TransactionService
                 'description' => $data['description'] ?? $transaction->description,
                 'merchant_name' => $data['merchant_name'] ?? $transaction->merchant_name,
                 'receipt_number' => $data['receipt_number'] ?? $transaction->receipt_number,
+                'payment_method' => $data['payment_method'] ?? $transaction->payment_method,
                 'notes' => $data['notes'] ?? $transaction->notes,
                 'updated_by' => auth()->id() ?? 'system',
             ];
@@ -179,12 +184,12 @@ class TransactionService
                 }
             }
 
-            // Terapkan efek saldo baru
-            if ($account) {
+            // Terapkan efek saldo baru pada akun target
+            if ($newAccount) {
                 if ($transaction->type === 'income') {
-                    $account->increment('current_balance_minor', (int) $transaction->amount_minor);
+                    $newAccount->increment('current_balance_minor', (int) $transaction->amount_minor);
                 } elseif ($transaction->type === 'expense' || $transaction->type === 'savings') {
-                    $account->decrement('current_balance_minor', (int) $transaction->amount_minor);
+                    $newAccount->decrement('current_balance_minor', (int) $transaction->amount_minor);
                 }
             }
 

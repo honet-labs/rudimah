@@ -19,10 +19,12 @@ const props = withDefaults(
     tenants?: Tenant[];
     apps?: AppManifest[];
     categories?: FinanceCategory[];
+    accounts?: Array<{ id: string; name: string; account_type: string }>;
     transaction: Transaction;
   }>(),
   {
     categories: () => [],
+    accounts: () => [],
   }
 );
 
@@ -41,11 +43,22 @@ const transactionType = ref<'income' | 'expense' | 'savings'>(
   props.transaction.type === 'income' ? 'income' : (props.transaction.type === 'savings' ? 'savings' : 'expense')
 );
 const categoryId = ref(props.transaction.category_id || (props.categories[0]?.id || ''));
+const accountId = ref(props.transaction.account_id || props.accounts?.[0]?.id || '');
 const transactionDate = ref(props.transaction.transaction_date ? props.transaction.transaction_date.substring(0, 10) : new Date().toISOString().substring(0, 10));
 const description = ref(props.transaction.description || '');
 const merchantName = ref(props.transaction.merchant_name || '');
 const receiptNumber = ref(props.transaction.receipt_number || '');
 const notes = ref(props.transaction.notes || '');
+
+const accountOptions = computed(() =>
+  (props.accounts || []).map(a => {
+    const typeLabel = a.account_type === 'cash' ? 'Tunai' : (a.account_type === 'bank' ? 'Bank' : (a.account_type === 'ewallet' ? 'E-Wallet' : (a.account_type === 'credit_card' ? 'Kartu Kredit' : 'Lainnya')));
+    return {
+      label: `${a.name} (${typeLabel})`,
+      value: a.id,
+    };
+  })
+);
 
 const initialItems: TransactionItem[] = (props.transaction.items && props.transaction.items.length > 0)
   ? props.transaction.items.map(it => ({
@@ -111,6 +124,7 @@ function handleSubmit() {
   isSubmitting.value = true;
 
   router.put(`/t/${props.tenant.slug}/apps/pekan/transactions/${props.transaction.id}`, {
+    account_id: accountId.value || null,
     type: transactionType.value,
     category_id: categoryId.value || null,
     amount_minor: grandTotalMinor.value > 0 ? grandTotalMinor.value : props.transaction.amount_minor,
@@ -222,6 +236,14 @@ function handleSubmit() {
               v-model="categoryId"
               label="Kategori Transaksi"
               :options="categoryOptions"
+            />
+
+            <RdSelect
+              id="account_id"
+              v-model="accountId"
+              label="Metode Pembayaran / Akun"
+              :options="accountOptions"
+              required
             />
 
             <RdInput

@@ -132,11 +132,12 @@ const columns = [
   { key: 'description', label: 'Nama Transaksi' },
   { key: 'category_name', label: 'Kategori', width: '120px' },
   { key: 'type', label: 'Jenis Transaksi', width: '120px' },
+  { key: 'payment_method', label: 'Metode Pembayaran', width: '150px' },
   { key: 'items', label: 'Item', width: '170px' },
   { key: 'quantity', label: 'Quantity', width: '80px', align: 'center' as const },
   { key: 'amount_minor', label: 'Nominal', width: '130px', align: 'right' as const },
   { key: 'images', label: 'Lampiran', width: '100px', align: 'center' as const },
-  { key: 'actions', label: 'Aksi', width: '125px', align: 'center' as const },
+  { key: 'actions', label: 'Aksi', width: '100px', align: 'center' as const },
 ];
 </script>
 
@@ -238,6 +239,12 @@ const columns = [
             </span>
           </template>
 
+          <template #payment_method="{ item }">
+            <span class="text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+              {{ item.account?.name || item.payment_method || 'Kas Utama' }}
+            </span>
+          </template>
+
           <template #items="{ item }">
             <div v-if="item.items && item.items.length > 0" class="text-xs space-y-0.5 max-w-[170px]">
               <span class="text-slate-800 dark:text-slate-200 block truncate" :title="item.items[0].item_name">
@@ -293,31 +300,36 @@ const columns = [
           </template>
 
           <template #actions="{ item }">
-            <div class="flex flex-col gap-1 w-full max-w-[115px] mx-auto py-0.5">
-              <!-- Baris 1: Rincian & Ubah -->
-              <div class="grid grid-cols-2 gap-1 w-full">
-                <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" title="Rincian Transaksi" class="w-full flex">
-                  <RdButton variant="outline" size="sm" type="button" class="w-full !px-1 !py-0.5 text-[11px] h-6 justify-center">
-                    Rincian
-                  </RdButton>
-                </a>
-                <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" title="Ubah Transaksi" class="w-full flex">
-                  <RdButton variant="outline" size="sm" type="button" class="w-full !px-1 !py-0.5 text-[11px] h-6 justify-center">
-                    Ubah
-                  </RdButton>
-                </a>
-              </div>
-              <!-- Baris 2: Hapus -->
-              <RdButton
-                variant="danger"
-                size="sm"
+            <div class="flex items-center justify-center gap-1">
+              <a
+                :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`"
+                title="Rincian Transaksi"
+                class="p-1.5 text-slate-500 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors inline-flex items-center justify-center"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </a>
+              <a
+                :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`"
+                title="Ubah Transaksi"
+                class="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors inline-flex items-center justify-center"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </a>
+              <button
                 type="button"
                 title="Hapus Transaksi"
-                class="w-full !px-1.5 !py-0.5 text-[11px] h-6 justify-center"
+                class="p-1.5 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors inline-flex items-center justify-center cursor-pointer"
                 @click.stop="confirmDelete(item)"
               >
-                Hapus
-              </RdButton>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
             </div>
           </template>
         </RdTable>
@@ -346,6 +358,10 @@ const columns = [
                 <span class="text-slate-300 dark:text-slate-700">·</span>
                 <span class="text-xs text-slate-500 font-medium">
                   <RdDateTime :value="item.transaction_date" format="date" />
+                </span>
+                <span class="text-slate-300 dark:text-slate-700">·</span>
+                <span class="text-xs text-slate-500 font-medium">
+                  {{ item.account?.name || item.payment_method || 'Kas Utama' }}
                 </span>
               </div>
               <h4 class="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
@@ -437,30 +453,37 @@ const columns = [
             </div>
           </div>
 
-          <!-- Baris 4: Aksi Mobile (2 Baris: Rincian & Ubah di baris 1, Hapus di baris 2) -->
-          <div class="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <div class="grid grid-cols-2 gap-2">
-              <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`" class="w-full flex h-8">
-                <RdButton variant="outline" size="sm" type="button" class="w-full h-8 justify-center text-xs">
-                  Rincian
-                </RdButton>
-              </a>
-              <a :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`" class="w-full flex h-8">
-                <RdButton variant="outline" size="sm" type="button" class="w-full h-8 justify-center text-xs">
-                  Ubah
-                </RdButton>
-              </a>
-            </div>
-            <RdButton
-              variant="danger"
-              size="sm"
+          <!-- Baris 4: Aksi Mobile (Icon-Only Buttons) -->
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <a
+              :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}`"
+              title="Rincian Transaksi"
+              class="p-2 text-slate-600 hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md inline-flex items-center justify-center"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </a>
+            <a
+              :href="`/t/${tenantSlug}/apps/pekan/transactions/${item.id}/edit`"
+              title="Ubah Transaksi"
+              class="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md inline-flex items-center justify-center"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </a>
+            <button
               type="button"
-              class="w-full h-8 justify-center text-xs"
               title="Hapus Transaksi"
+              class="p-2 text-red-600 hover:text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-md inline-flex items-center justify-center cursor-pointer"
               @click.stop="confirmDelete(item)"
             >
-              Hapus Transaksi
-            </RdButton>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>

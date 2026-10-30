@@ -65,13 +65,17 @@ const itemColumns = [
       ]"
     >
       <template #actions>
-        <a :href="`/t/${tenant.slug}/apps/pekan/transactions/${transaction.id}/edit`">
-          <RdButton variant="outline" size="sm">
-            Ubah
+        <a :href="`/t/${tenant.slug}/apps/pekan/transactions/${transaction.id}/edit`" title="Ubah Transaksi">
+          <RdButton variant="outline" size="sm" class="!p-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
           </RdButton>
         </a>
-        <RdButton variant="danger" size="sm" @click="isDeleteDialogOpen = true">
-          Hapus
+        <RdButton variant="danger" size="sm" class="!p-2" title="Hapus Transaksi" @click="isDeleteDialogOpen = true">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
         </RdButton>
       </template>
     </RdPageHeader>
@@ -126,6 +130,12 @@ const itemColumns = [
               <dt class="text-slate-500 font-medium">Kategori</dt>
               <dd class="text-slate-800 dark:text-slate-100 font-medium mt-0.5">
                 {{ transaction.category_name || 'Tanpa Kategori' }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-slate-500 font-medium">Metode Pembayaran</dt>
+              <dd class="text-slate-800 dark:text-slate-100 font-semibold mt-0.5">
+                {{ transaction.account?.name || transaction.payment_method || 'Kas Utama' }}
               </dd>
             </div>
             <div>

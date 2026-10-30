@@ -24,7 +24,7 @@ class TransactionController
         $tenant = TenantContext::get();
         $user = $request->user();
 
-        $query = FinanceTransaction::with(['category', 'items'])
+        $query = FinanceTransaction::with(['category', 'items', 'account'])
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at');
 
@@ -76,6 +76,7 @@ class TransactionController
         $user = $request->user();
 
         $categories = FinanceCategory::where('is_active', true)->get();
+        $accounts = FinanceAccount::where('is_active', true)->orderBy('name')->get();
 
         $tenants = $user ? $user->getActiveTenants() : [];
 
@@ -90,6 +91,7 @@ class TransactionController
             'tenants' => $tenants,
             'apps' => AppRegistry::all(),
             'categories' => $categories,
+            'accounts' => $accounts,
         ]);
     }
 
@@ -130,7 +132,7 @@ class TransactionController
         $tenant = TenantContext::get();
         $user = $request->user();
         $resolvedId = $id ?: $request->route('id') ?: $tenantSlug;
-        $transaction = FinanceTransaction::with(['category', 'items', 'attachments'])
+        $transaction = FinanceTransaction::with(['category', 'items', 'attachments', 'account'])
             ->findOrFail($resolvedId);
 
         $tenants = $user ? $user->getActiveTenants() : [];
@@ -156,6 +158,7 @@ class TransactionController
         $transaction = FinanceTransaction::with(['category', 'items'])->findOrFail($resolvedId);
 
         $categories = FinanceCategory::where('is_active', true)->get();
+        $accounts = FinanceAccount::where('is_active', true)->orderBy('name')->get();
         $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('Pekan/Transactions/Edit', [
@@ -168,6 +171,7 @@ class TransactionController
             'tenants' => $tenants,
             'apps' => AppRegistry::all(),
             'categories' => $categories,
+            'accounts' => $accounts,
             'transaction' => $transaction,
         ]);
     }
@@ -178,6 +182,7 @@ class TransactionController
         $transaction = FinanceTransaction::findOrFail($resolvedId);
 
         $validated = $request->validate([
+            'account_id' => 'nullable|string',
             'category_id' => 'nullable|string',
             'type' => 'required|in:income,expense,transfer,savings',
             'amount_minor' => 'required|integer|min:1',

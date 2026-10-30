@@ -4,6 +4,7 @@ namespace App\Modules\Pekan\Http\Controllers;
 
 use App\Core\Applications\AppRegistry;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Pekan\Models\FinanceAccount;
 use App\Modules\Pekan\Models\FinanceCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,6 +21,8 @@ class SettingsController
             ->orderBy('name')
             ->get();
 
+        $accounts = FinanceAccount::orderBy('name')->get();
+
         return Inertia::render('Pekan/Settings/Index', [
             'user' => $user ? [
                 'id' => $user->id,
@@ -30,6 +33,7 @@ class SettingsController
             'tenants' => $user ? $user->getActiveTenants() : [],
             'apps' => AppRegistry::all(),
             'categories' => $categories,
+            'accounts' => $accounts,
             'status' => session('status'),
             'error' => session('error'),
         ]);

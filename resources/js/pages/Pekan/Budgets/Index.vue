@@ -172,9 +172,12 @@ function copyId(id: string) {
             <a
               v-if="activeTab === 'active'"
               :href="`/t/${tenant.slug}/apps/pekan/budgets/${b.id}/edit`"
-              class="text-xs text-teal-700 dark:text-teal-400 hover:underline font-semibold ml-2"
+              title="Ubah Anggaran"
+              class="p-1.5 text-slate-500 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors inline-flex items-center justify-center ml-2"
             >
-              Ubah
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
             </a>
             <span v-else class="text-[11px] text-slate-400 font-medium">
               Periode Selesai

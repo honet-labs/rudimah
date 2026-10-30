@@ -130,10 +130,14 @@ function openPreview(url: string, title: string) {
 
         <div class="border-t border-slate-100 dark:border-slate-800 pt-3 flex items-center justify-between">
           <span class="text-[11px] text-slate-400 uppercase font-medium">Status: Aktif</span>
-          <a :href="`/t/${tenant.slug}/apps/pekan/savings/${s.id}/edit`">
-            <RdButton variant="outline" size="sm">
-              Ubah Pos
-            </RdButton>
+          <a
+            :href="`/t/${tenant.slug}/apps/pekan/savings/${s.id}/edit`"
+            title="Ubah Pos Tabungan"
+            class="p-1.5 text-slate-500 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors inline-flex items-center justify-center"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
           </a>
         </div>
       </RdCard>

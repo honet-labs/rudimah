@@ -20,12 +20,19 @@ interface CategoryOption {
   name: string;
 }
 
+interface AccountOption {
+  id: string;
+  name: string;
+  account_type: string;
+}
+
 const props = defineProps<{
   user?: User;
   tenant: Tenant;
   tenants?: Tenant[];
   apps?: AppManifest[];
   categories?: CategoryOption[];
+  accounts?: AccountOption[];
 }>();
 
 const isProcessing = ref(false);
@@ -43,6 +50,17 @@ function openPreview(url: string, title: string) {
 }
 
 const selectedCategoryId = ref(props.categories?.[0]?.id || '');
+const selectedAccountId = ref(props.accounts?.[0]?.id || '');
+
+const accountOptions = computed(() => {
+  return (props.accounts || []).map(a => {
+    const typeLabel = a.account_type === 'cash' ? 'Tunai' : (a.account_type === 'bank' ? 'Bank' : (a.account_type === 'ewallet' ? 'E-Wallet' : (a.account_type === 'credit_card' ? 'Kartu Kredit' : 'Lainnya')));
+    return {
+      label: `${a.name} (${typeLabel})`,
+      value: a.id,
+    };
+  });
+});
 
 const extraction = ref<ReceiptExtraction>({
   description: '',
@@ -279,6 +297,7 @@ async function saveConfirmedTransaction() {
         receipt_number: extraction.value.receipt_number,
         transaction_date: extraction.value.transaction_date,
         category_id: selectedCategoryId.value || undefined,
+        account_id: selectedAccountId.value || undefined,
         subtotal_minor: extraction.value.subtotal_minor,
         tax_minor: extraction.value.tax_minor,
         service_charge_minor: extraction.value.service_charge_minor,
@@ -404,7 +423,7 @@ const categoryOptions = computed(() => {
             />
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <RdInput
               id="ocr_receipt_no"
               v-model="extraction.receipt_number"
@@ -422,6 +441,14 @@ const categoryOptions = computed(() => {
                 v-model="selectedCategoryId"
                 label="Kategori Pengeluaran"
                 :options="categoryOptions"
+              />
+            </div>
+            <div v-if="accountOptions.length > 0">
+              <RdSelect
+                v-model="selectedAccountId"
+                label="Metode Pembayaran"
+                :options="accountOptions"
+                required
               />
             </div>
           </div>

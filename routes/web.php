@@ -10,6 +10,7 @@ use App\Core\MFA\Http\Middleware\EnsureMfaVerified;
 use App\Core\Tenancy\ResolveTenantMiddleware;
 use App\Modules\App1\Http\Controllers\App1Controller;
 use App\Modules\App2\Http\Controllers\App2Controller;
+use App\Modules\Pekan\Http\Controllers\AccountController;
 use App\Modules\Pekan\Http\Controllers\BudgetController;
 use App\Modules\Pekan\Http\Controllers\CategoryController;
 use App\Modules\Pekan\Http\Controllers\DashboardController;
@@ -159,6 +160,11 @@ Route::prefix('t/{tenantSlug}')->middleware(['auth', EnsureMfaVerified::class, R
             Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
             Route::put('/categories/{id}', [CategoryController::class, 'update'])->name('categories.update');
             Route::delete('/categories/{id}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+
+            // Manajemen Metode Pembayaran / Akun Keuangan
+            Route::post('/accounts', [AccountController::class, 'store'])->name('accounts.store');
+            Route::put('/accounts/{id}', [AccountController::class, 'update'])->name('accounts.update');
+            Route::delete('/accounts/{id}', [AccountController::class, 'destroy'])->name('accounts.destroy');
         });
 
         // Modul Skeleton App1

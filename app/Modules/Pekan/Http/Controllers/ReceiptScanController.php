@@ -34,8 +34,12 @@ class ReceiptScanController
                 ->where('category_type', 'expense')
                 ->orderBy('name')
                 ->get();
+            $accounts = FinanceAccount::where('is_active', true)
+                ->orderBy('name')
+                ->get();
         } catch (\Throwable) {
             $categories = collect();
+            $accounts = collect();
         }
 
         return Inertia::render('Pekan/ReceiptScan/Index', [
@@ -49,6 +53,7 @@ class ReceiptScanController
             'tenants' => $user ? $user->getActiveTenants() : [],
             'apps' => AppRegistry::all(),
             'categories' => $categories,
+            'accounts' => $accounts,
         ]);
     }
 

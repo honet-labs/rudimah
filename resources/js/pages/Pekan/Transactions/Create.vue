@@ -20,15 +20,18 @@ const props = withDefaults(
     tenants?: Tenant[];
     apps?: AppManifest[];
     categories?: FinanceCategory[];
+    accounts?: Array<{ id: string; name: string; account_type: string }>;
   }>(),
   {
     categories: () => [],
+    accounts: () => [],
   }
 );
 
 const isSubmitting = ref(false);
 const transactionType = ref<'income' | 'expense' | 'savings'>('expense');
 const categoryId = ref(props.categories.find(c => c.category_type === 'expense')?.id || props.categories[0]?.id || '');
+const accountId = ref(props.accounts?.[0]?.id || '');
 const transactionDate = ref(new Date().toISOString().substring(0, 10));
 const description = ref('');
 const merchantName = ref('');
@@ -43,6 +46,16 @@ const categoryOptions = computed(() =>
   props.categories
     .filter(c => c.category_type === transactionType.value)
     .map(c => ({ label: c.name, value: c.id }))
+);
+
+const accountOptions = computed(() =>
+  (props.accounts || []).map(a => {
+    const typeLabel = a.account_type === 'cash' ? 'Tunai' : (a.account_type === 'bank' ? 'Bank' : (a.account_type === 'ewallet' ? 'E-Wallet' : (a.account_type === 'credit_card' ? 'Kartu Kredit' : 'Lainnya')));
+    return {
+      label: `${a.name} (${typeLabel})`,
+      value: a.id,
+    };
+  })
 );
 
 watch(transactionType, (newType) => {
@@ -80,6 +93,7 @@ function handleSubmit() {
   isSubmitting.value = true;
 
   router.post(`/t/${props.tenant.slug}/apps/pekan/transactions`, {
+    account_id: accountId.value || null,
     type: transactionType.value,
     category_id: categoryId.value || null,
     amount_minor: grandTotalMinor.value > 0 ? grandTotalMinor.value : 50000,
@@ -129,7 +143,7 @@ function handleSubmit() {
           />
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
           <RdSelect
             v-model="transactionType"
             label="Jenis Mutasi"
@@ -145,6 +159,13 @@ function handleSubmit() {
             v-model="categoryId"
             label="Kategori"
             :options="categoryOptions"
+          />
+
+          <RdSelect
+            v-model="accountId"
+            label="Metode Pembayaran / Akun"
+            :options="accountOptions"
+            required
           />
         </div>
 
