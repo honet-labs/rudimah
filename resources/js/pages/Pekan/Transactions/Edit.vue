@@ -29,15 +29,6 @@ const props = withDefaults(
 );
 
 const isSubmitting = ref(false);
-const copiedId = ref<string | null>(null);
-function copyId(id: string) {
-  if (!id) return;
-  navigator.clipboard.writeText(id);
-  copiedId.value = id;
-  setTimeout(() => {
-    if (copiedId.value === id) copiedId.value = null;
-  }, 2000);
-}
 
 const transactionType = ref<'income' | 'expense' | 'savings'>(
   props.transaction.type === 'income' ? 'income' : (props.transaction.type === 'savings' ? 'savings' : 'expense')
@@ -159,16 +150,6 @@ function handleSubmit() {
       <div class="lg:col-span-2 space-y-6">
         <RdCard title="Informasi Transaksi">
           <div class="space-y-4">
-            <!-- ID Transaksi (Primary Key) -->
-            <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-md border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
-              <div class="min-w-0">
-                <span class="block text-[11px] font-medium text-slate-500 dark:text-slate-400">ID Transaksi (Primary Key)</span>
-                <span class="font-mono text-xs font-semibold text-slate-800 dark:text-slate-100 select-all truncate block">{{ transaction.id }}</span>
-              </div>
-              <RdButton type="button" variant="outline" size="sm" class="shrink-0" @click="copyId(transaction.id)">
-                {{ copiedId === transaction.id ? 'Tersalin' : 'Salin ID' }}
-              </RdButton>
-            </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="sm:col-span-2 flex items-center gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">

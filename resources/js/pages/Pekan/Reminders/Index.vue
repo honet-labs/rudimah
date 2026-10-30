@@ -37,7 +37,6 @@ const tenantSlug = computed(() => props.tenant?.slug || (props.tenant as any)?.c
 
 // Tabel Kolom
 const columns = [
-  { key: 'id', label: 'ID Tagihan', width: '120px' },
   { key: 'title', label: 'Nama Tagihan' },
   { key: 'category_name', label: 'Kategori', width: '130px' },
   { key: 'due_date', label: 'Tanggal Jatuh Tempo', width: '150px' },
@@ -46,16 +45,6 @@ const columns = [
   { key: 'actions', label: 'Aksi', width: '180px', align: 'center' as const },
 ];
 
-// Salin ID Tagihan
-const copiedId = ref<string | null>(null);
-function copyId(id: string) {
-  if (!id) return;
-  navigator.clipboard.writeText(id);
-  copiedId.value = id;
-  setTimeout(() => {
-    if (copiedId.value === id) copiedId.value = null;
-  }, 2000);
-}
 
 // Lightbox Pratinjau Gambar
 const previewModalOpen = ref(false);
@@ -216,21 +205,6 @@ function statusLabel(status?: string): string {
       <div class="hidden lg:block">
         <RdCard padding>
           <RdTable :columns="columns" :items="reminders">
-            <!-- 1. ID Tagihan -->
-            <template #id="{ item }">
-              <button
-                type="button"
-                @click.stop="copyId(item.id)"
-                class="font-mono text-[11px] text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 transition-colors select-all cursor-pointer inline-flex items-center gap-1 group text-left"
-                :title="`Klik untuk menyalin: ${item.id}`"
-              >
-                <span>#{{ item.id ? item.id.substring(0, 8) : '-' }}</span>
-                <span v-if="copiedId === item.id" class="text-[10px] text-teal-600 font-sans font-semibold">Tersalin</span>
-                <svg v-else class="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </button>
-            </template>
 
             <!-- 2. Nama Tagihan -->
             <template #title="{ item }">
@@ -361,15 +335,6 @@ function statusLabel(status?: string): string {
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0 flex-1 space-y-1">
               <div class="flex items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  @click.stop="copyId(rem.id)"
-                  class="font-mono text-[11px] text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 select-all cursor-pointer"
-                  :title="rem.id"
-                >
-                  #{{ rem.id ? rem.id.substring(0, 8) : '-' }}
-                </button>
-                <span class="text-slate-300 dark:text-slate-700">·</span>
                 <span class="text-xs text-slate-500 dark:text-slate-400 font-normal">
                   {{ rem.category_name || rem.category?.name || 'Tanpa Kategori' }}
                 </span>
@@ -601,8 +566,8 @@ function statusLabel(status?: string): string {
         <!-- Ringkasan Singkat -->
         <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg flex items-center justify-between text-xs">
           <div>
-            <span class="text-slate-400 block">ID Tagihan:</span>
-            <span class="font-mono font-medium text-slate-700 dark:text-slate-300">#{{ historyReminder?.id }}</span>
+            <span class="text-slate-400 block">Nama Tagihan:</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-200">{{ historyReminder?.title }}</span>
           </div>
           <div class="text-right">
             <span class="text-slate-400 block">Total Riwayat:</span>
@@ -700,17 +665,8 @@ function statusLabel(status?: string): string {
         <!-- Grid Informasi -->
         <div class="grid grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg text-xs">
           <div>
-            <span class="text-slate-400 block">ID Tagihan:</span>
-            <div class="flex items-center gap-1 font-mono font-medium text-slate-800 dark:text-slate-200">
-              <span class="truncate">{{ detailReminder.id }}</span>
-              <button
-                type="button"
-                @click="copyId(detailReminder.id)"
-                class="text-teal-600 hover:text-teal-700 ml-1 shrink-0 font-sans text-[11px]"
-              >
-                {{ copiedId === detailReminder.id ? 'Tersalin' : 'Salin' }}
-              </button>
-            </div>
+            <span class="text-slate-400 block">Nama Tagihan:</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-200">{{ detailReminder.title }}</span>
           </div>
           <div>
             <span class="text-slate-400 block">Status Tagihan:</span>

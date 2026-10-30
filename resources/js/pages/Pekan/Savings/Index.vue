@@ -26,15 +26,6 @@ withDefaults(
 const previewModalOpen = ref(false);
 const previewImage = ref<{ url: string; title: string }>({ url: '', title: '' });
 
-const copiedId = ref<string | null>(null);
-function copyId(id: string) {
-  if (!id) return;
-  navigator.clipboard.writeText(id);
-  copiedId.value = id;
-  setTimeout(() => {
-    if (copiedId.value === id) copiedId.value = null;
-  }, 2000);
-}
 
 function openPreview(url: string, title: string) {
   previewImage.value = { url, title };
@@ -65,19 +56,7 @@ function openPreview(url: string, title: string) {
         :key="s.id"
         padding
       >
-        <div class="flex items-center justify-between mb-1.5">
-          <button
-            type="button"
-            @click="copyId(s.id)"
-            class="font-mono text-[11px] text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 transition-colors select-all cursor-pointer inline-flex items-center gap-1 group text-left"
-            :title="`Klik untuk menyalin ID Tabungan: ${s.id}`"
-          >
-            <span>#{{ s.id ? s.id.substring(0, 8) : '-' }}</span>
-            <span v-if="copiedId === s.id" class="text-[10px] text-teal-600 font-sans font-semibold">Tersalin</span>
-            <svg v-else class="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          </button>
+        <div class="flex items-center justify-end mb-1.5">
           <RdBadge variant="neutral">
             {{ Math.round(s.progress_percent) }}%
           </RdBadge>

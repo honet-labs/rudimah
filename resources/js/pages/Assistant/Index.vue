@@ -493,7 +493,7 @@ onMounted(() => {
           </div>
 
           <div class="p-2.5 px-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 shrink-0">
-            Terisolasi ketat pada ID: {{ tenant.id }}
+            Terisolasi ketat pada ruang kerja {{ tenant.name }}
           </div>
         </aside>
 

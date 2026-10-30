@@ -53,15 +53,6 @@ const isDeleteDialogOpen = ref(false);
 const isDeleting = ref(false);
 const transactionToDelete = ref<Transaction | null>(null);
 
-const copiedId = ref<string | null>(null);
-function copyId(id: string) {
-  if (!id) return;
-  navigator.clipboard.writeText(id);
-  copiedId.value = id;
-  setTimeout(() => {
-    if (copiedId.value === id) copiedId.value = null;
-  }, 2000);
-}
 
 function openPreview(url: string, title: string, images?: any[]) {
   previewImage.value = { url, title, images: images || [] };
@@ -126,7 +117,6 @@ const typeOptions = [
 ];
 
 const columns = [
-  { key: 'id', label: 'ID Transaksi', width: '100px' },
   { key: 'transaction_date', label: 'Tanggal Transaksi', width: '130px' },
   { key: 'merchant_name', label: 'Nama Merchant', width: '150px' },
   { key: 'description', label: 'Nama Transaksi' },
@@ -193,20 +183,6 @@ const columns = [
       <!-- 1. Tampilan Layar Lebar & Desktop (Tabel Komprehensif 10 Kolom) -->
       <div class="hidden lg:block">
         <RdTable :columns="columns" :items="transactions">
-          <template #id="{ item }">
-            <button
-              type="button"
-              @click.stop="copyId(item.id)"
-              class="font-mono text-[11px] text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 transition-colors select-all cursor-pointer inline-flex items-center gap-1 group text-left"
-              :title="`Klik untuk menyalin: ${item.id}`"
-            >
-              <span>#{{ item.id ? item.id.substring(0, 8) : '-' }}</span>
-              <span v-if="copiedId === item.id" class="text-[10px] text-teal-600 font-sans font-semibold">Tersalin</span>
-              <svg v-else class="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </button>
-          </template>
 
           <template #transaction_date="{ value }">
             <RdDateTime :value="value" format="date" />
@@ -342,20 +318,10 @@ const columns = [
           :key="item.id"
           class="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-3 w-full"
         >
-          <!-- Baris 1: ID, Tanggal & Badge Jenis & Kategori -->
+          <!-- Baris 1: Tanggal & Metode Pembayaran & Badge Jenis & Kategori -->
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0 space-y-1">
               <div class="flex items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  @click.stop="copyId(item.id)"
-                  class="font-mono text-[11px] text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 select-all inline-flex items-center gap-1 cursor-pointer"
-                  :title="item.id"
-                >
-                  <span>#{{ item.id ? item.id.substring(0, 8) : '-' }}</span>
-                  <span v-if="copiedId === item.id" class="text-[10px] text-teal-600 font-sans font-semibold">Tersalin</span>
-                </button>
-                <span class="text-slate-300 dark:text-slate-700">·</span>
                 <span class="text-xs text-slate-500 font-medium">
                   <RdDateTime :value="item.transaction_date" format="date" />
                 </span>
@@ -588,7 +554,7 @@ const columns = [
     <!-- Modal Rincian Item Transaksi Multi-Item -->
     <RdModal
       v-model="itemsModalOpen"
-      :title="`Rincian Item Transaksi - #${selectedTransactionForItems?.id ? selectedTransactionForItems.id.substring(0, 8) : ''}`"
+      :title="`Rincian Item Transaksi: ${selectedTransactionForItems?.merchant_name || selectedTransactionForItems?.description || 'Transaksi'}`"
       max-width="2xl"
     >
       <div v-if="selectedTransactionForItems" class="space-y-4">
