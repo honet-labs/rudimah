@@ -13,7 +13,6 @@ import RdCheckbox from '../../../design-system/RdCheckbox.vue';
 import RdModal from '../../../design-system/RdModal.vue';
 import RdAlert from '../../../design-system/RdAlert.vue';
 import RdEmptyState from '../../../design-system/RdEmptyState.vue';
-import RdMoney from '../../../design-system/RdMoney.vue';
 import type { User, Tenant, AppManifest } from '../../../types/core';
 
 interface CategoryItem {
@@ -31,7 +30,6 @@ interface AccountItem {
   id: string;
   name: string;
   account_type: 'cash' | 'bank' | 'ewallet' | 'credit_card' | 'other';
-  current_balance_minor: number;
   is_active: boolean;
   created_at?: string;
 }
@@ -157,11 +155,10 @@ function deleteCategory() {
   });
 }
 
-// --- 2. MANAJEMEN METODE PEMBAYARAN (AKUN KEUANGAN) ---
+// --- 2. MANAJEMEN METODE PEMBAYARAN ---
 const accountColumns = [
-  { key: 'name', label: 'Nama Metode / Akun' },
-  { key: 'account_type', label: 'Tipe', width: '150px', align: 'center' as const },
-  { key: 'current_balance_minor', label: 'Saldo Saat Ini', width: '170px', align: 'right' as const },
+  { key: 'name', label: 'Nama Metode Pembayaran' },
+  { key: 'account_type', label: 'Tipe / Jenis', width: '180px', align: 'center' as const },
   { key: 'is_active', label: 'Status', width: '120px', align: 'center' as const },
   { key: 'actions', label: 'Aksi', width: '100px', align: 'center' as const },
 ];
@@ -174,13 +171,12 @@ const isSubmittingAccount = ref(false);
 const accountForm = ref({
   name: '',
   account_type: 'bank' as 'cash' | 'bank' | 'ewallet' | 'credit_card' | 'other',
-  current_balance_rupiah: 0,
   is_active: true,
 });
 
 const accountTypeOptions = [
-  { label: 'Rekening Bank', value: 'bank' },
   { label: 'Kas Tunai (Cash)', value: 'cash' },
+  { label: 'Rekening Bank', value: 'bank' },
   { label: 'Dompet Digital (E-Wallet)', value: 'ewallet' },
   { label: 'Kartu Kredit (Credit Card)', value: 'credit_card' },
   { label: 'Lainnya', value: 'other' },
@@ -192,7 +188,6 @@ function openCreateAccountModal() {
   accountForm.value = {
     name: '',
     account_type: 'bank',
-    current_balance_rupiah: 0,
     is_active: true,
   };
   showAccountModal.value = true;
@@ -204,7 +199,6 @@ function openEditAccountModal(account: AccountItem) {
   accountForm.value = {
     name: account.name,
     account_type: account.account_type,
-    current_balance_rupiah: Math.round((account.current_balance_minor || 0) / 100),
     is_active: account.is_active,
   };
   showAccountModal.value = true;
@@ -217,7 +211,6 @@ function submitAccount() {
   const payload = {
     name: accountForm.value.name.trim(),
     account_type: accountForm.value.account_type,
-    current_balance_minor: Math.round(Number(accountForm.value.current_balance_rupiah || 0) * 100),
     is_active: accountForm.value.is_active,
   };
 
@@ -320,7 +313,7 @@ function deleteAccount() {
         ]"
         @click="mainSection = 'accounts'"
       >
-        <span>Metode Pembayaran (Akun Kas)</span>
+        <span>Metode Pembayaran</span>
         <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
           {{ (accounts || []).length }}
         </span>
@@ -485,8 +478,8 @@ function deleteAccount() {
     <!-- SEKSI 2: MANAJEMEN METODE PEMBAYARAN (AKUN KEUANGAN) -->
     <div v-else-if="mainSection === 'accounts'" class="space-y-6">
       <RdCard
-        title="Metode Pembayaran & Akun Kas"
-        description="Kelola rekening bank, dompet digital, kartu kredit, dan kas tunai untuk sumber pembayaran saat pencatatan transaksi maupun pemindaian struk"
+        title="Metode Pembayaran"
+        description="Kelola daftar metode pembayaran transaksi seperti Uang Tunai, Rekening Bank, Dompet Digital, Kartu Kredit, atau QRIS"
       >
         <template #actions>
           <RdButton variant="primary" size="sm" @click="openCreateAccountModal">
@@ -504,12 +497,6 @@ function deleteAccount() {
               <RdBadge variant="neutral" class="whitespace-nowrap uppercase text-[10px]">
                 {{ value === 'cash' ? 'Tunai' : (value === 'bank' ? 'Bank' : (value === 'ewallet' ? 'E-Wallet' : (value === 'credit_card' ? 'Kartu Kredit' : 'Lainnya'))) }}
               </RdBadge>
-            </template>
-
-            <template #current_balance_minor="{ value }">
-              <span class="font-mono font-medium text-slate-800 dark:text-slate-200">
-                <RdMoney :amount-minor="value || 0" />
-              </span>
             </template>
 
             <template #is_active="{ value }">
@@ -705,32 +692,23 @@ function deleteAccount() {
     <RdModal
       v-model="showAccountModal"
       :title="isEditingAccount ? 'Ubah Metode Pembayaran' : 'Tambah Metode Pembayaran'"
-      :description="isEditingAccount ? 'Perbarui informasi rekening bank, dompet digital, atau kas' : 'Buat rekening, dompet digital, kartu kredit, atau kas tunai baru'"
+      :description="isEditingAccount ? 'Perbarui informasi metode pembayaran transaksi' : 'Tambahkan metode pembayaran baru untuk pencatatan transaksi'"
       max-width="md"
     >
       <form @submit.prevent="submitAccount" class="space-y-4 py-2">
         <RdInput
           v-model="accountForm.name"
-          label="Nama Metode / Akun"
-          placeholder="Contoh: BCA Utama, Kas Dompet, GoPay, Mandiri Kartu Kredit"
-          hint="Nama akun atau dompet yang mudah dikenali saat pembayaran transaksi"
+          label="Nama Metode Pembayaran"
+          placeholder="Contoh: Uang Tunai, Bank BCA, GoPay, OVO, QRIS, Kartu Kredit Mandiri"
+          hint="Nama metode pembayaran yang mudah dikenali saat input transaksi"
           required
         />
 
         <RdSelect
           v-model="accountForm.account_type"
-          label="Tipe Akun"
+          label="Tipe / Jenis"
           :options="accountTypeOptions"
-          hint="Tentukan jenis instrumen penyimpanan dana ini"
-          required
-        />
-
-        <RdInput
-          v-model.number="accountForm.current_balance_rupiah"
-          type="number"
-          label="Saldo Awal / Terkini (Rp)"
-          placeholder="0"
-          hint="Nominal saldo riil yang tersimpan dalam akun ini saat ini"
+          hint="Pilih jenis instrumen metode pembayaran ini"
           required
         />
 

@@ -24,11 +24,8 @@ class AccountController
         $validated = $request->validate([
             'name' => 'required|string|max:150',
             'account_type' => 'required|string|in:cash,bank,ewallet,credit_card,other',
-            'opening_balance' => 'nullable|numeric|min:0',
             'is_active' => 'nullable|boolean',
         ]);
-
-        $balanceMinor = isset($validated['opening_balance']) ? (int) round(((float) $validated['opening_balance'])) : 0;
 
         FinanceAccount::create([
             'id' => (string) Str::uuid(),
@@ -36,8 +33,8 @@ class AccountController
             'name' => trim($validated['name']),
             'account_type' => $validated['account_type'],
             'currency' => 'IDR',
-            'opening_balance_minor' => $balanceMinor,
-            'current_balance_minor' => $balanceMinor,
+            'opening_balance_minor' => 0,
+            'current_balance_minor' => 0,
             'is_active' => $validated['is_active'] ?? true,
             'created_by' => $request->user()?->id,
         ]);
