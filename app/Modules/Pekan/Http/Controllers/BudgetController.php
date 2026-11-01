@@ -21,7 +21,9 @@ class BudgetController
 
         $budgets = FinanceBudget::with('category')->get();
         foreach ($budgets as $budget) {
-            $budget->recalculateSpentAmount();
+            if (!$budget->is_past) {
+                $budget->recalculateSpentAmount();
+            }
         }
 
         $tenants = $user ? $user->getActiveTenants() : [];
@@ -151,6 +153,8 @@ class BudgetController
             'alert_threshold_pct' => $validated['alert_threshold_pct'],
             'notes' => $validated['notes'] ?? null,
         ]);
+
+        $budget->recalculateSpentAmount(true);
 
         $tenant = TenantContext::get();
         $slug = $tenant?->slug ?: $tenantSlug;

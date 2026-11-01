@@ -223,11 +223,12 @@ class TransactionService
             }
         }
 
-        // 2. Cek kecocokan dengan pos anggaran aktif (prioritas tinggi agar transaksi memotong anggaran yang relevan)
+        // 2. Cek kecocokan dengan pos anggaran aktif (hanya yang sedang berjalan, bukan histori)
         $activeBudgets = FinanceBudget::with('category')
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
-            ->get();
+            ->get()
+            ->filter(fn($b) => !$b->is_past);
 
         $textToMatch = strtolower($categoryName . ' ' . $description);
         foreach ($activeBudgets as $b) {
@@ -287,7 +288,10 @@ class TransactionService
                 ->get();
 
             foreach ($budgets as $b) {
-                $b->recalculateSpentAmount();
+                // Abaikan anggaran yang periodenya sudah selesai / histori
+                if (!$b->is_past) {
+                    $b->recalculateSpentAmount();
+                }
             }
         } catch (\Throwable $e) {
             // fail-safe logging without breaking transaction flow

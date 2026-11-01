@@ -8,6 +8,7 @@ import RdButton from '../../../design-system/RdButton.vue';
 import RdInput from '../../../design-system/RdInput.vue';
 import RdSelect from '../../../design-system/RdSelect.vue';
 import RdTextarea from '../../../design-system/RdTextarea.vue';
+import RdConfirmDialog from '../../../design-system/RdConfirmDialog.vue';
 import type { User, Tenant, AppManifest } from '../../../types/core';
 import type { FinanceBudget, FinanceCategory } from '../../../types/pekan';
 
@@ -21,6 +22,9 @@ const props = defineProps<{
 }>();
 
 const isSubmitting = ref(false);
+const isDeleteDialogOpen = ref(false);
+const isDeleting = ref(false);
+
 const name = ref(props.budget.name || '');
 const categoryId = ref(props.budget.category_id || (props.categories?.[0]?.id || ''));
 const amountLimitMinor = ref(props.budget.amount_limit_minor || 1000000);
@@ -59,6 +63,17 @@ function handleSubmit() {
     }
   });
 }
+
+function handleDelete() {
+  if (isDeleting.value) return;
+  isDeleting.value = true;
+
+  router.delete(`/t/${props.tenant.slug}/apps/pekan/budgets/${props.budget.id}`, {
+    onFinish: () => {
+      isDeleting.value = false;
+    }
+  });
+}
 </script>
 
 <template>
@@ -71,7 +86,18 @@ function handleSubmit() {
         { label: 'Anggaran', href: `/t/${tenant.slug}/apps/pekan/budgets` },
         { label: 'Ubah' }
       ]"
-    />
+    >
+      <template #actions>
+        <RdButton
+          type="button"
+          variant="danger"
+          size="sm"
+          @click="isDeleteDialogOpen = true"
+        >
+          Hapus Anggaran
+        </RdButton>
+      </template>
+    </RdPageHeader>
 
     <form @submit.prevent="handleSubmit" class="max-w-2xl">
       <RdCard title="Informasi Anggaran">
@@ -139,27 +165,49 @@ function handleSubmit() {
             :rows="3"
           />
 
-          <div class="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <RdButton
-              type="submit"
-              variant="primary"
-              size="md"
-              :loading="isSubmitting"
-            >
-              Simpan Perubahan
-            </RdButton>
-            <a :href="`/t/${tenant.slug}/apps/pekan/budgets`">
+          <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div class="flex items-center gap-3">
               <RdButton
-                type="button"
-                variant="outline"
+                type="submit"
+                variant="primary"
                 size="md"
+                :loading="isSubmitting"
               >
-                Batal
+                Simpan Perubahan
               </RdButton>
-            </a>
+              <a :href="`/t/${tenant.slug}/apps/pekan/budgets`">
+                <RdButton
+                  type="button"
+                  variant="outline"
+                  size="md"
+                >
+                  Batal
+                </RdButton>
+              </a>
+            </div>
+
+            <RdButton
+              type="button"
+              variant="danger"
+              size="md"
+              @click="isDeleteDialogOpen = true"
+            >
+              Hapus Anggaran
+            </RdButton>
           </div>
         </div>
       </RdCard>
     </form>
+
+    <!-- Dialog Konfirmasi Hapus Anggaran -->
+    <RdConfirmDialog
+      v-model="isDeleteDialogOpen"
+      title="Hapus Pos Anggaran Belanja?"
+      :message="`Pos anggaran '${budget.name}' akan dihapus secara permanen. Transaksi yang sebelumnya telah dialokasikan tidak akan terhapus dari buku kas.`"
+      danger
+      confirm-text="Ya, Hapus Anggaran"
+      :loading="isDeleting"
+      @confirm="handleDelete"
+    />
   </RudimahAppShell>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
 import RdCard from '../../../design-system/RdCard.vue';
@@ -7,6 +8,7 @@ import RdButton from '../../../design-system/RdButton.vue';
 import RdMoney from '../../../design-system/RdMoney.vue';
 import RdBadge from '../../../design-system/RdBadge.vue';
 import RdEmptyState from '../../../design-system/RdEmptyState.vue';
+import RdConfirmDialog from '../../../design-system/RdConfirmDialog.vue';
 import type { User, Tenant } from '../../../types/core';
 import type { FinanceBudget } from '../../../types/pekan';
 
@@ -35,6 +37,30 @@ const displayedBudgets = computed(() => {
   return activeTab.value === 'active' ? activeBudgets.value : historyBudgets.value;
 });
 
+// Dialog Hapus Anggaran
+const isDeleteDialogOpen = ref(false);
+const isDeleting = ref(false);
+const budgetToDelete = ref<FinanceBudget | null>(null);
+
+function confirmDelete(budget: FinanceBudget) {
+  budgetToDelete.value = budget;
+  isDeleteDialogOpen.value = true;
+}
+
+function handleDelete() {
+  if (!budgetToDelete.value) return;
+  isDeleting.value = true;
+  router.delete(`/t/${props.tenant.slug}/apps/pekan/budgets/${budgetToDelete.value.id}`, {
+    preserveScroll: true,
+    onSuccess: () => {
+      isDeleteDialogOpen.value = false;
+      budgetToDelete.value = null;
+    },
+    onFinish: () => {
+      isDeleting.value = false;
+    },
+  });
+}
 </script>
 
 <template>
@@ -150,23 +176,36 @@ const displayedBudgets = computed(() => {
 
         <div class="border-t border-slate-100 dark:border-slate-800 pt-3 flex items-center justify-between text-[11px] text-slate-400">
           <span>Periode: {{ b.period_label || (b.period === 'monthly' ? 'Bulanan' : 'Mingguan') }}</span>
-          <div class="flex items-center gap-2">
-            <span v-if="b.progress_percent >= b.alert_threshold_pct && activeTab === 'active'" class="font-medium text-amber-800 dark:text-amber-400">
+          <div class="flex items-center gap-1.5">
+            <span v-if="b.is_past" class="text-[11px] text-slate-400 font-medium mr-1">
+              Periode Selesai
+            </span>
+            <span v-else-if="b.progress_percent >= b.alert_threshold_pct" class="font-medium text-amber-800 dark:text-amber-400 mr-1">
               Mendekati limit
             </span>
+
+            <!-- Tombol Ubah Anggaran -->
             <a
-              v-if="activeTab === 'active'"
               :href="`/t/${tenant.slug}/apps/pekan/budgets/${b.id}/edit`"
               title="Ubah Anggaran"
-              class="p-1.5 text-slate-500 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors inline-flex items-center justify-center ml-2"
+              class="p-1.5 text-slate-500 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors inline-flex items-center justify-center cursor-pointer"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             </a>
-            <span v-else class="text-[11px] text-slate-400 font-medium">
-              Periode Selesai
-            </span>
+
+            <!-- Tombol Hapus Anggaran -->
+            <button
+              type="button"
+              @click.stop="confirmDelete(b)"
+              title="Hapus Anggaran"
+              class="p-1.5 text-slate-500 hover:text-red-700 dark:text-slate-400 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors inline-flex items-center justify-center cursor-pointer"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           </div>
         </div>
       </RdCard>
@@ -191,6 +230,17 @@ const displayedBudgets = computed(() => {
       v-else
       title="Belum Ada Histori Anggaran"
       description="Anggaran belanja dari bulan-bulan atau periode sebelumnya yang telah berakhir akan otomatis terarsip di sini untuk dievaluasi."
+    />
+
+    <!-- Dialog Konfirmasi Hapus Anggaran -->
+    <RdConfirmDialog
+      v-model="isDeleteDialogOpen"
+      title="Hapus Pos Anggaran Belanja?"
+      :message="`Pos anggaran '${budgetToDelete?.name || 'ini'}' akan dihapus secara permanen. Transaksi yang sebelumnya telah dialokasikan tidak akan terhapus dari buku kas.`"
+      danger
+      confirm-text="Ya, Hapus Anggaran"
+      :loading="isDeleting"
+      @confirm="handleDelete"
     />
   </RudimahAppShell>
 </template>

@@ -87,8 +87,13 @@ class FinanceBudget extends Model
         return [$startDate, $endDate];
     }
 
-    public function recalculateSpentAmount(): int
+    public function recalculateSpentAmount(bool $force = false): int
     {
+        // Kunci nominal anggaran jika periodenya sudah berakhir (masuk histori) agar tidak terus bertambah
+        if (!$force && ($this->is_past || $this->status === 'archived')) {
+            return (int) $this->spent_amount_minor;
+        }
+
         [$startDate, $endDate] = $this->getDateRange();
 
         $categoryIds = [];
