@@ -72,12 +72,21 @@ Route::middleware(['auth', EnsureMfaVerified::class])->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::post('/profile/chat-pairings', [ProfileController::class, 'generateChatPairingCode'])->name('profile.chat-pairings.generate');
     Route::delete('/profile/chat-sessions/{session}', [ProfileController::class, 'disconnectChatSession'])->name('profile.chat-sessions.destroy');
-    Route::get('/admin', [AdminController::class, 'dashboard'])->name('admin.dashboard');
-    Route::post('/admin/notifications', [AdminController::class, 'updateNotifications'])->name('admin.notifications.update');
-    Route::post('/admin/notifications/test', [AdminController::class, 'testNotification'])->name('admin.notifications.test');
-    Route::post('/admin/ai', [AdminController::class, 'updateAi'])->name('admin.ai.update');
-    Route::post('/admin/ai/test', [AdminController::class, 'testAi'])->name('admin.ai.test');
-    Route::post('/admin/ai/models', [AdminController::class, 'detectAiModels'])->name('admin.ai.models');
+    // Administrasi Platform RUDIMAH
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/', [AdminController::class, 'dashboard'])->name('dashboard');
+        Route::get('/workspaces', [AdminController::class, 'workspaces'])->name('workspaces');
+        Route::get('/users', [AdminController::class, 'users'])->name('users');
+        Route::get('/ai', [AdminController::class, 'ai'])->name('ai');
+        Route::get('/notifications', [AdminController::class, 'notifications'])->name('notifications');
+        Route::get('/apps', [AdminController::class, 'apps'])->name('apps');
+
+        Route::post('/notifications', [AdminController::class, 'updateNotifications'])->name('notifications.update');
+        Route::post('/notifications/test', [AdminController::class, 'testNotification'])->name('notifications.test');
+        Route::post('/ai', [AdminController::class, 'updateAi'])->name('ai.update');
+        Route::post('/ai/test', [AdminController::class, 'testAi'])->name('ai.test');
+        Route::post('/ai/models', [AdminController::class, 'detectAiModels'])->name('ai.models');
+    });
 
     // Peluncur Cerdas Aplikasi Global (Mencegah 404 ketika diakses tanpa slug tenant spesifik)
     Route::get('/apps', [WorkspaceController::class, 'launchApp'])->name('apps.index');

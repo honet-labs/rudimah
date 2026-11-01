@@ -108,10 +108,11 @@ const pekanNavItems = computed(() => [
 
 const adminNavItems = computed(() => [
   { name: 'Ringkasan Sistem', path: '/admin', icon: 'server' },
-  { name: 'Semua Ruang Kerja', path: '/admin#workspaces', icon: 'building' },
-  { name: 'Pengguna Terdaftar', path: '/admin#users', icon: 'users' },
-  { name: 'Kanal Notifikasi & OTP', path: '/admin#notifications', icon: 'bell' },
-  { name: 'Katalog Modul Aplikasi', path: '/admin#apps', icon: 'apps' },
+  { name: 'Semua Ruang Kerja', path: '/admin/workspaces', icon: 'building' },
+  { name: 'Pengguna Terdaftar', path: '/admin/users', icon: 'users' },
+  { name: 'Penyedia AI Platform', path: '/admin/ai', icon: 'cpu' },
+  { name: 'Kanal Notifikasi & OTP', path: '/admin/notifications', icon: 'bell' },
+  { name: 'Katalog Modul Aplikasi', path: '/admin/apps', icon: 'apps' },
   { name: 'Pilih Ruang Kerja', path: '/workspaces', icon: 'arrow-left' },
 ]);
 
@@ -136,7 +137,7 @@ function isCurrentRoute(targetPath: string): boolean {
   const cleanTarget = targetPath.split('?')[0].split('#')[0];
   const current = currentPath.value.split('#')[0];
 
-  // Hash route matching (misal untuk /admin#workspaces)
+  // Hash route matching (fallback)
   if (targetPath.includes('#')) {
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
     return current + hash === targetPath;
@@ -145,6 +146,11 @@ function isCurrentRoute(targetPath: string): boolean {
   // Exact match
   if (current === cleanTarget) {
     return true;
+  }
+
+  // Jangan cocokkan /admin dengan sub-route /admin/*
+  if (cleanTarget === '/admin') {
+    return current === '/admin' || current === '/admin/';
   }
 
   // Jika target dasbor dan URL saat ini adalah root modul (/t/:slug/apps/pekan atau /t/:slug/apps/pekan/)

@@ -15,41 +15,12 @@ use Inertia\Response;
 
 class AdminController
 {
-    public function dashboard(Request $request): Response
+    private function getCommonAdminProps(Request $request): array
     {
         $user = $request->user();
         if (!$user->is_super_admin) {
             abort(403, 'Hanya Administrator Platform yang memiliki akses ke halaman ini.');
         }
-
-        $totalTenants = Tenant::count();
-        $totalUsers = User::count();
-        $tenantsList = Tenant::withCount('memberships')->latest()->get()->map(function ($t) {
-            return [
-                'id' => $t->id,
-                'name' => $t->name,
-                'slug' => $t->slug,
-                'status' => $t->status,
-                'members_count' => $t->memberships_count,
-                'created_at' => $t->created_at?->toDateString(),
-            ];
-        });
-
-        $usersList = User::withCount('memberships')->latest()->limit(50)->get()->map(function ($u) {
-            return [
-                'id' => $u->id,
-                'name' => $u->full_name,
-                'email' => $u->email,
-                'is_super_admin' => (bool) $u->is_super_admin,
-                'has_mfa' => (bool) $u->mfaMethods()->where('is_verified', true)->exists(),
-                'workspaces_count' => $u->memberships_count,
-                'created_at' => $u->created_at?->toDateString(),
-            ];
-        });
-
-        $appsList = AppRegistry::all();
-        $notificationSettings = PlatformNotificationService::getSettings();
-        $aiSettings = PlatformAiService::getSettings();
 
         // Resolve ruang kerja aktif/default bagi admin untuk navigasi aplikasi yang valid
         $defaultTenant = null;
@@ -77,7 +48,7 @@ class AdminController
             'role' => 'admin',
         ] : null;
 
-        return Inertia::render('Admin/Dashboard', [
+        return [
             'user' => [
                 'id' => $user->id,
                 'name' => $user->full_name,
@@ -87,6 +58,44 @@ class AdminController
             'tenant' => $tenantPayload,
             'status' => session('status'),
             'error' => session('error'),
+        ];
+    }
+
+    public function dashboard(Request $request): Response
+    {
+        $common = $this->getCommonAdminProps($request);
+
+        $totalTenants = Tenant::count();
+        $totalUsers = User::count();
+
+        $recentTenants = Tenant::withCount('memberships')->latest()->limit(5)->get()->map(function ($t) {
+            return [
+                'id' => $t->id,
+                'name' => $t->name,
+                'slug' => $t->slug,
+                'status' => $t->status,
+                'members_count' => $t->memberships_count,
+                'created_at' => $t->created_at?->toDateString(),
+            ];
+        });
+
+        $recentUsers = User::withCount('memberships')->latest()->limit(5)->get()->map(function ($u) {
+            return [
+                'id' => $u->id,
+                'name' => $u->full_name,
+                'email' => $u->email,
+                'is_super_admin' => (bool) $u->is_super_admin,
+                'has_mfa' => (bool) $u->mfaMethods()->where('is_verified', true)->exists(),
+                'workspaces_count' => $u->memberships_count,
+                'created_at' => $u->created_at?->toDateString(),
+            ];
+        });
+
+        $notificationSettings = PlatformNotificationService::getSettings();
+        $aiSettings = PlatformAiService::getSettings();
+        $appsList = AppRegistry::all();
+
+        return Inertia::render('Admin/Dashboard', array_merge($common, [
             'systemStats' => [
                 'totalTenants' => $totalTenants,
                 'totalUsers' => $totalUsers,
@@ -94,12 +103,83 @@ class AdminController
                 'redisConnected' => true,
                 'appVersion' => '1.0.0-rudimah',
             ],
-            'notificationSettings' => $notificationSettings,
+            'recentTenants' => $recentTenants,
+            'recentUsers' => $recentUsers,
             'aiSettings' => $aiSettings,
-            'tenantsList' => $tenantsList,
-            'usersList' => $usersList,
+            'notificationSettings' => $notificationSettings,
             'appsList' => $appsList,
-        ]);
+        ]));
+    }
+
+    public function workspaces(Request $request): Response
+    {
+        $common = $this->getCommonAdminProps($request);
+
+        $tenantsList = Tenant::withCount('memberships')->latest()->get()->map(function ($t) {
+            return [
+                'id' => $t->id,
+                'name' => $t->name,
+                'slug' => $t->slug,
+                'status' => $t->status,
+                'members_count' => $t->memberships_count,
+                'created_at' => $t->created_at?->toDateString(),
+            ];
+        });
+
+        return Inertia::render('Admin/Workspaces', array_merge($common, [
+            'tenantsList' => $tenantsList,
+        ]));
+    }
+
+    public function users(Request $request): Response
+    {
+        $common = $this->getCommonAdminProps($request);
+
+        $usersList = User::withCount('memberships')->latest()->get()->map(function ($u) {
+            return [
+                'id' => $u->id,
+                'name' => $u->full_name,
+                'email' => $u->email,
+                'is_super_admin' => (bool) $u->is_super_admin,
+                'has_mfa' => (bool) $u->mfaMethods()->where('is_verified', true)->exists(),
+                'workspaces_count' => $u->memberships_count,
+                'created_at' => $u->created_at?->toDateString(),
+            ];
+        });
+
+        return Inertia::render('Admin/Users', array_merge($common, [
+            'usersList' => $usersList,
+        ]));
+    }
+
+    public function ai(Request $request): Response
+    {
+        $common = $this->getCommonAdminProps($request);
+        $aiSettings = PlatformAiService::getSettings();
+
+        return Inertia::render('Admin/Ai', array_merge($common, [
+            'aiSettings' => $aiSettings,
+        ]));
+    }
+
+    public function notifications(Request $request): Response
+    {
+        $common = $this->getCommonAdminProps($request);
+        $notificationSettings = PlatformNotificationService::getSettings();
+
+        return Inertia::render('Admin/Notifications', array_merge($common, [
+            'notificationSettings' => $notificationSettings,
+        ]));
+    }
+
+    public function apps(Request $request): Response
+    {
+        $common = $this->getCommonAdminProps($request);
+        $appsList = AppRegistry::all();
+
+        return Inertia::render('Admin/Apps', array_merge($common, [
+            'appsList' => $appsList,
+        ]));
     }
 
     /**
