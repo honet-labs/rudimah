@@ -251,6 +251,7 @@ class TenantAssistantService
         $isDeleteIntent = (bool) preg_match('/\b(hapus|batalkan|delete)\s+(transaksi|mutasi|catatan)\b/i', $userMessageTrimmed);
         $isExplicitCreate = (bool) preg_match('/\b(catat|tambah|masuk(?:in|kan)?|simpan|input|buatkan|tadi\s+(?:makan|beli|minum|jajan|belanja)|beli|makan|bayar)\b/i', $userMessageTrimmed);
 
+        $detectedUnitPriceInfo = null;
         if (!empty($parsedActions)) {
             foreach ($parsedActions as $action) {
                 try {
@@ -285,6 +286,22 @@ class TenantAssistantService
                         }
                     }
 
+                    // Resolusi Merchant Otomatis untuk Bahan Bakar (BBM) jika belum terisi
+                    if (empty($merchantName)) {
+                        $fuelSource = strtolower(($action['description'] ?? '') . ' ' . $userMessageTrimmed);
+                        if (preg_match('/\b(pertamax(?:\s*(?:turbo|green))?|pertalite|dexlite|biosolar|solar pertamina|pertamina dex)\b/i', $fuelSource)) {
+                            $merchantName = 'SPBU Pertamina';
+                        } elseif (preg_match('/\b(shell\s*(?:super|v-power|diesel)?)\b/i', $fuelSource)) {
+                            $merchantName = 'Shell';
+                        } elseif (preg_match('/\b(bp\s*(?:92|ultimate|diesel)?)\b/i', $fuelSource)) {
+                            $merchantName = 'BP-AKR';
+                        } elseif (preg_match('/\b(revvo|vivo)\b/i', $fuelSource)) {
+                            $merchantName = 'SPBU Vivo';
+                        } elseif (preg_match('/\b(bensin|bbm|spbu|pom bensin)\b/i', $fuelSource)) {
+                            $merchantName = 'SPBU';
+                        }
+                    }
+
                     // Resolusi Deskripsi Lengkap
                     $description = trim($action['description'] ?? '');
                     if (empty($description) || in_array(strtolower($description), ['transaksi', 'makan', 'makan siang', 'makan malam', 'makan pagi', 'pengeluaran'])) {
@@ -301,6 +318,12 @@ class TenantAssistantService
                     }
                     if (empty($description)) {
                         $description = 'Pengeluaran via Asisten AI';
+                    }
+
+                    // Deteksi Harga Satuan dan Kuantitas/Volume (misal BBM per liter atau timbangan per kg)
+                    $unitPriceInfo = $this->detectUnitPriceAndVolume($userMessageTrimmed, $amountMinor);
+                    if ($unitPriceInfo) {
+                        $detectedUnitPriceInfo = $unitPriceInfo;
                     }
 
                     // Ekstraksi / Pembentukan Baris Item Transaksi
@@ -323,6 +346,17 @@ class TenantAssistantService
                                 if ($itemTotal <= 0 && $itemPrice > 0) {
                                     $itemTotal = (int) round($itemPrice * $itemQty);
                                 }
+
+                                // Koreksi jika model AI hanya mengisi quantity: 1 dan price_minor sama dengan total belanja,
+                                // padahal pengguna secara eksplisit menyebutkan harga satuan per unit/liter/kg
+                                if (count($action['items']) === 1 && $unitPriceInfo && $unitPriceInfo['unit_price'] > 0) {
+                                    if ($itemQty == 1 && ($itemPrice == $amountMinor || $itemPrice <= 0)) {
+                                        $itemQty = $unitPriceInfo['quantity'];
+                                        $itemPrice = $unitPriceInfo['unit_price'];
+                                        $itemTotal = $amountMinor;
+                                    }
+                                }
+
                                 $calculatedItemsTotal += $itemTotal;
                                 $items[] = [
                                     'item_name' => $itemName,
@@ -350,10 +384,21 @@ class TenantAssistantService
                                 $cleanItemName = ucwords($candidateItem);
                             }
                         }
+                        if (preg_match('/(?:beli|isi)\s+(bensin\s+[a-z0-9]+|pertamax(?:\s*(?:turbo|green))?|pertalite|solar|dexlite)\b/i', $userMessageTrimmed, $fmMatch)) {
+                            $cleanItemName = ucwords($fmMatch[1]);
+                        }
+
+                        $itemQty = 1;
+                        $itemPrice = $amountMinor;
+                        if ($unitPriceInfo && $unitPriceInfo['unit_price'] > 0) {
+                            $itemQty = $unitPriceInfo['quantity'];
+                            $itemPrice = $unitPriceInfo['unit_price'];
+                        }
+
                         $items[] = [
                             'item_name' => $cleanItemName ?: 'Transaksi',
-                            'quantity' => 1,
-                            'price_minor' => $amountMinor,
+                            'quantity' => $itemQty,
+                            'price_minor' => $itemPrice,
                             'total_minor' => $amountMinor,
                             'discount_minor' => 0,
                         ];
@@ -495,6 +540,21 @@ class TenantAssistantService
 
                 // Bersihkan kalimat matematika janggal/halusinasi jika ada (seperti "Total dua transaksi Rp 30.000 untuk hari ini")
                 $replyContent = preg_replace('/\s*Total\s+(?:dua|tiga|\d+)\s+transaksi\s+Rp\s*[\d\.,]+\s+untuk\s+hari\s+ini\.?/i', '', $replyContent);
+
+                // Jika transaksi mencatat pembelian berbasis satuan (misal BBM per liter atau timbangan),
+                // pastikan balasan asisten merinci volume dan harga satuannya
+                if (!empty($detectedUnitPriceInfo) && $detectedUnitPriceInfo['unit_price'] > 0 && $hasCreate) {
+                    $qtyFormatted = number_format($detectedUnitPriceInfo['quantity'], $detectedUnitPriceInfo['quantity'] == round($detectedUnitPriceInfo['quantity']) ? 0 : 2, ',', '.');
+                    $unitPriceFormatted = 'Rp ' . number_format($detectedUnitPriceInfo['unit_price'], 0, ',', '.');
+                    $unitLabel = $detectedUnitPriceInfo['unit'];
+
+                    if (stripos($replyContent, (string) $detectedUnitPriceInfo['unit_price']) === false && stripos($replyContent, $unitPriceFormatted) === false) {
+                        $detailSnippet = " ({$qtyFormatted} {$unitLabel} @ {$unitPriceFormatted})";
+                        if (preg_match('/(Rp\s*[\d\.,]+)/i', $replyContent, $rpm)) {
+                            $replyContent = preg_replace('/' . preg_quote($rpm[1], '/') . '/', $rpm[1] . $detailSnippet, $replyContent, 1);
+                        }
+                    }
+                }
 
                 if ($hasUpdate) {
                     $replyContent = preg_replace('/Transaksi\s+dicatat\s*:/i', 'Transaksi berhasil diperbarui:', $replyContent);
@@ -696,6 +756,115 @@ class TenantAssistantService
             ->where('created_at', '>=', now()->subHours(2))
             ->orderBy('created_at', 'desc')
             ->first();
+    }
+
+    /**
+     * Parsing nominal uang Bahasa Indonesia (misal: "Rp 15.950", "35rb", "15.950", "35.000", "50 ribu").
+     */
+    protected function parseIndonesianNominal(string $text): int
+    {
+        $text = trim($text);
+        if (empty($text)) {
+            return 0;
+        }
+
+        $isRibu = (bool) preg_match('/(?:ribu|rb|k)\b/i', $text);
+        $isJuta = (bool) preg_match('/(?:juta|jt)\b/i', $text);
+
+        // Hapus teks Rp, IDR, spasi, dan akhiran kata nominal
+        $cleaned = preg_replace('/^(?:rp\.?|idr)\s*/i', '', $text);
+        $cleaned = preg_replace('/\s*(?:ribu|rb|k|juta|jt).*$/i', '', $cleaned);
+        $cleaned = trim($cleaned);
+
+        // Bersihkan karakter selain angka, titik, dan koma
+        $cleaned = preg_replace('/[^\d\.,]/', '', $cleaned);
+        if (empty($cleaned)) {
+            return 0;
+        }
+
+        // Jika ada titik atau koma, tentukan apakah ribuan atau pecahan desimal
+        // Pola ribuan standar: 15.950 atau 1.500.000 atau 15,950 (3 digit di akhir)
+        if (preg_match('/^\d{1,3}(?:[\.,]\d{3})+$/', $cleaned)) {
+            $val = (float) str_replace(['.', ','], '', $cleaned);
+        } elseif (preg_match('/^\d+[\.,]\d+$/', $cleaned)) {
+            // Pecahan desimal, misal 15,5 atau 2.5 (biasanya sebelum rb/juta)
+            $val = (float) str_replace(',', '.', $cleaned);
+        } else {
+            $val = (float) str_replace(['.', ','], '', $cleaned);
+        }
+
+        if ($isRibu && $val < 1000) {
+            $val *= 1000;
+        } elseif ($isJuta && $val < 1000000) {
+            $val *= 1000000;
+        }
+
+        return (int) round($val);
+    }
+
+    /**
+     * Mendeteksi harga satuan dan volume/kuantitas dari teks pesan pengguna
+     * (misal: "beli bensin pertamax 35rb untuk 1liternya Rp15.950", "beli telur 30rb sekilonya 28000", "50rb @ 10000/liter").
+     *
+     * @return array{unit_price: int, quantity: float, unit: string}|null
+     */
+    protected function detectUnitPriceAndVolume(string $text, int $totalAmountMinor): ?array
+    {
+        // Pola 1: "untuk 1liternya Rp15.950", "seliternya 10rb", "sekilonya 25.000", "harga 1 liter 15950", "per liter 10rb"
+        $pattern1 = '/(?:untuk|harga|seharga|senilai|adalah|sebesar|per|tiap|@)?\s*(?:1|se)?\s*(liter|ltr|lt|kg|kilo|gram|gr|pcs|pc|bungkus|buah|meter|m)\s*(?:nya)?\s*(?:seharga|senilai|adalah|sebesar|rp\.?|:|@)?\s*([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i';
+
+        // Pola 2: "15.950/liter", "15rb per liter", "28000 per kg"
+        $pattern2 = '/(?:rp\.?\s*)?([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)\s*(?:\/|\s+per\s+)\s*(liter|ltr|lt|kg|kilo|gram|gr|pcs|pc|bungkus|buah|meter|m)/i';
+
+        // Pola 3: "@ 15.950", "@ Rp 15.950"
+        $pattern3 = '/@\s*(?:rp\.?\s*)?([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)(?:\s*(?:\/|\s+per\s+)?(liter|ltr|lt|kg|kilo|gram|gr|pcs|pc|bungkus|buah|meter|m))?/i';
+
+        $unitPrice = 0;
+        $unit = '';
+
+        if (preg_match($pattern1, $text, $m)) {
+            $unit = strtolower($m[1]);
+            $unitPrice = $this->parseIndonesianNominal($m[2]);
+        } elseif (preg_match($pattern2, $text, $m)) {
+            $unitPrice = $this->parseIndonesianNominal($m[1]);
+            $unit = strtolower($m[2]);
+        } elseif (preg_match($pattern3, $text, $m)) {
+            $unitPrice = $this->parseIndonesianNominal($m[1]);
+            $unit = !empty($m[2]) ? strtolower($m[2]) : 'unit';
+        }
+
+        if ($unitPrice <= 0) {
+            return null;
+        }
+
+        // Jika totalAmountMinor diketahui dan lebih besar dari unitPrice
+        if ($totalAmountMinor > 0 && $totalAmountMinor >= $unitPrice) {
+            $calculatedQty = round($totalAmountMinor / $unitPrice, 4);
+            return [
+                'unit_price' => $unitPrice,
+                'quantity' => $calculatedQty,
+                'unit' => $unit,
+            ];
+        }
+
+        // Jika pengguna justru menyebutkan kuantitas dan harga satuan: misal "2.5 liter harganya 15950 per liter"
+        if (preg_match('/([0-9]+(?:[\.,][0-9]+)?)\s*(liter|ltr|lt|kg|kilo|gram|gr|pcs|pc|bungkus|buah|meter|m)\b/i', $text, $qm)) {
+            $rawQty = str_replace(',', '.', $qm[1]);
+            $qty = (float) $rawQty;
+            if ($qty > 0) {
+                return [
+                    'unit_price' => $unitPrice,
+                    'quantity' => round($qty, 4),
+                    'unit' => strtolower($qm[2]),
+                ];
+            }
+        }
+
+        return [
+            'unit_price' => $unitPrice,
+            'quantity' => 1,
+            'unit' => $unit,
+        ];
     }
 }
 
