@@ -33,22 +33,20 @@ class ReceiptScanController
 
         PlatformAiService::applyRuntimeConfig();
         $platformSettings = PlatformAiService::getSettings();
-        $activeProvider = $platformSettings['active_provider'] ?? config('rudimah.ai.default_provider', 'gemini');
-        $normalizedActive = (strtolower($activeProvider) === 'ninerouter') ? '9router' : strtolower($activeProvider);
-        $activeDetails = $platformSettings['providers'][$normalizedActive] ?? [];
 
         $tenantSetting = $tenant ? TenantAiSetting::where('tenant_id', $tenant->id)->first() : null;
         $hasCustomKey = !empty($tenantSetting?->api_key);
 
         $effectiveProvider = $hasCustomKey && !empty($tenantSetting?->provider)
             ? $tenantSetting->provider
-            : $normalizedActive;
+            : ($platformSettings['effective_ocr_provider'] ?? config('rudimah.ocr.provider', 'gemini'));
 
         $effectiveNormalized = (strtolower($effectiveProvider) === 'ninerouter') ? '9router' : strtolower($effectiveProvider);
+        $activeDetails = $platformSettings['providers'][$effectiveNormalized] ?? [];
 
         $effectiveModel = $hasCustomKey && !empty($tenantSetting?->model)
             ? $tenantSetting->model
-            : ($activeDetails['model'] ?? config("rudimah.ai.{$effectiveNormalized}_model", 'gpt-4o-mini'));
+            : ($platformSettings['effective_ocr_model'] ?? config('rudimah.ocr.model', 'gpt-4o-mini'));
 
         if ($effectiveNormalized === '9router' && ($effectiveModel === 'high-models-agent' || empty($effectiveModel))) {
             $effectiveModel = 'gpt-4o-mini';

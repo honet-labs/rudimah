@@ -52,13 +52,13 @@ class ReceiptOcrService
         $hasCustomKey = !empty($tenantSetting?->api_key);
         $providerCode = $hasCustomKey && !empty($tenantSetting?->provider)
             ? $tenantSetting->provider
-            : config('rudimah.ai.default_provider', 'gemini');
+            : config('rudimah.ocr.provider', config('rudimah.ai.default_provider', 'gemini'));
 
         $normalizedCode = (strtolower($providerCode) === 'ninerouter') ? '9router' : strtolower($providerCode);
 
         $modelName = $hasCustomKey && !empty($tenantSetting?->model)
             ? $tenantSetting->model
-            : config("rudimah.ai.{$normalizedCode}_model", config('rudimah.ocr.model', 'gpt-4o-mini'));
+            : config('rudimah.ocr.model', config("rudimah.ai.{$normalizedCode}_model", 'gpt-4o-mini'));
 
         // high-models-agent adalah router model teks dan tidak menerima input vision di 9Router
         if ($normalizedCode === '9router' && ($modelName === 'high-models-agent' || empty($modelName))) {

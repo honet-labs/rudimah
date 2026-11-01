@@ -78,6 +78,10 @@ interface AiProviderDetail {
 interface AiSettingsProp {
   active_provider: string;
   is_enabled: boolean;
+  ocr_provider?: string;
+  ocr_model?: string;
+  effective_ocr_provider?: string;
+  effective_ocr_model?: string;
   providers: {
     gemini: AiProviderDetail;
     openai: AiProviderDetail;
@@ -197,9 +201,18 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
 }
 
 // Manajemen Konfigurasi AI Platform
+const savedAiTab = typeof window !== 'undefined' ? localStorage.getItem('rudimah_admin_ai_tab') : null;
 const activeAiTab = ref<'gemini' | 'openai' | 'claude' | '9router'>(
-  (props.aiSettings?.active_provider as 'gemini' | 'openai' | 'claude' | '9router') || 'gemini'
+  (savedAiTab as any) || (props.aiSettings?.active_provider as any) || 'gemini'
 );
+
+function switchAiTab(tab: 'gemini' | 'openai' | 'claude' | '9router') {
+  activeAiTab.value = tab;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('rudimah_admin_ai_tab', tab);
+  }
+}
+
 const isAiSaving = ref(false);
 const isAiTesting = ref(false);
 const showTestAiModal = ref(false);
@@ -215,6 +228,8 @@ const aiProviderOptions = [
 const aiForm = ref({
   active_provider: props.aiSettings?.active_provider || 'gemini',
   is_enabled: props.aiSettings?.is_enabled ?? true,
+  ocr_provider: props.aiSettings?.ocr_provider || 'auto',
+  ocr_model: props.aiSettings?.ocr_model || '',
   gemini: {
     api_endpoint: props.aiSettings?.providers?.gemini?.api_endpoint || 'https://generativelanguage.googleapis.com',
     api_key: '',
@@ -233,12 +248,15 @@ const aiForm = ref({
   '9router': {
     api_endpoint: props.aiSettings?.providers?.['9router']?.api_endpoint || 'https://api.9router.com/v1',
     api_key: '',
-    model: props.aiSettings?.providers?.['9router']?.model || 'gpt-4o-mini',
+    model: props.aiSettings?.providers?.['9router']?.model || 'high-models-agent',
   },
 });
 
 function saveAiSettings() {
   isAiSaving.value = true;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('rudimah_admin_ai_tab', activeAiTab.value);
+  }
   router.post('/admin/ai', aiForm.value, {
     preserveScroll: true,
     onFinish: () => {
@@ -609,7 +627,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                 ? 'border-teal-600 bg-teal-50/50 dark:bg-teal-950/20 shadow-sm'
                 : 'border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 hover:border-slate-300'
             ]"
-            @click="activeAiTab = provKey as any"
+            @click="switchAiTab(provKey as any)"
           >
             <div class="flex items-center justify-between gap-2 mb-1.5">
               <span class="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white truncate">
@@ -618,6 +636,14 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
               <RdBadge v-if="aiForm.active_provider === provKey" variant="info" class="shrink-0 text-[10px]">
                 Aktif
               </RdBadge>
+              <button
+                v-else
+                type="button"
+                class="text-[10px] text-teal-600 dark:text-teal-400 hover:underline shrink-0 font-medium"
+                @click.stop="aiForm.active_provider = provKey as any; switchAiTab(provKey as any)"
+              >
+                Aktifkan
+              </button>
             </div>
             <p class="text-[11px] text-slate-500 font-mono truncate mb-2">
               {{ prov.model || '-' }}
@@ -653,13 +679,28 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
               </RdButton>
             </div>
 
-            <div class="max-w-md pt-2">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/60 dark:border-slate-800">
               <RdSelect
                 v-model="aiForm.active_provider"
                 label="Penyedia AI Default Platform"
                 :options="aiProviderOptions"
-                hint="Penyedia default yang otomatis digunakan oleh asisten jika ruang kerja tidak menentukan kunci mandiri"
+                hint="Penyedia default yang digunakan untuk asisten cerdas jika ruang kerja tidak menggunakan kunci mandiri"
               />
+
+              <div class="space-y-1.5">
+                <RdInput
+                  v-model="aiForm.ocr_model"
+                  label="Model Khusus Scan Struk / OCR Vision (Opsional)"
+                  placeholder="Kosongkan untuk mengikuti model penyedia aktif"
+                  hint="Nama model vision (misal: gpt-4o-mini, gpt-4o, claude-3-5-sonnet, gemini-1.5-flash)"
+                />
+                <p class="text-[11px] text-slate-500">
+                  Model OCR aktif saat ini:
+                  <span class="font-mono font-medium text-teal-700 dark:text-teal-400">
+                    {{ aiForm.ocr_model || props.aiSettings?.effective_ocr_model || 'Otomatis' }}
+                  </span>
+                </p>
+              </div>
             </div>
           </div>
 
@@ -673,7 +714,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
                   : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               ]"
-              @click="activeAiTab = 'gemini'"
+              @click="switchAiTab('gemini')"
             >
               <span>Google Gemini</span>
               <span v-if="props.aiSettings?.providers?.gemini?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
@@ -687,7 +728,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
                   : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               ]"
-              @click="activeAiTab = 'openai'"
+              @click="switchAiTab('openai')"
             >
               <span>OpenAI ChatGPT</span>
               <span v-if="props.aiSettings?.providers?.openai?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
@@ -701,7 +742,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
                   : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               ]"
-              @click="activeAiTab = 'claude'"
+              @click="switchAiTab('claude')"
             >
               <span>Anthropic Claude</span>
               <span v-if="props.aiSettings?.providers?.claude?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
@@ -715,7 +756,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   ? 'border-teal-600 text-teal-700 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20'
                   : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               ]"
-              @click="activeAiTab = '9router'"
+              @click="switchAiTab('9router')"
             >
               <span>9Router AI Gateway</span>
               <span v-if="props.aiSettings?.providers?.['9router']?.is_configured" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
@@ -726,7 +767,20 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
           <div v-show="activeAiTab === 'gemini'" class="space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan Google Gemini</h4>
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan Google Gemini</h4>
+                  <RdBadge v-if="aiForm.active_provider === 'gemini'" variant="success" class="text-[10px]">
+                    Penyedia Aktif Platform
+                  </RdBadge>
+                  <button
+                    v-else
+                    type="button"
+                    class="text-xs text-teal-600 dark:text-teal-400 font-medium hover:underline cursor-pointer"
+                    @click="aiForm.active_provider = 'gemini'"
+                  >
+                    Jadikan Penyedia Aktif
+                  </button>
+                </div>
                 <p class="text-xs text-slate-500">Integrasi resmi model Gemini Flash & Gemini Pro dari Google AI Studio</p>
               </div>
               <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
@@ -813,7 +867,20 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
           <div v-show="activeAiTab === 'openai'" class="space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan OpenAI ChatGPT</h4>
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan OpenAI ChatGPT</h4>
+                  <RdBadge v-if="aiForm.active_provider === 'openai'" variant="success" class="text-[10px]">
+                    Penyedia Aktif Platform
+                  </RdBadge>
+                  <button
+                    v-else
+                    type="button"
+                    class="text-xs text-teal-600 dark:text-teal-400 font-medium hover:underline cursor-pointer"
+                    @click="aiForm.active_provider = 'openai'"
+                  >
+                    Jadikan Penyedia Aktif
+                  </button>
+                </div>
                 <p class="text-xs text-slate-500">Integrasi model OpenAI GPT-4o, GPT-4o-mini, atau gateway kompatibel</p>
               </div>
               <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
@@ -900,7 +967,20 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
           <div v-show="activeAiTab === 'claude'" class="space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan Anthropic Claude</h4>
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan Anthropic Claude</h4>
+                  <RdBadge v-if="aiForm.active_provider === 'claude'" variant="success" class="text-[10px]">
+                    Penyedia Aktif Platform
+                  </RdBadge>
+                  <button
+                    v-else
+                    type="button"
+                    class="text-xs text-teal-600 dark:text-teal-400 font-medium hover:underline cursor-pointer"
+                    @click="aiForm.active_provider = 'claude'"
+                  >
+                    Jadikan Penyedia Aktif
+                  </button>
+                </div>
                 <p class="text-xs text-slate-500">Integrasi model Claude 3.5 Sonnet, Claude 3 Opus, dan Claude 3.5 Haiku</p>
               </div>
               <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
@@ -987,7 +1067,20 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
           <div v-show="activeAiTab === '9router'" class="space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan 9Router AI Gateway</h4>
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan 9Router AI Gateway</h4>
+                  <RdBadge v-if="aiForm.active_provider === '9router'" variant="success" class="text-[10px]">
+                    Penyedia Aktif Platform
+                  </RdBadge>
+                  <button
+                    v-else
+                    type="button"
+                    class="text-xs text-teal-600 dark:text-teal-400 font-medium hover:underline cursor-pointer"
+                    @click="aiForm.active_provider = '9router'"
+                  >
+                    Jadikan Penyedia Aktif
+                  </button>
+                </div>
                 <p class="text-xs text-slate-500">Integrasi gateway terpadu multi-penyedia AI dengan protokol kompatibel OpenAI</p>
               </div>
               <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">

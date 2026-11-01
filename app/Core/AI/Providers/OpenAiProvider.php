@@ -241,6 +241,7 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
     {
         $items = [];
         if (!empty($raw['items']) && is_array($raw['items'])) {
+            foreach ($raw['items'] as $it) {
                 $rawQty = $it['quantity'] ?? 1;
                 $qty = is_numeric($rawQty) ? (float) $rawQty : 1;
                 if ($qty <= 0) {

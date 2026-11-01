@@ -42,11 +42,29 @@ class PlatformAiService
         // 4. 9Router AI Gateway
         $routerRawKey = $dbSettings->get('ai_9router_key', env('NINEROUTER_API_KEY', ''));
         $routerEndpoint = $dbSettings->get('ai_9router_endpoint', 'https://api.9router.com/v1');
-        $routerModel = $dbSettings->get('ai_9router_model', 'gpt-4o-mini');
+        $routerModel = $dbSettings->get('ai_9router_model', 'high-models-agent');
+
+        $ocrProvider = $dbSettings->get('ai_ocr_provider', 'auto');
+        $ocrModel = $dbSettings->get('ai_ocr_model', '');
+
+        $effectiveOcrProvider = ($ocrProvider && $ocrProvider !== 'auto') ? $ocrProvider : ($activeProvider ?: 'gemini');
+        $effectiveOcrModel = $ocrModel;
+        if (empty($effectiveOcrModel)) {
+            $effectiveOcrModel = match ($effectiveOcrProvider) {
+                '9router' => ($routerModel && $routerModel !== 'high-models-agent') ? $routerModel : 'gpt-4o-mini',
+                'openai' => $openaiModel ?: 'gpt-4o-mini',
+                'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
+                default => $geminiModel ?: 'gemini-1.5-flash',
+            };
+        }
 
         return [
             'active_provider' => $activeProvider ?: 'gemini',
             'is_enabled' => $isEnabled,
+            'ocr_provider' => $ocrProvider,
+            'ocr_model' => $ocrModel,
+            'effective_ocr_provider' => $effectiveOcrProvider,
+            'effective_ocr_model' => $effectiveOcrModel,
             'providers' => [
                 'gemini' => [
                     'name' => 'Google Gemini',
@@ -77,7 +95,7 @@ class PlatformAiService
                     'api_key' => '',
                     'has_api_key' => !empty($routerRawKey),
                     'api_endpoint' => $routerEndpoint ?: 'https://api.9router.com/v1',
-                    'model' => $routerModel ?: 'gpt-4o-mini',
+                    'model' => $routerModel ?: 'high-models-agent',
                     'is_configured' => !empty($routerRawKey),
                 ],
             ],
@@ -95,6 +113,14 @@ class PlatformAiService
 
         if (isset($data['is_enabled'])) {
             SystemSetting::set('ai_enabled', !empty($data['is_enabled']) ? '1' : '0', 'ai');
+        }
+
+        if (isset($data['ocr_provider'])) {
+            SystemSetting::set('ai_ocr_provider', trim($data['ocr_provider']), 'ai');
+        }
+
+        if (isset($data['ocr_model'])) {
+            SystemSetting::set('ai_ocr_model', trim($data['ocr_model']), 'ai');
         }
 
         $providers = ['gemini', 'openai', 'claude', '9router'];
@@ -143,16 +169,24 @@ class PlatformAiService
 
             $routerKey = $settings->get('ai_9router_key', env('NINEROUTER_API_KEY', ''));
             $routerEndpoint = $settings->get('ai_9router_endpoint', 'https://api.9router.com/v1');
-            $routerModel = $settings->get('ai_9router_model', 'gpt-4o-mini');
+            $routerModel = $settings->get('ai_9router_model', 'high-models-agent');
 
-            $activeOcrModel = match ($activeProvider) {
-                '9router' => ($routerModel && $routerModel !== 'high-models-agent') ? $routerModel : 'gpt-4o-mini',
-                'openai' => $openaiModel ?: 'gpt-4o-mini',
-                'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
-                default => $geminiModel ?: 'gemini-1.5-flash',
-            };
+            $customOcrProvider = $settings->get('ai_ocr_provider', 'auto');
+            $customOcrModel = $settings->get('ai_ocr_model', '');
 
-            $activeOcrEndpoint = match ($activeProvider) {
+            $activeOcrProvider = ($customOcrProvider && $customOcrProvider !== 'auto') ? $customOcrProvider : $activeProvider;
+            $activeOcrModel = $customOcrModel;
+
+            if (empty($activeOcrModel)) {
+                $activeOcrModel = match ($activeOcrProvider) {
+                    '9router' => ($routerModel && $routerModel !== 'high-models-agent') ? $routerModel : 'gpt-4o-mini',
+                    'openai' => $openaiModel ?: 'gpt-4o-mini',
+                    'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
+                    default => $geminiModel ?: 'gemini-1.5-flash',
+                };
+            }
+
+            $activeOcrEndpoint = match ($activeOcrProvider) {
                 '9router' => $routerEndpoint,
                 'openai' => $openaiEndpoint,
                 'claude' => $claudeEndpoint,
@@ -176,7 +210,7 @@ class PlatformAiService
                 'rudimah.ai.9router_key' => $routerKey,
                 'rudimah.ai.9router_endpoint' => $routerEndpoint,
                 'rudimah.ai.9router_model' => $routerModel,
-                'rudimah.ocr.provider' => $activeProvider,
+                'rudimah.ocr.provider' => $activeOcrProvider,
                 'rudimah.ocr.model' => $activeOcrModel,
                 'rudimah.ocr.endpoint' => $activeOcrEndpoint,
             ]);
