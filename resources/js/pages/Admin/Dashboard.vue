@@ -78,10 +78,6 @@ interface AiProviderDetail {
 interface AiSettingsProp {
   active_provider: string;
   is_enabled: boolean;
-  ocr_provider?: string;
-  ocr_model?: string;
-  effective_ocr_provider?: string;
-  effective_ocr_model?: string;
   providers: {
     gemini: AiProviderDetail;
     openai: AiProviderDetail;
@@ -228,8 +224,6 @@ const aiProviderOptions = [
 const aiForm = ref({
   active_provider: props.aiSettings?.active_provider || 'gemini',
   is_enabled: props.aiSettings?.is_enabled ?? true,
-  ocr_provider: props.aiSettings?.ocr_provider || 'auto',
-  ocr_model: props.aiSettings?.ocr_model || '',
   gemini: {
     api_endpoint: props.aiSettings?.providers?.gemini?.api_endpoint || 'https://generativelanguage.googleapis.com',
     api_key: '',
@@ -256,9 +250,6 @@ function saveAiSettings() {
   isAiSaving.value = true;
   if (typeof window !== 'undefined') {
     localStorage.setItem('rudimah_admin_ai_tab', activeAiTab.value);
-  }
-  if (!aiForm.value.ocr_provider) {
-    aiForm.value.ocr_provider = 'auto';
   }
   router.post('/admin/ai', aiForm.value, {
     preserveScroll: true,
@@ -682,39 +673,26 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
               </RdButton>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/60 dark:border-slate-800 items-start">
               <RdSelect
                 v-model="aiForm.active_provider"
-                label="Penyedia AI Default Platform"
+                label="Penyedia AI Aktif Platform"
                 :options="aiProviderOptions"
-                hint="Penyedia default yang digunakan untuk asisten cerdas dan seluruh fitur sistem"
+                hint="Penyedia AI terpadu yang digunakan untuk seluruh fitur sistem: Chat Asisten dan Pindai Struk (OCR)"
               />
 
-              <RdSelect
-                v-model="aiForm.ocr_provider"
-                label="Penyedia Pindai Struk / OCR"
-                :options="[
-                  { label: 'Otomatis (Ikuti Penyedia Default)', value: 'auto' },
-                  { label: 'OpenAI ChatGPT', value: 'openai' },
-                  { label: 'Google Gemini', value: 'gemini' },
-                  { label: 'Anthropic Claude', value: 'claude' },
-                  { label: '9Router AI Gateway', value: '9router' },
-                ]"
-                hint="Pilih 'Otomatis' agar fitur Pindai Struk selalu sinkron dengan penyedia default aktif"
-              />
-
-              <div class="space-y-1.5">
-                <RdInput
-                  v-model="aiForm.ocr_model"
-                  label="Model Khusus Scan Struk / OCR (Opsional)"
-                  placeholder="Kosongkan untuk mengikuti model penyedia"
-                  hint="Kosongkan untuk otomatis menggunakan model dari penyedia yang dipilih"
-                />
-                <p class="text-[11px] text-slate-500">
-                  Model OCR aktif saat ini:
+              <div class="space-y-1.5 p-3 rounded-lg border border-slate-200/60 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-800/40">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Konfigurasi AI Terpadu</span>
+                  <RdBadge variant="success" class="text-[10px]">
+                    Sinkron Otomatis
+                  </RdBadge>
+                </div>
+                <p class="text-[11px] text-slate-500 leading-relaxed">
+                  Fitur <strong>Chat Asisten</strong> dan <strong>Pindai Struk (OCR)</strong> otomatis menggunakan penyedia dan model yang sama:
                   <span class="font-mono font-medium text-teal-700 dark:text-teal-400">
-                    {{ aiForm.ocr_model || (aiForm.ocr_provider && aiForm.ocr_provider !== 'auto' ? aiForm[aiForm.ocr_provider]?.model : aiForm[aiForm.active_provider]?.model) || 'Mengikuti Model Penyedia' }}
-                  </span>
+                    {{ aiForm[aiForm.active_provider]?.model || 'Mengikuti Model Penyedia' }}
+                  </span>.
                 </p>
               </div>
             </div>

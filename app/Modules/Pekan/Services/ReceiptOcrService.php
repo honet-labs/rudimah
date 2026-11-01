@@ -43,29 +43,31 @@ class ReceiptOcrService
             throw new \InvalidArgumentException('Tipe berkas tidak didukung untuk pemindaian OCR. Gunakan gambar JPG, PNG, WEBP, atau berkas PDF.');
         }
 
-        // Ambil konfigurasi AI ruang kerja atau platform global (100% sinkron dengan Chat AI)
+        // Ambil konfigurasi AI ruang kerja atau platform global (100% sinkron dan sama persis dengan Chat AI)
         $tenantSetting = TenantAiSetting::where('tenant_id', $tenantId)->first();
         if ($tenantSetting && !$tenantSetting->is_enabled) {
             throw new \RuntimeException('Layanan AI dinonaktifkan untuk ruang kerja ini.');
         }
 
         $platformSettings = PlatformAiService::getSettings();
+        $activePlatformProvider = $platformSettings['active_provider'] ?? config('rudimah.ai.default_provider', 'gemini');
+        $activeProviderDetails = $platformSettings['providers'][$activePlatformProvider] ?? [];
 
-        $hasCustomKey = !empty($tenantSetting?->api_key);
-        $providerCode = ($hasCustomKey && !empty($tenantSetting?->provider))
-            ? $tenantSetting->provider
-            : ($platformSettings['effective_ocr_provider'] ?? config('rudimah.ocr.provider', config('rudimah.ai.default_provider', 'gemini')));
+        $hasCustomKey = !empty($tenantSetting?->api_key_encrypted) && !empty($tenantSetting?->api_key);
+        $isUsingCustom = $hasCustomKey && !empty($tenantSetting?->provider);
 
+        // 100% Menggunakan Penyedia dan Model AI yang Sama Persis dengan Chat Asisten
+        $providerCode = $isUsingCustom ? $tenantSetting->provider : $activePlatformProvider;
         $normalizedCode = (strtolower($providerCode) === 'ninerouter') ? '9router' : strtolower($providerCode);
-        $activeDetails = $platformSettings['providers'][$normalizedCode] ?? [];
+        $activeDetails = $isUsingCustom ? [] : ($platformSettings['providers'][$normalizedCode] ?? []);
 
-        $modelName = ($hasCustomKey && !empty($tenantSetting?->model))
-            ? $tenantSetting->model
-            : ($platformSettings['effective_ocr_model'] ?? ($activeDetails['model'] ?? config('rudimah.ocr.model')));
+        $modelName = $isUsingCustom
+            ? ($tenantSetting->model ?: ($activeProviderDetails['model'] ?? ''))
+            : ($activeProviderDetails['model'] ?? config("rudimah.ai.{$normalizedCode}_model", ''));
 
-        $endpoint = ($hasCustomKey && !empty($tenantSetting?->api_endpoint))
+        $endpoint = $isUsingCustom
             ? $tenantSetting->api_endpoint
-            : ($activeDetails['api_endpoint'] ?? config("rudimah.ai.{$normalizedCode}_endpoint", config('rudimah.ocr.endpoint')));
+            : ($activeProviderDetails['api_endpoint'] ?? config("rudimah.ai.{$normalizedCode}_endpoint"));
 
         $scanId = (string) Str::uuid();
         $provider = $this->providerManager->resolve($normalizedCode, $tenantSetting);

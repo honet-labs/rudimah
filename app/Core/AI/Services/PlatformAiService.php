@@ -44,36 +44,46 @@ class PlatformAiService
         $routerEndpoint = $dbSettings->get('ai_9router_endpoint', 'https://api.9router.com/v1');
         $routerModel = $dbSettings->get('ai_9router_model', 'high-models-agent');
 
-        $ocrProvider = $dbSettings->get('ai_ocr_provider', 'auto');
-        $ocrModel = $dbSettings->get('ai_ocr_model', '');
+        $providerKeyStatus = [
+            'openai' => !empty($openaiRawKey),
+            'gemini' => !empty($geminiRawKey),
+            'claude' => !empty($claudeRawKey),
+            '9router' => !empty($routerRawKey),
+        ];
 
-        $effectiveOcrProvider = ($ocrProvider && $ocrProvider !== 'auto') ? $ocrProvider : ($activeProvider ?: 'gemini');
-        $effectiveOcrModel = $ocrModel;
-        if (empty($effectiveOcrModel)) {
-            $effectiveOcrModel = match ($effectiveOcrProvider) {
-                '9router' => $routerModel ?: 'high-models-agent',
-                'openai' => $openaiModel ?: 'gpt-4o-mini',
-                'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
-                default => $geminiModel ?: 'gemini-1.5-flash',
-            };
+        // Jika active_provider yang tersimpan tidak memiliki kredensial API tetapi penyedia lain memilikinya,
+        // alihkan default aktif ke penyedia yang telah dikonfigurasi (misal OpenAI) agar tidak gagal panggil
+        if (empty($providerKeyStatus[$activeProvider])) {
+            foreach (['openai', 'gemini', 'claude', '9router'] as $pCode) {
+                if (!empty($providerKeyStatus[$pCode])) {
+                    $activeProvider = $pCode;
+                    break;
+                }
+            }
         }
+
+        $activeModel = match ($activeProvider) {
+            'openai' => $openaiModel ?: 'gpt-4o-mini',
+            'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
+            '9router' => $routerModel ?: 'high-models-agent',
+            default => $geminiModel ?: 'gemini-1.5-flash',
+        };
+
+        $activeEndpoint = match ($activeProvider) {
+            'openai' => $openaiEndpoint ?: 'https://api.openai.com/v1',
+            'claude' => $claudeEndpoint ?: 'https://api.anthropic.com/v1',
+            '9router' => $routerEndpoint ?: 'https://api.9router.com/v1',
+            default => $geminiEndpoint ?: 'https://generativelanguage.googleapis.com',
+        };
 
         return [
             'active_provider' => $activeProvider ?: 'gemini',
+            'active_model' => $activeModel,
+            'active_endpoint' => $activeEndpoint,
             'is_enabled' => $isEnabled,
-            'ocr_provider' => $ocrProvider,
-            'ocr_model' => $ocrModel,
-            'effective_ocr_provider' => $effectiveOcrProvider,
-            'effective_ocr_model' => $effectiveOcrModel,
+            'effective_ocr_provider' => $activeProvider ?: 'gemini',
+            'effective_ocr_model' => $activeModel,
             'providers' => [
-                'gemini' => [
-                    'name' => 'Google Gemini',
-                    'api_key' => '',
-                    'has_api_key' => !empty($geminiRawKey),
-                    'api_endpoint' => $geminiEndpoint ?: 'https://generativelanguage.googleapis.com',
-                    'model' => $geminiModel ?: 'gemini-1.5-flash',
-                    'is_configured' => !empty($geminiRawKey),
-                ],
                 'openai' => [
                     'name' => 'OpenAI',
                     'api_key' => '',
@@ -81,6 +91,14 @@ class PlatformAiService
                     'api_endpoint' => $openaiEndpoint ?: 'https://api.openai.com/v1',
                     'model' => $openaiModel ?: 'gpt-4o-mini',
                     'is_configured' => !empty($openaiRawKey),
+                ],
+                'gemini' => [
+                    'name' => 'Google Gemini',
+                    'api_key' => '',
+                    'has_api_key' => !empty($geminiRawKey),
+                    'api_endpoint' => $geminiEndpoint ?: 'https://generativelanguage.googleapis.com',
+                    'model' => $geminiModel ?: 'gemini-1.5-flash',
+                    'is_configured' => !empty($geminiRawKey),
                 ],
                 'claude' => [
                     'name' => 'Anthropic Claude',
@@ -115,12 +133,10 @@ class PlatformAiService
             SystemSetting::set('ai_enabled', !empty($data['is_enabled']) ? '1' : '0', 'ai');
         }
 
-        if (isset($data['ocr_provider'])) {
-            SystemSetting::set('ai_ocr_provider', trim($data['ocr_provider']), 'ai');
-        }
-
-        if (isset($data['ocr_model'])) {
-            SystemSetting::set('ai_ocr_model', trim($data['ocr_model']), 'ai');
+        // Hapus kunci residu OCR yang memisahkan provider/model
+        try {
+            SystemSetting::whereIn('key', ['ai_ocr_provider', 'ai_ocr_model'])->delete();
+        } catch (\Throwable) {
         }
 
         $providers = ['gemini', 'openai', 'claude', '9router'];
@@ -171,25 +187,33 @@ class PlatformAiService
             $routerEndpoint = $settings->get('ai_9router_endpoint', 'https://api.9router.com/v1');
             $routerModel = $settings->get('ai_9router_model', 'high-models-agent');
 
-            $customOcrProvider = $settings->get('ai_ocr_provider', 'auto');
-            $customOcrModel = $settings->get('ai_ocr_model', '');
+            $providerKeyStatus = [
+                'openai' => !empty($openaiKey),
+                'gemini' => !empty($geminiKey),
+                'claude' => !empty($claudeKey),
+                '9router' => !empty($routerKey),
+            ];
 
-            $activeOcrProvider = ($customOcrProvider && $customOcrProvider !== 'auto') ? $customOcrProvider : $activeProvider;
-            $activeOcrModel = $customOcrModel;
-
-            if (empty($activeOcrModel)) {
-                $activeOcrModel = match ($activeOcrProvider) {
-                    '9router' => $routerModel ?: 'high-models-agent',
-                    'openai' => $openaiModel ?: 'gpt-4o-mini',
-                    'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
-                    default => $geminiModel ?: 'gemini-1.5-flash',
-                };
+            if (empty($providerKeyStatus[$activeProvider])) {
+                foreach (['openai', 'gemini', 'claude', '9router'] as $pCode) {
+                    if (!empty($providerKeyStatus[$pCode])) {
+                        $activeProvider = $pCode;
+                        break;
+                    }
+                }
             }
 
-            $activeOcrEndpoint = match ($activeOcrProvider) {
-                '9router' => $routerEndpoint,
+            $activeModel = match ($activeProvider) {
+                'openai' => $openaiModel ?: 'gpt-4o-mini',
+                'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
+                '9router' => $routerModel ?: 'high-models-agent',
+                default => $geminiModel ?: 'gemini-1.5-flash',
+            };
+
+            $activeEndpoint = match ($activeProvider) {
                 'openai' => $openaiEndpoint,
                 'claude' => $claudeEndpoint,
+                '9router' => $routerEndpoint,
                 default => $geminiEndpoint,
             };
 
@@ -210,9 +234,11 @@ class PlatformAiService
                 'rudimah.ai.9router_key' => $routerKey,
                 'rudimah.ai.9router_endpoint' => $routerEndpoint,
                 'rudimah.ai.9router_model' => $routerModel,
-                'rudimah.ocr.provider' => $activeOcrProvider,
-                'rudimah.ocr.model' => $activeOcrModel,
-                'rudimah.ocr.endpoint' => $activeOcrEndpoint,
+
+                // Fitur OCR dan Chat AI 100% menggunakan provider dan model yang sama
+                'rudimah.ocr.provider' => $activeProvider,
+                'rudimah.ocr.model' => $activeModel,
+                'rudimah.ocr.endpoint' => $activeEndpoint,
             ]);
         } catch (\Throwable $e) {
             Log::debug('[PlatformAiService] Belum dapat menerapkan konfigurasi runtime: ' . $e->getMessage());

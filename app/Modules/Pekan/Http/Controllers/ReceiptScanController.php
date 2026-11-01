@@ -33,26 +33,27 @@ class ReceiptScanController
 
         PlatformAiService::applyRuntimeConfig();
         $platformSettings = PlatformAiService::getSettings();
+        $activePlatformProvider = $platformSettings['active_provider'] ?? config('rudimah.ai.default_provider', 'gemini');
+        $activeProviderDetails = $platformSettings['providers'][$activePlatformProvider] ?? [];
 
         $tenantSetting = $tenant ? TenantAiSetting::where('tenant_id', $tenant->id)->first() : null;
-        $hasCustomKey = !empty($tenantSetting?->api_key);
+        $hasCustomKey = !empty($tenantSetting?->api_key_encrypted) && !empty($tenantSetting?->api_key);
+        $isUsingCustom = $hasCustomKey && !empty($tenantSetting?->provider);
 
-        $effectiveProvider = $hasCustomKey && !empty($tenantSetting?->provider)
-            ? $tenantSetting->provider
-            : ($platformSettings['effective_ocr_provider'] ?? config('rudimah.ocr.provider', 'gemini'));
-
+        // 100% Menggunakan Penyedia dan Model AI yang Sama Persis dengan Chat Asisten
+        $effectiveProvider = $isUsingCustom ? $tenantSetting->provider : $activePlatformProvider;
         $effectiveNormalized = (strtolower($effectiveProvider) === 'ninerouter') ? '9router' : strtolower($effectiveProvider);
-        $activeDetails = $platformSettings['providers'][$effectiveNormalized] ?? [];
+        $activeDetails = $isUsingCustom ? [] : ($platformSettings['providers'][$effectiveNormalized] ?? []);
 
-        $effectiveModel = ($hasCustomKey && !empty($tenantSetting?->model))
-            ? $tenantSetting->model
-            : ($platformSettings['effective_ocr_model'] ?? ($activeDetails['model'] ?? ''));
+        $effectiveModel = $isUsingCustom
+            ? ($tenantSetting->model ?: ($activeProviderDetails['model'] ?? ''))
+            : ($activeProviderDetails['model'] ?? config("rudimah.ai.{$effectiveNormalized}_model", ''));
 
         $providerNames = [
-            '9router' => '9Router AI Gateway',
             'openai' => 'OpenAI',
-            'claude' => 'Anthropic Claude',
             'gemini' => 'Google Gemini',
+            'claude' => 'Anthropic Claude',
+            '9router' => '9Router AI Gateway',
         ];
 
         try {
@@ -84,8 +85,8 @@ class ReceiptScanController
                 'provider' => $effectiveNormalized,
                 'provider_name' => $providerNames[$effectiveNormalized] ?? strtoupper($effectiveNormalized),
                 'model' => $effectiveModel,
-                'is_configured' => $hasCustomKey ? true : ($activeDetails['is_configured'] ?? false),
-                'is_custom' => $hasCustomKey,
+                'is_configured' => $isUsingCustom ? true : ($activeDetails['is_configured'] ?? false),
+                'is_custom' => $isUsingCustom,
             ],
         ]);
     }

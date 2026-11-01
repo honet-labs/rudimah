@@ -69,7 +69,7 @@ class AiProviderManager
                 'gemini' => config('rudimah.ai.gemini_model', 'gemini-1.5-flash'),
                 'openai' => config('rudimah.ai.openai_model', 'gpt-4o-mini'),
                 'claude' => config('rudimah.ai.claude_model', 'claude-3-5-sonnet-20241022'),
-                '9router', 'ninerouter' => config('rudimah.ai.9router_model', config('rudimah.ai.ninerouter_model', 'gpt-4o-mini')),
+                '9router', 'ninerouter' => config('rudimah.ai.9router_model', config('rudimah.ai.ninerouter_model', 'high-models-agent')),
                 'hermes' => 'hermes-3-llama-3.1-8b',
                 'openclaw' => 'openclaw-agent-v1',
                 default => null,
@@ -80,11 +80,16 @@ class AiProviderManager
             'gemini' => new GeminiProvider($apiKey, $defaultModel ?: 'gemini-1.5-flash'),
             'openai' => new OpenAiProvider($apiKey, $defaultModel ?: 'gpt-4o-mini', $endpoint),
             'claude' => new ClaudeProvider($apiKey, $defaultModel ?: 'claude-3-5-sonnet-20241022', $endpoint),
-            '9router', 'ninerouter' => new NineRouterProvider($apiKey, $defaultModel ?: 'gpt-4o-mini', $endpoint),
+            '9router', 'ninerouter' => new NineRouterProvider($apiKey, $defaultModel ?: 'high-models-agent', $endpoint),
             'hermes' => new HermesProvider($apiKey, $defaultModel ?: 'hermes-3-llama-3.1-8b', $endpoint),
             'openclaw' => new OpenClawProvider($apiKey, $defaultModel ?: 'openclaw-agent-v1', $endpoint),
             'mock', 'local' => new LocalMockProvider(),
-            default => new NineRouterProvider($apiKey, $defaultModel ?: 'gpt-4o-mini', $endpoint),
+            default => match ($defaultProvider) {
+                'openai' => new OpenAiProvider($apiKey, $defaultModel ?: 'gpt-4o-mini', $endpoint),
+                'claude' => new ClaudeProvider($apiKey, $defaultModel ?: 'claude-3-5-sonnet-20241022', $endpoint),
+                'gemini' => new GeminiProvider($apiKey, $defaultModel ?: 'gemini-1.5-flash'),
+                default => new NineRouterProvider($apiKey, $defaultModel ?: 'high-models-agent', $endpoint),
+            },
         };
     }
 }

@@ -208,9 +208,6 @@ class AdminController
             '9router.api_key' => 'nullable|string|max:255',
             '9router.api_endpoint' => 'nullable|string|max:255',
             '9router.model' => 'nullable|string|max:100',
-
-            'ocr_provider' => 'nullable|string|in:auto,gemini,openai,claude,9router',
-            'ocr_model' => 'nullable|string|max:100',
         ]);
 
         PlatformAiService::saveSettings($validated);

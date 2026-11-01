@@ -79,16 +79,16 @@ class ReceiptOcrHumanVerificationTest extends TestCase
         TenantContext::clear();
     }
 
-    public function test_custom_ocr_model_and_provider_configured_in_admin_is_applied_to_ocr_config(): void
+    public function test_unified_ai_provider_and_model_is_applied_to_ocr_config(): void
     {
         config([
-            'rudimah.ai.default_provider' => 'gemini',
+            'rudimah.ai.default_provider' => 'openai',
             'rudimah.ocr.provider' => 'openai',
-            'rudimah.ocr.model' => 'gpt-4o',
+            'rudimah.ocr.model' => 'gpt-4o-mini',
         ]);
 
         $this->assertEquals('openai', config('rudimah.ocr.provider'));
-        $this->assertEquals('gpt-4o', config('rudimah.ocr.model'));
+        $this->assertEquals('gpt-4o-mini', config('rudimah.ocr.model'));
     }
 
     public function test_ocr_inherits_openai_provider_and_model_when_configured(): void

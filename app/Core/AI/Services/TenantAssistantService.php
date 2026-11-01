@@ -43,18 +43,22 @@ class TenantAssistantService
         }
 
         PlatformAiService::applyRuntimeConfig();
+        $platformSettings = PlatformAiService::getSettings();
+        $activePlatformProvider = $platformSettings['active_provider'] ?? config('rudimah.ai.default_provider', 'gemini');
+        $activeProviderDetails = $platformSettings['providers'][$activePlatformProvider] ?? [];
 
         $setting = TenantAiSetting::where('tenant_id', $tenantId)->first();
-        $hasCustomKey = !empty($setting?->api_key);
+        $hasCustomKey = !empty($setting?->api_key_encrypted) && !empty($setting?->api_key);
+        $isUsingCustom = $hasCustomKey && !empty($setting?->provider);
 
         // Otomatis mewarisi dari Administrasi Sistem jika ruang kerja tidak menggunakan kunci kustom
-        $activeProvider = $hasCustomKey
-            ? ($setting->provider ?: config('rudimah.ai.default_provider', '9router'))
-            : config('rudimah.ai.default_provider', '9router');
+        $activeProvider = $isUsingCustom ? $setting->provider : $activePlatformProvider;
+        $normalizedProvider = (strtolower($activeProvider) === 'ninerouter') ? '9router' : strtolower($activeProvider);
+        $activeDetails = $isUsingCustom ? [] : ($platformSettings['providers'][$normalizedProvider] ?? []);
 
-        $activeModel = $hasCustomKey
-            ? ($setting->model ?: config("rudimah.ai.{$activeProvider}_model", 'high-models-agent'))
-            : config("rudimah.ai.{$activeProvider}_model", 'high-models-agent');
+        $activeModel = $isUsingCustom
+            ? ($setting->model ?: ($activeProviderDetails['model'] ?? ''))
+            : ($activeProviderDetails['model'] ?? config("rudimah.ai.{$normalizedProvider}_model", ''));
 
         $conversation = AiConversation::create([
             'id' => (string) Str::uuid(),
@@ -140,18 +144,24 @@ class TenantAssistantService
         }
 
         // Tentukan provider, model, dan endpoint aktif (otomatis warisi dari Administrasi Sistem bila tidak ada kunci kustom)
-        $hasCustomKey = !empty($setting?->api_key);
-        $activeProvider = $hasCustomKey
-            ? ($setting->provider ?: config('rudimah.ai.default_provider', '9router'))
-            : config('rudimah.ai.default_provider', '9router');
+        $platformSettings = PlatformAiService::getSettings();
+        $activePlatformProvider = $platformSettings['active_provider'] ?? config('rudimah.ai.default_provider', 'gemini');
+        $activeProviderDetails = $platformSettings['providers'][$activePlatformProvider] ?? [];
 
-        $activeModel = $hasCustomKey
-            ? ($setting->model ?: config("rudimah.ai.{$activeProvider}_model", 'high-models-agent'))
-            : config("rudimah.ai.{$activeProvider}_model", 'high-models-agent');
+        $hasCustomKey = !empty($setting?->api_key_encrypted) && !empty($setting?->api_key);
+        $isUsingCustom = $hasCustomKey && !empty($setting?->provider);
 
-        $activeEndpoint = $hasCustomKey && !empty($setting?->api_endpoint)
+        $activeProvider = $isUsingCustom ? $setting->provider : $activePlatformProvider;
+        $normalizedProvider = (strtolower($activeProvider) === 'ninerouter') ? '9router' : strtolower($activeProvider);
+        $activeDetails = $isUsingCustom ? [] : ($platformSettings['providers'][$normalizedProvider] ?? []);
+
+        $activeModel = $isUsingCustom
+            ? ($setting->model ?: ($activeProviderDetails['model'] ?? ''))
+            : ($activeProviderDetails['model'] ?? config("rudimah.ai.{$normalizedProvider}_model", ''));
+
+        $activeEndpoint = $isUsingCustom && !empty($setting?->api_endpoint)
             ? $setting->api_endpoint
-            : config("rudimah.ai.{$activeProvider}_endpoint");
+            : ($activeDetails['api_endpoint'] ?? config("rudimah.ai.{$normalizedProvider}_endpoint"));
 
         // Jika percakapan lama memiliki provider yang berbeda atau belum terset, sinkronkan ke provider aktif
         if ($conversation->provider !== $activeProvider || empty($conversation->model)) {
