@@ -763,34 +763,14 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
               <div>
                 <div class="flex items-center gap-2">
                   <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan Google Gemini</h4>
-                  <RdBadge v-if="aiForm.active_provider === 'gemini'" variant="success" class="text-[10px]">
-                    Penyedia Aktif Platform
+                  <RdBadge :variant="aiForm.active_provider === 'gemini' ? 'success' : 'neutral'" class="text-[10px]">
+                    {{ aiForm.active_provider === 'gemini' ? 'Penyedia Utama Aktif' : 'Tidak Aktif' }}
                   </RdBadge>
-                  <button
-                    v-else
-                    type="button"
-                    class="text-xs text-teal-600 dark:text-teal-400 font-medium hover:underline cursor-pointer"
-                    @click="aiForm.active_provider = 'gemini'"
-                  >
-                    Jadikan Penyedia Aktif
-                  </button>
                 </div>
                 <p class="text-xs text-slate-500">Integrasi resmi model Gemini Flash & Gemini Pro dari Google AI Studio</p>
               </div>
 
-              <!-- Status Keaktifan Gemini -->
-              <div
-                :class="[
-                  'p-2.5 px-3 rounded-lg border flex items-center justify-between text-xs',
-                  aiForm.active_provider === 'gemini'
-                    ? 'bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-200'
-                    : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                ]"
-              >
-                <div class="flex items-center gap-2">
-                  <span :class="['w-2 h-2 rounded-full inline-block shrink-0', aiForm.active_provider === 'gemini' ? 'bg-teal-600 dark:bg-teal-400' : 'bg-slate-400']"></span>
-                  <span>{{ aiForm.active_provider === 'gemini' ? 'Google Gemini aktif sebagai Penyedia Utama Platform & Pindai Struk' : 'Google Gemini saat ini bukan penyedia default aktif' }}</span>
-                </div>
+              <div class="flex flex-wrap items-center gap-2 shrink-0">
                 <RdButton
                   v-if="aiForm.active_provider !== 'gemini'"
                   type="button"
@@ -799,15 +779,13 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   class="text-xs shrink-0"
                   @click="aiForm.active_provider = 'gemini'"
                 >
-                  Gunakan Gemini Sebagai Default
+                  Jadikan Penyedia Aktif
                 </RdButton>
-              </div>
-              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <RdButton
                   type="button"
                   variant="outline"
                   size="sm"
-                  class="w-full sm:w-auto"
+                  class="text-xs shrink-0"
                   :disabled="detectingModels['gemini'] || (!aiForm.gemini.api_key && !props.aiSettings?.providers?.gemini?.has_api_key)"
                   @click="detectModels('gemini')"
                 >
@@ -818,7 +796,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   type="button"
                   variant="outline"
                   size="sm"
-                  class="w-full sm:w-auto"
+                  class="text-xs shrink-0"
                   :disabled="isAiTesting || (!aiForm.gemini.api_key && !props.aiSettings?.providers?.gemini?.has_api_key)"
                   @click="openAiTestModal('gemini')"
                 >
@@ -888,34 +866,14 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
               <div>
                 <div class="flex items-center gap-2">
                   <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan OpenAI ChatGPT</h4>
-                  <RdBadge v-if="aiForm.active_provider === 'openai'" variant="success" class="text-[10px]">
-                    Penyedia Aktif Platform
+                  <RdBadge :variant="aiForm.active_provider === 'openai' ? 'success' : 'neutral'" class="text-[10px]">
+                    {{ aiForm.active_provider === 'openai' ? 'Penyedia Utama Aktif' : 'Tidak Aktif' }}
                   </RdBadge>
-                  <button
-                    v-else
-                    type="button"
-                    class="text-xs text-teal-600 dark:text-teal-400 font-medium hover:underline cursor-pointer"
-                    @click="aiForm.active_provider = 'openai'"
-                  >
-                    Jadikan Penyedia Aktif
-                  </button>
                 </div>
                 <p class="text-xs text-slate-500">Integrasi model OpenAI GPT-4o, GPT-4o-mini, atau gateway kompatibel</p>
               </div>
 
-              <!-- Status Keaktifan OpenAI -->
-              <div
-                :class="[
-                  'p-2.5 px-3 rounded-lg border flex items-center justify-between text-xs',
-                  aiForm.active_provider === 'openai'
-                    ? 'bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-200'
-                    : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                ]"
-              >
-                <div class="flex items-center gap-2">
-                  <span :class="['w-2 h-2 rounded-full inline-block shrink-0', aiForm.active_provider === 'openai' ? 'bg-teal-600 dark:bg-teal-400' : 'bg-slate-400']"></span>
-                  <span>{{ aiForm.active_provider === 'openai' ? 'OpenAI ChatGPT aktif sebagai Penyedia Utama Platform & Pindai Struk' : 'OpenAI ChatGPT saat ini bukan penyedia default aktif' }}</span>
-                </div>
+              <div class="flex flex-wrap items-center gap-2 shrink-0">
                 <RdButton
                   v-if="aiForm.active_provider !== 'openai'"
                   type="button"
@@ -924,15 +882,13 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   class="text-xs shrink-0"
                   @click="aiForm.active_provider = 'openai'"
                 >
-                  Gunakan OpenAI Sebagai Default
+                  Jadikan Penyedia Aktif
                 </RdButton>
-              </div>
-              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <RdButton
                   type="button"
                   variant="outline"
                   size="sm"
-                  class="w-full sm:w-auto"
+                  class="text-xs shrink-0"
                   :disabled="detectingModels['openai'] || (!aiForm.openai.api_key && !props.aiSettings?.providers?.openai?.has_api_key)"
                   @click="detectModels('openai')"
                 >
@@ -943,7 +899,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   type="button"
                   variant="outline"
                   size="sm"
-                  class="w-full sm:w-auto"
+                  class="text-xs shrink-0"
                   :disabled="isAiTesting || (!aiForm.openai.api_key && !props.aiSettings?.providers?.openai?.has_api_key)"
                   @click="openAiTestModal('openai')"
                 >
@@ -1013,34 +969,14 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
               <div>
                 <div class="flex items-center gap-2">
                   <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan Anthropic Claude</h4>
-                  <RdBadge v-if="aiForm.active_provider === 'claude'" variant="success" class="text-[10px]">
-                    Penyedia Aktif Platform
+                  <RdBadge :variant="aiForm.active_provider === 'claude' ? 'success' : 'neutral'" class="text-[10px]">
+                    {{ aiForm.active_provider === 'claude' ? 'Penyedia Utama Aktif' : 'Tidak Aktif' }}
                   </RdBadge>
-                  <button
-                    v-else
-                    type="button"
-                    class="text-xs text-teal-600 dark:text-teal-400 font-medium hover:underline cursor-pointer"
-                    @click="aiForm.active_provider = 'claude'"
-                  >
-                    Jadikan Penyedia Aktif
-                  </button>
                 </div>
                 <p class="text-xs text-slate-500">Integrasi model Claude 3.5 Sonnet, Claude 3 Opus, dan Claude 3.5 Haiku</p>
               </div>
 
-              <!-- Status Keaktifan Claude -->
-              <div
-                :class="[
-                  'p-2.5 px-3 rounded-lg border flex items-center justify-between text-xs',
-                  aiForm.active_provider === 'claude'
-                    ? 'bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-200'
-                    : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                ]"
-              >
-                <div class="flex items-center gap-2">
-                  <span :class="['w-2 h-2 rounded-full inline-block shrink-0', aiForm.active_provider === 'claude' ? 'bg-teal-600 dark:bg-teal-400' : 'bg-slate-400']"></span>
-                  <span>{{ aiForm.active_provider === 'claude' ? 'Anthropic Claude aktif sebagai Penyedia Utama Platform & Pindai Struk' : 'Anthropic Claude saat ini bukan penyedia default aktif' }}</span>
-                </div>
+              <div class="flex flex-wrap items-center gap-2 shrink-0">
                 <RdButton
                   v-if="aiForm.active_provider !== 'claude'"
                   type="button"
@@ -1049,15 +985,13 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   class="text-xs shrink-0"
                   @click="aiForm.active_provider = 'claude'"
                 >
-                  Gunakan Claude Sebagai Default
+                  Jadikan Penyedia Aktif
                 </RdButton>
-              </div>
-              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <RdButton
                   type="button"
                   variant="outline"
                   size="sm"
-                  class="w-full sm:w-auto"
+                  class="text-xs shrink-0"
                   :disabled="detectingModels['claude'] || (!aiForm.claude.api_key && !props.aiSettings?.providers?.claude?.has_api_key)"
                   @click="detectModels('claude')"
                 >
@@ -1068,7 +1002,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   type="button"
                   variant="outline"
                   size="sm"
-                  class="w-full sm:w-auto"
+                  class="text-xs shrink-0"
                   :disabled="isAiTesting || (!aiForm.claude.api_key && !props.aiSettings?.providers?.claude?.has_api_key)"
                   @click="openAiTestModal('claude')"
                 >
@@ -1138,34 +1072,14 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
               <div>
                 <div class="flex items-center gap-2">
                   <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Pengaturan 9Router AI Gateway</h4>
-                  <RdBadge v-if="aiForm.active_provider === '9router'" variant="success" class="text-[10px]">
-                    Penyedia Aktif Platform
+                  <RdBadge :variant="aiForm.active_provider === '9router' ? 'success' : 'neutral'" class="text-[10px]">
+                    {{ aiForm.active_provider === '9router' ? 'Penyedia Utama Aktif' : 'Tidak Aktif' }}
                   </RdBadge>
-                  <button
-                    v-else
-                    type="button"
-                    class="text-xs text-teal-600 dark:text-teal-400 font-medium hover:underline cursor-pointer"
-                    @click="aiForm.active_provider = '9router'"
-                  >
-                    Jadikan Penyedia Aktif
-                  </button>
                 </div>
                 <p class="text-xs text-slate-500">Integrasi gateway terpadu multi-penyedia AI dengan protokol kompatibel OpenAI</p>
               </div>
 
-              <!-- Status Keaktifan 9Router -->
-              <div
-                :class="[
-                  'p-2.5 px-3 rounded-lg border flex items-center justify-between text-xs',
-                  aiForm.active_provider === '9router'
-                    ? 'bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-200'
-                    : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                ]"
-              >
-                <div class="flex items-center gap-2">
-                  <span :class="['w-2 h-2 rounded-full inline-block shrink-0', aiForm.active_provider === '9router' ? 'bg-teal-600 dark:bg-teal-400' : 'bg-slate-400']"></span>
-                  <span>{{ aiForm.active_provider === '9router' ? '9Router AI Gateway aktif sebagai Penyedia Utama Platform & Pindai Struk' : '9Router AI Gateway saat ini bukan penyedia default aktif' }}</span>
-                </div>
+              <div class="flex flex-wrap items-center gap-2 shrink-0">
                 <RdButton
                   v-if="aiForm.active_provider !== '9router'"
                   type="button"
@@ -1174,15 +1088,13 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   class="text-xs shrink-0"
                   @click="aiForm.active_provider = '9router'"
                 >
-                  Gunakan 9Router Sebagai Default
+                  Jadikan Penyedia Aktif
                 </RdButton>
-              </div>
-              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <RdButton
                   type="button"
                   variant="outline"
                   size="sm"
-                  class="w-full sm:w-auto"
+                  class="text-xs shrink-0"
                   :disabled="detectingModels['9router'] || (!aiForm['9router'].api_key && !props.aiSettings?.providers?.['9router']?.has_api_key)"
                   @click="detectModels('9router')"
                 >
@@ -1193,7 +1105,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
                   type="button"
                   variant="outline"
                   size="sm"
-                  class="w-full sm:w-auto"
+                  class="text-xs shrink-0"
                   :disabled="isAiTesting || (!aiForm['9router'].api_key && !props.aiSettings?.providers?.['9router']?.has_api_key)"
                   @click="openAiTestModal('9router')"
                 >
