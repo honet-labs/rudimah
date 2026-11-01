@@ -4,6 +4,7 @@ import { router } from '@inertiajs/vue3';
 import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
 import RdCard from '../../../design-system/RdCard.vue';
+import RdBadge from '../../../design-system/RdBadge.vue';
 import RdButton from '../../../design-system/RdButton.vue';
 import RdFileUpload from '../../../design-system/RdFileUpload.vue';
 import RdInput from '../../../design-system/RdInput.vue';
@@ -60,6 +61,10 @@ function openPreview(url: string, title: string) {
 
 const selectedCategoryId = ref(props.categories?.[0]?.id || '');
 const selectedAccountId = ref(props.accounts?.[0]?.id || '');
+
+const isAiConnected = computed(() => {
+  return Boolean(props.ai_engine?.is_configured);
+});
 
 const accountOptions = computed(() => {
   return (props.accounts || []).map(a => {
@@ -351,27 +356,23 @@ const categoryOptions = computed(() => {
         { label: 'PEKAN', href: `/t/${tenant.slug}/apps/pekan/dashboard` },
         { label: 'Pindai Struk' }
       ]"
-    />
+    >
+      <template #actions>
+        <div class="flex items-center gap-2">
+          <RdBadge
+            :variant="isAiConnected ? 'success' : 'danger'"
+            size="sm"
+            class="items-center gap-1.5"
+            :title="isAiConnected ? 'Layanan AI terhubung dan siap digunakan' : 'Layanan AI belum terhubung atau kunci API belum dikonfigurasi'"
+          >
+            <span :class="['w-1.5 h-1.5 rounded-full inline-block shrink-0', isAiConnected ? 'bg-teal-600 dark:bg-teal-400' : 'bg-red-500']"></span>
+            <span>Status AI: {{ isAiConnected ? 'Connected' : 'Not Connected' }}</span>
+          </RdBadge>
+        </div>
+      </template>
+    </RdPageHeader>
 
     <div class="space-y-6 max-w-4xl">
-      <!-- Status Mesin AI Vision & Konfigurasi -->
-      <div v-if="ai_engine" class="flex flex-col sm:flex-row sm:items-center justify-between text-xs px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 gap-2">
-        <div class="flex items-center gap-2">
-          <span class="inline-block w-2 h-2 rounded-full" :class="ai_engine.is_configured ? 'bg-teal-600' : 'bg-amber-500'"></span>
-          <span>
-            Mesin AI Vision: <strong>{{ ai_engine.provider_name }}</strong>
-            <span v-if="ai_engine.model" class="font-mono ml-1 text-slate-500 dark:text-slate-400">({{ ai_engine.model }})</span>
-          </span>
-        </div>
-        <span class="text-slate-500 dark:text-slate-400">
-          {{ ai_engine.is_custom ? 'Pengaturan kustom ruang kerja' : 'Mengikuti konfigurasi administrasi sistem' }}
-        </span>
-      </div>
-
-      <!-- Peringatan jika kunci belum diatur di administrasi sistem -->
-      <RdAlert v-if="ai_engine && !ai_engine.is_configured" variant="warning" title="Kunci API Belum Dikonfigurasi">
-        Penyedia AI {{ ai_engine.provider_name }} belum memiliki kunci atau token API yang tersimpan. Silakan atur token API melalui Administrasi Sistem agar pemindaian OCR kuitansi dapat berjalan.
-      </RdAlert>
 
       <!-- Banner Kesalahan Jika Ada -->
       <RdAlert v-if="errorMessage" variant="error" title="Kendala Pemrosesan Struk">
