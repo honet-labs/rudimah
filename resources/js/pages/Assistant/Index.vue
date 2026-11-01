@@ -364,8 +364,8 @@ onMounted(() => {
   >
     <div class="flex-1 min-h-0 flex flex-col h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
       <!-- Top Subheader -->
-      <div class="min-h-12 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0">
-        <div class="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+      <div class="min-h-12 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 sm:px-4 py-2 flex items-center justify-between gap-2 shrink-0">
+        <div class="flex items-center gap-2 min-w-0">
           <!-- Mobile toggle riwayat percakapan -->
           <button
             type="button"
@@ -388,45 +388,50 @@ onMounted(() => {
             />
           </h1>
 
-          <RdBadge variant="neutral" size="sm" class="hidden lg:inline-flex shrink-0">
-            Konteks: {{ tenant.name }}
-          </RdBadge>
-          <RdBadge
-            :variant="isAiConnected ? 'success' : 'danger'"
-            size="sm"
-            class="hidden sm:inline-flex shrink-0 items-center gap-1.5"
-            :title="isAiConnected ? 'Layanan AI terhubung dan siap digunakan' : 'Layanan AI belum terhubung atau kunci API belum dikonfigurasi'"
-          >
-            <span :class="['w-1.5 h-1.5 rounded-full inline-block shrink-0', isAiConnected ? 'bg-teal-600 dark:bg-teal-400' : 'bg-red-500']"></span>
-            <span>Status AI: {{ isAiConnected ? 'Connected' : 'Not Connected' }}</span>
-          </RdBadge>
+          <!-- Badges tersembunyi di mobile agar tidak menumpuk baris tombol -->
+          <div class="hidden md:flex items-center gap-2 shrink-0">
+            <RdBadge variant="neutral" size="sm">
+              Konteks: {{ tenant.name }}
+            </RdBadge>
+            <RdBadge
+              :variant="isAiConnected ? 'success' : 'danger'"
+              size="sm"
+              class="items-center gap-1.5"
+              :title="isAiConnected ? 'Layanan AI terhubung dan siap digunakan' : 'Layanan AI belum terhubung atau kunci API belum dikonfigurasi'"
+            >
+              <span :class="['w-1.5 h-1.5 rounded-full inline-block shrink-0', isAiConnected ? 'bg-teal-600 dark:bg-teal-400' : 'bg-red-500']"></span>
+              <span>Status AI: {{ isAiConnected ? 'Connected' : 'Not Connected' }}</span>
+            </RdBadge>
+          </div>
         </div>
 
         <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <RdButton
+          <button
             v-if="can_manage_settings"
-            variant="outline"
-            size="sm"
+            type="button"
             @click="isSettingsModalOpen = true"
-            class="text-xs"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer shrink-0"
             title="Pengaturan Integrasi AI"
           >
-            <svg class="w-3.5 h-3.5 sm:mr-1 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="w-4 h-4 shrink-0 text-slate-600 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <span class="hidden sm:inline">Pengaturan AI</span>
-          </RdButton>
+          </button>
 
-          <RdButton
-            variant="primary"
-            size="sm"
+          <button
+            type="button"
             @click="startNewConversation"
-            class="text-xs"
+            class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium rounded-md bg-teal-700 hover:bg-teal-800 text-white transition-colors cursor-pointer shrink-0"
+            title="Mulai Percakapan Baru"
           >
-            <span>+ Baru</span>
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Baru</span>
             <span class="hidden sm:inline">&nbsp;Percakapan</span>
-          </RdButton>
+          </button>
         </div>
       </div>
 
@@ -675,9 +680,10 @@ onMounted(() => {
       <RdModal
         v-model="isSettingsModalOpen"
         title="Pengaturan Integrasi Asisten AI"
+        max-width="lg"
         @close="isSettingsModalOpen = false"
       >
-        <div class="space-y-4 text-xs">
+        <div class="space-y-4 text-xs max-h-[65vh] overflow-y-auto pr-1">
           <RdAlert
             v-if="settingsAlert"
             :variant="settingsAlert.type === 'success' ? 'success' : 'error'"
@@ -701,7 +707,7 @@ onMounted(() => {
             <p class="text-slate-600 dark:text-slate-300 leading-relaxed text-[11px]">
               Ruang kerja Anda secara otomatis mewarisi kredensial AI terpusat dari Administrasi Sistem platform. Anda tidak perlu memasukkan kunci API atau URL endpoint lagi di sini.
             </p>
-            <div class="grid grid-cols-2 gap-2 pt-1 text-[11px] border-t border-teal-200/60 dark:border-teal-900/50 text-slate-700 dark:text-slate-300">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px] border-t border-teal-200/60 dark:border-teal-900/50 text-slate-700 dark:text-slate-300">
               <div>
                 <span class="text-slate-500 dark:text-slate-400 block text-[10px]">Penyedia Default:</span>
                 <span class="font-semibold font-mono">{{ platform_config?.provider_name || '9Router AI Gateway' }}</span>
@@ -710,7 +716,7 @@ onMounted(() => {
                 <span class="text-slate-500 dark:text-slate-400 block text-[10px]">Model Platform:</span>
                 <span class="font-semibold font-mono">{{ platform_config?.model || 'high-models-agent' }}</span>
               </div>
-              <div class="col-span-2">
+              <div class="col-span-1 sm:col-span-2">
                 <span class="text-slate-500 dark:text-slate-400 block text-[10px]">Kunci API & Endpoint:</span>
                 <span class="font-medium text-teal-700 dark:text-teal-300 text-[11px]">Dikelola Terpusat di Administrasi Sistem</span>
               </div>
@@ -818,16 +824,18 @@ onMounted(() => {
               Aktifkan asisten AI untuk anggota ruang kerja ini
             </label>
           </div>
+        </div>
 
-          <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+        <template #footer>
+          <div class="w-full flex items-center justify-between gap-2">
             <div>
               <button
                 v-if="settings.is_custom"
                 type="button"
-                class="text-[11px] text-red-600 hover:text-red-700 dark:text-red-400 hover:underline"
+                class="text-[11px] text-red-600 hover:text-red-700 dark:text-red-400 hover:underline cursor-pointer"
                 @click="resetToPlatformDefault"
               >
-                Kembalikan ke Default Sistem
+                Reset ke Default
               </button>
             </div>
             <div class="flex items-center gap-2">
@@ -844,11 +852,11 @@ onMounted(() => {
                 :loading="isSavingSettings"
                 @click="saveSettings"
               >
-                Simpan Pengaturan
+                Simpan
               </RdButton>
             </div>
           </div>
-        </div>
+        </template>
       </RdModal>
     </div>
   </RudimahAppShell>

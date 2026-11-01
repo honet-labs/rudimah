@@ -100,7 +100,7 @@ const pekanNavItems = computed(() => [
   { name: 'Anggaran', path: `/t/${tenantSlug.value}/apps/pekan/budgets`, icon: 'budget' },
   { name: 'Tabungan', path: `/t/${tenantSlug.value}/apps/pekan/savings`, icon: 'savings' },
   { name: 'Pengingat Tagihan', path: `/t/${tenantSlug.value}/apps/pekan/reminders`, icon: 'bell' },
-  { name: 'Pindai Struk OCR', path: `/t/${tenantSlug.value}/apps/pekan/receipt-scan`, icon: 'camera' },
+  { name: 'Pindai Struk', path: `/t/${tenantSlug.value}/apps/pekan/receipt-scan`, icon: 'qr' },
   { name: 'Asisten AI', path: `/t/${tenantSlug.value}/assistant`, icon: 'chat' },
   { name: 'Laporan', path: `/t/${tenantSlug.value}/apps/pekan/reports`, icon: 'chart' },
   { name: 'Pengaturan', path: `/t/${tenantSlug.value}/apps/pekan/settings`, icon: 'cog' },

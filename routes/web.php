@@ -147,7 +147,7 @@ Route::prefix('t/{tenantSlug}')->middleware(['auth', EnsureMfaVerified::class, R
             Route::delete('/reminders/{id}', [ReminderController::class, 'destroy'])->name('reminders.destroy');
             Route::post('/reminders/{id}/pay', [ReminderController::class, 'pay'])->name('reminders.pay');
 
-            // Pindai Struk OCR
+            // Pindai Struk
             Route::get('/receipt-scan', [ReceiptScanController::class, 'index'])->name('receiptscan.index');
             Route::post('/receipt-scan/upload', [ReceiptScanController::class, 'upload'])->name('receiptscan.upload');
             Route::post('/receipt-scan/confirm', [ReceiptScanController::class, 'confirm'])->name('receiptscan.confirm');

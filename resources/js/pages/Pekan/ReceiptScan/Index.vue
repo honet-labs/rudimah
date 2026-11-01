@@ -345,7 +345,7 @@ const categoryOptions = computed(() => {
     app-name="PEKAN"
   >
     <RdPageHeader
-      title="Pindai Kuitansi & Struk OCR"
+      title="Pindai Struk"
       description="Ekstraksi otomatis bukti belanja dengan model AI vision terpadu dan tinjauan verifikasi sebelum simpan"
       :breadcrumbs="[
         { label: 'PEKAN', href: `/t/${tenant.slug}/apps/pekan/dashboard` },

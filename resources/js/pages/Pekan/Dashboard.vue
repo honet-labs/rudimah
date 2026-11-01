@@ -102,13 +102,22 @@ const txColumns = [
         </RdButton>
 
         <a :href="`/t/${tenant?.slug || ''}/apps/pekan/receipt-scan`">
-          <RdButton variant="outline" size="sm">
-            Pindai Struk OCR
+          <RdButton variant="outline" size="sm" class="inline-flex items-center gap-1.5" title="Pindai Struk">
+            <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14 14h3v3h-3zM20 14v3h-3M14 20h7" />
+            </svg>
+            <span>Pindai Struk</span>
           </RdButton>
         </a>
         <a :href="`/t/${tenant?.slug || ''}/apps/pekan/transactions/create`">
-          <RdButton variant="primary" size="sm">
-            Tambah Transaksi
+          <RdButton variant="primary" size="sm" class="inline-flex items-center gap-1.5" title="Tambah Transaksi">
+            <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Tambah</span>
           </RdButton>
         </a>
       </template>
