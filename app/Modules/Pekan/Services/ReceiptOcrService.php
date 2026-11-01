@@ -49,25 +49,23 @@ class ReceiptOcrService
             throw new \RuntimeException('Layanan AI dinonaktifkan untuk ruang kerja ini.');
         }
 
+        $platformSettings = PlatformAiService::getSettings();
+
         $hasCustomKey = !empty($tenantSetting?->api_key);
-        $providerCode = $hasCustomKey && !empty($tenantSetting?->provider)
+        $providerCode = ($hasCustomKey && !empty($tenantSetting?->provider))
             ? $tenantSetting->provider
-            : config('rudimah.ocr.provider', config('rudimah.ai.default_provider', 'gemini'));
+            : ($platformSettings['effective_ocr_provider'] ?? config('rudimah.ocr.provider', config('rudimah.ai.default_provider', 'gemini')));
 
         $normalizedCode = (strtolower($providerCode) === 'ninerouter') ? '9router' : strtolower($providerCode);
+        $activeDetails = $platformSettings['providers'][$normalizedCode] ?? [];
 
-        $modelName = $hasCustomKey && !empty($tenantSetting?->model)
+        $modelName = ($hasCustomKey && !empty($tenantSetting?->model))
             ? $tenantSetting->model
-            : config('rudimah.ocr.model', config("rudimah.ai.{$normalizedCode}_model", 'gpt-4o-mini'));
+            : ($platformSettings['effective_ocr_model'] ?? ($activeDetails['model'] ?? config('rudimah.ocr.model')));
 
-        // high-models-agent adalah router model teks dan tidak menerima input vision di 9Router
-        if ($normalizedCode === '9router' && ($modelName === 'high-models-agent' || empty($modelName))) {
-            $modelName = 'gpt-4o-mini';
-        }
-
-        $endpoint = $hasCustomKey && !empty($tenantSetting?->api_endpoint)
+        $endpoint = ($hasCustomKey && !empty($tenantSetting?->api_endpoint))
             ? $tenantSetting->api_endpoint
-            : config("rudimah.ai.{$normalizedCode}_endpoint", config('rudimah.ocr.endpoint'));
+            : ($activeDetails['api_endpoint'] ?? config("rudimah.ai.{$normalizedCode}_endpoint", config('rudimah.ocr.endpoint')));
 
         $scanId = (string) Str::uuid();
         $provider = $this->providerManager->resolve($normalizedCode, $tenantSetting);

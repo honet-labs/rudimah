@@ -44,13 +44,9 @@ class ReceiptScanController
         $effectiveNormalized = (strtolower($effectiveProvider) === 'ninerouter') ? '9router' : strtolower($effectiveProvider);
         $activeDetails = $platformSettings['providers'][$effectiveNormalized] ?? [];
 
-        $effectiveModel = $hasCustomKey && !empty($tenantSetting?->model)
+        $effectiveModel = ($hasCustomKey && !empty($tenantSetting?->model))
             ? $tenantSetting->model
-            : ($platformSettings['effective_ocr_model'] ?? config('rudimah.ocr.model', 'gpt-4o-mini'));
-
-        if ($effectiveNormalized === '9router' && ($effectiveModel === 'high-models-agent' || empty($effectiveModel))) {
-            $effectiveModel = 'gpt-4o-mini';
-        }
+            : ($platformSettings['effective_ocr_model'] ?? ($activeDetails['model'] ?? ''));
 
         $providerNames = [
             '9router' => '9Router AI Gateway',

@@ -51,7 +51,7 @@ class PlatformAiService
         $effectiveOcrModel = $ocrModel;
         if (empty($effectiveOcrModel)) {
             $effectiveOcrModel = match ($effectiveOcrProvider) {
-                '9router' => ($routerModel && $routerModel !== 'high-models-agent') ? $routerModel : 'gpt-4o-mini',
+                '9router' => $routerModel ?: 'high-models-agent',
                 'openai' => $openaiModel ?: 'gpt-4o-mini',
                 'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
                 default => $geminiModel ?: 'gemini-1.5-flash',
@@ -179,7 +179,7 @@ class PlatformAiService
 
             if (empty($activeOcrModel)) {
                 $activeOcrModel = match ($activeOcrProvider) {
-                    '9router' => ($routerModel && $routerModel !== 'high-models-agent') ? $routerModel : 'gpt-4o-mini',
+                    '9router' => $routerModel ?: 'high-models-agent',
                     'openai' => $openaiModel ?: 'gpt-4o-mini',
                     'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
                     default => $geminiModel ?: 'gemini-1.5-flash',

@@ -90,4 +90,18 @@ class ReceiptOcrHumanVerificationTest extends TestCase
         $this->assertEquals('openai', config('rudimah.ocr.provider'));
         $this->assertEquals('gpt-4o', config('rudimah.ocr.model'));
     }
+
+    public function test_ocr_inherits_openai_provider_and_model_when_configured(): void
+    {
+        config([
+            'rudimah.ai.default_provider' => 'openai',
+            'rudimah.ai.openai_model' => 'gpt-4o',
+            'rudimah.ai.openai_key' => 'sk-test-openai',
+            'rudimah.ocr.provider' => 'openai',
+            'rudimah.ocr.model' => 'gpt-4o',
+        ]);
+
+        $this->assertEquals('openai', config('rudimah.ocr.provider'));
+        $this->assertEquals('gpt-4o', config('rudimah.ocr.model'));
+    }
 }
