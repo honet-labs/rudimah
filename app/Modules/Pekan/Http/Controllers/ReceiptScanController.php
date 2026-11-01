@@ -2,6 +2,8 @@
 
 namespace App\Modules\Pekan\Http\Controllers;
 
+use App\Core\AI\Models\TenantAiSetting;
+use App\Core\AI\Services\PlatformAiService;
 use App\Core\Applications\AppRegistry;
 use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\TenantContext;
@@ -29,6 +31,36 @@ class ReceiptScanController
         $tenant = TenantContext::get();
         $user = $request->user();
 
+        PlatformAiService::applyRuntimeConfig();
+        $platformSettings = PlatformAiService::getSettings();
+        $activeProvider = $platformSettings['active_provider'] ?? config('rudimah.ai.default_provider', 'gemini');
+        $normalizedActive = (strtolower($activeProvider) === 'ninerouter') ? '9router' : strtolower($activeProvider);
+        $activeDetails = $platformSettings['providers'][$normalizedActive] ?? [];
+
+        $tenantSetting = $tenant ? TenantAiSetting::where('tenant_id', $tenant->id)->first() : null;
+        $hasCustomKey = !empty($tenantSetting?->api_key);
+
+        $effectiveProvider = $hasCustomKey && !empty($tenantSetting?->provider)
+            ? $tenantSetting->provider
+            : $normalizedActive;
+
+        $effectiveNormalized = (strtolower($effectiveProvider) === 'ninerouter') ? '9router' : strtolower($effectiveProvider);
+
+        $effectiveModel = $hasCustomKey && !empty($tenantSetting?->model)
+            ? $tenantSetting->model
+            : ($activeDetails['model'] ?? config("rudimah.ai.{$effectiveNormalized}_model", 'gpt-4o-mini'));
+
+        if ($effectiveNormalized === '9router' && ($effectiveModel === 'high-models-agent' || empty($effectiveModel))) {
+            $effectiveModel = 'gpt-4o-mini';
+        }
+
+        $providerNames = [
+            '9router' => '9Router AI Gateway',
+            'openai' => 'OpenAI',
+            'claude' => 'Anthropic Claude',
+            'gemini' => 'Google Gemini',
+        ];
+
         try {
             $categories = FinanceCategory::where('is_active', true)
                 ->where('category_type', 'expense')
@@ -54,6 +86,13 @@ class ReceiptScanController
             'apps' => AppRegistry::all(),
             'categories' => $categories,
             'accounts' => $accounts,
+            'ai_engine' => [
+                'provider' => $effectiveNormalized,
+                'provider_name' => $providerNames[$effectiveNormalized] ?? strtoupper($effectiveNormalized),
+                'model' => $effectiveModel,
+                'is_configured' => $hasCustomKey ? true : ($activeDetails['is_configured'] ?? false),
+                'is_custom' => $hasCustomKey,
+            ],
         ]);
     }
 

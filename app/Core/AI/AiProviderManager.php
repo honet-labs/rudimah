@@ -31,11 +31,13 @@ class AiProviderManager
         }
 
         $defaultProvider = config('rudimah.ai.default_provider', 'gemini');
-        $provider = $providerName ?: ($tenantSetting?->provider ?: $defaultProvider);
+        $hasCustomKey = !empty($tenantSetting?->api_key);
 
-        $apiKey = $tenantSetting?->api_key;
-        $endpoint = $tenantSetting?->api_endpoint;
-        $defaultModel = $tenantSetting?->model;
+        $provider = $providerName ?: ($hasCustomKey && !empty($tenantSetting->provider) ? $tenantSetting->provider : $defaultProvider);
+
+        $apiKey = $hasCustomKey ? $tenantSetting->api_key : null;
+        $endpoint = $hasCustomKey ? $tenantSetting->api_endpoint : null;
+        $defaultModel = $hasCustomKey ? $tenantSetting->model : null;
 
         // Fallback ke pengaturan global platform jika ruang kerja tidak mendefinisikan kunci kustom
         if (empty($apiKey)) {
@@ -43,7 +45,7 @@ class AiProviderManager
                 'gemini' => config('rudimah.ai.gemini_key'),
                 'openai' => config('rudimah.ai.openai_key'),
                 'claude' => config('rudimah.ai.claude_key'),
-                '9router', 'ninerouter' => config('rudimah.ai.ninerouter_key'),
+                '9router', 'ninerouter' => config('rudimah.ai.9router_key', config('rudimah.ai.ninerouter_key')),
                 'hermes' => config('rudimah.ai.hermes_key'),
                 'openclaw' => config('rudimah.ai.openclaw_key'),
                 default => null,
@@ -55,7 +57,7 @@ class AiProviderManager
                 'gemini' => config('rudimah.ai.gemini_endpoint'),
                 'openai' => config('rudimah.ai.openai_endpoint'),
                 'claude' => config('rudimah.ai.claude_endpoint'),
-                '9router', 'ninerouter' => config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1'),
+                '9router', 'ninerouter' => config('rudimah.ai.9router_endpoint', config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1')),
                 'hermes' => config('rudimah.ai.hermes_endpoint'),
                 'openclaw' => config('rudimah.ai.openclaw_endpoint'),
                 default => null,
@@ -67,7 +69,7 @@ class AiProviderManager
                 'gemini' => config('rudimah.ai.gemini_model', 'gemini-1.5-flash'),
                 'openai' => config('rudimah.ai.openai_model', 'gpt-4o-mini'),
                 'claude' => config('rudimah.ai.claude_model', 'claude-3-5-sonnet-20241022'),
-                '9router', 'ninerouter' => config('rudimah.ai.ninerouter_model', 'high-models-agent'),
+                '9router', 'ninerouter' => config('rudimah.ai.9router_model', config('rudimah.ai.ninerouter_model', 'gpt-4o-mini')),
                 'hermes' => 'hermes-3-llama-3.1-8b',
                 'openclaw' => 'openclaw-agent-v1',
                 default => null,
@@ -78,11 +80,11 @@ class AiProviderManager
             'gemini' => new GeminiProvider($apiKey, $defaultModel ?: 'gemini-1.5-flash'),
             'openai' => new OpenAiProvider($apiKey, $defaultModel ?: 'gpt-4o-mini', $endpoint),
             'claude' => new ClaudeProvider($apiKey, $defaultModel ?: 'claude-3-5-sonnet-20241022', $endpoint),
-            '9router', 'ninerouter' => new NineRouterProvider($apiKey, $defaultModel ?: 'high-models-agent', $endpoint),
+            '9router', 'ninerouter' => new NineRouterProvider($apiKey, $defaultModel ?: 'gpt-4o-mini', $endpoint),
             'hermes' => new HermesProvider($apiKey, $defaultModel ?: 'hermes-3-llama-3.1-8b', $endpoint),
             'openclaw' => new OpenClawProvider($apiKey, $defaultModel ?: 'openclaw-agent-v1', $endpoint),
             'mock', 'local' => new LocalMockProvider(),
-            default => new NineRouterProvider($apiKey, $defaultModel ?: 'high-models-agent', $endpoint),
+            default => new NineRouterProvider($apiKey, $defaultModel ?: 'gpt-4o-mini', $endpoint),
         };
     }
 }

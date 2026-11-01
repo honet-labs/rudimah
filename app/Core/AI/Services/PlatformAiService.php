@@ -143,13 +143,20 @@ class PlatformAiService
 
             $routerKey = $settings->get('ai_9router_key', env('NINEROUTER_API_KEY', ''));
             $routerEndpoint = $settings->get('ai_9router_endpoint', 'https://api.9router.com/v1');
-            $routerModel = $settings->get('ai_9router_model', 'high-models-agent');
+            $routerModel = $settings->get('ai_9router_model', 'gpt-4o-mini');
 
             $activeOcrModel = match ($activeProvider) {
-                '9router' => $routerModel ?: 'high-models-agent',
+                '9router' => ($routerModel && $routerModel !== 'high-models-agent') ? $routerModel : 'gpt-4o-mini',
                 'openai' => $openaiModel ?: 'gpt-4o-mini',
                 'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
                 default => $geminiModel ?: 'gemini-1.5-flash',
+            };
+
+            $activeOcrEndpoint = match ($activeProvider) {
+                '9router' => $routerEndpoint,
+                'openai' => $openaiEndpoint,
+                'claude' => $claudeEndpoint,
+                default => $geminiEndpoint,
             };
 
             config([
@@ -166,8 +173,12 @@ class PlatformAiService
                 'rudimah.ai.ninerouter_key' => $routerKey,
                 'rudimah.ai.ninerouter_endpoint' => $routerEndpoint,
                 'rudimah.ai.ninerouter_model' => $routerModel,
+                'rudimah.ai.9router_key' => $routerKey,
+                'rudimah.ai.9router_endpoint' => $routerEndpoint,
+                'rudimah.ai.9router_model' => $routerModel,
                 'rudimah.ocr.provider' => $activeProvider,
                 'rudimah.ocr.model' => $activeOcrModel,
+                'rudimah.ocr.endpoint' => $activeOcrEndpoint,
             ]);
         } catch (\Throwable $e) {
             Log::debug('[PlatformAiService] Belum dapat menerapkan konfigurasi runtime: ' . $e->getMessage());

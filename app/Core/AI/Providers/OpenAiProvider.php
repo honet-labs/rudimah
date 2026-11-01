@@ -138,10 +138,25 @@ class OpenAiProvider implements AiProviderInterface
 
     public function extractReceipt(string $fileBase64, string $mimeType, array $options = []): array
     {
-        $model = $options['model'] ?? 'gpt-4o-mini';
+        $model = $options['model'] ?? $this->defaultModel;
+        if (empty($model)) {
+            $model = 'gpt-4o-mini';
+        }
 
-        if (empty($this->apiKey)) {
-            throw new \RuntimeException('Kunci API OpenAI belum dikonfigurasi untuk pemindaian kuitansi OCR.');
+        $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;
+        if (empty($endpoint)) {
+            $endpoint = rtrim(config('rudimah.ai.openai_endpoint', 'https://api.openai.com/v1'), '/');
+        }
+
+        $apiKey = !empty($this->apiKey) ? $this->apiKey : (string) config('rudimah.ai.openai_key', '');
+
+        if (empty($apiKey)) {
+            throw new \RuntimeException('Kunci API OpenAI belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
+        }
+
+        $normalizedMime = strtolower(trim($mimeType));
+        if ($normalizedMime === 'image/jpg' || $normalizedMime === 'image/pjpeg') {
+            $normalizedMime = 'image/jpeg';
         }
 
         $prompt = 'Ekstrak data kuitansi atau struk belanja berikut ke dalam format JSON murni tanpa markdown wrapper:
@@ -167,10 +182,12 @@ class OpenAiProvider implements AiProviderInterface
 }
 Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
 
+        $url = str_ends_with($endpoint, '/chat/completions') ? $endpoint : "{$endpoint}/chat/completions";
+
         try {
-            $response = Http::withToken($this->apiKey)
+            $response = Http::withToken($apiKey)
                 ->timeout(90)
-                ->post("{$this->apiBaseUrl}/chat/completions", [
+                ->post($url, [
                     'model' => $model,
                     'messages' => [
                         [
@@ -180,7 +197,8 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
                                 [
                                     'type' => 'image_url',
                                     'image_url' => [
-                                        'url' => "data:{$mimeType};base64,{$fileBase64}",
+                                        'url' => "data:{$normalizedMime};base64,{$fileBase64}",
+                                        'detail' => 'auto',
                                     ],
                                 ],
                             ],
@@ -197,7 +215,15 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
         }
 
         if ($response->successful()) {
-            $content = $response->json('choices.0.message.content');
+            $data = $response->json();
+            if (!empty($data['error'])) {
+                $errMsg = is_array($data['error'])
+                    ? ($data['error']['message'] ?? json_encode($data['error']))
+                    : (string) $data['error'];
+                throw new \RuntimeException("OpenAI melaporkan kesalahan: {$errMsg}");
+            }
+
+            $content = $data['choices'][0]['message']['content'] ?? '';
             $parsed = json_decode($content, true);
             if (is_array($parsed)) {
                 return $this->normalizeReceiptData($parsed);
@@ -206,8 +232,9 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
         }
 
         $status = $response->status();
-        $errBody = mb_strimwidth($response->body(), 0, 300, '...');
-        throw new \RuntimeException("Pemindaian OCR OpenAI gagal (HTTP {$status}): {$errBody}");
+        $errData = $response->json();
+        $errMsg = $errData['error']['message'] ?? $errData['message'] ?? mb_strimwidth($response->body(), 0, 300, '...');
+        throw new \RuntimeException("Pemindaian OCR OpenAI gagal (HTTP {$status}): {$errMsg}");
     }
 
     protected function normalizeReceiptData(array $raw): array

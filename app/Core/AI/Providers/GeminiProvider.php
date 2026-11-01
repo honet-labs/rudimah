@@ -96,8 +96,10 @@ class GeminiProvider implements AiProviderInterface
     {
         $model = $options['model'] ?? $this->defaultModel;
 
-        if (empty($this->apiKey)) {
-            throw new \RuntimeException('Kunci API Google Gemini belum dikonfigurasi untuk pemindaian kuitansi OCR.');
+        $apiKey = !empty($this->apiKey) ? $this->apiKey : (string) config('rudimah.ai.gemini_key', '');
+
+        if (empty($apiKey)) {
+            throw new \RuntimeException('Kunci API Google Gemini belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
         }
 
         $systemPrompt = "Ekstrak struk belanja/kuitansi ini ke dalam format JSON murni tanpa markdown wrapper. Satuan Rupiah integer tanpa sen.
@@ -123,8 +125,8 @@ Format JSON wajib:
   ]
 }";
 
-        $baseEndpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : 'https://generativelanguage.googleapis.com';
-        $endpoint = "{$baseEndpoint}/v1beta/models/{$model}:generateContent?key={$this->apiKey}";
+        $baseEndpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : rtrim(config('rudimah.ai.gemini_endpoint', 'https://generativelanguage.googleapis.com'), '/');
+        $endpoint = "{$baseEndpoint}/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
         try {
             $response = Http::timeout(90)->post($endpoint, [
@@ -163,8 +165,9 @@ Format JSON wajib:
         }
 
         $status = $response->status();
-        $errBody = mb_strimwidth($response->body(), 0, 300, '...');
-        throw new \RuntimeException("Pemindaian OCR Google Gemini gagal (HTTP {$status}): {$errBody}");
+        $errData = $response->json();
+        $errMsg = $errData['error']['message'] ?? $errData['message'] ?? mb_strimwidth($response->body(), 0, 300, '...');
+        throw new \RuntimeException("Pemindaian OCR Google Gemini gagal (HTTP {$status}): {$errMsg}");
     }
 
     protected function normalizeReceiptData(array $raw): array

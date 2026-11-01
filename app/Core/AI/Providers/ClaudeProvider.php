@@ -126,8 +126,15 @@ class ClaudeProvider implements AiProviderInterface
             $endpoint = rtrim(config('rudimah.ai.claude_endpoint', 'https://api.anthropic.com/v1'), '/');
         }
 
-        if (empty($this->apiKey)) {
-            throw new \RuntimeException('Kunci API Anthropic Claude belum dikonfigurasi untuk pemindaian kuitansi OCR.');
+        $apiKey = !empty($this->apiKey) ? $this->apiKey : (string) config('rudimah.ai.claude_key', '');
+
+        if (empty($apiKey)) {
+            throw new \RuntimeException('Kunci API Anthropic Claude belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
+        }
+
+        $normalizedMime = strtolower(trim($mimeType));
+        if ($normalizedMime === 'image/jpg' || $normalizedMime === 'image/pjpeg') {
+            $normalizedMime = 'image/jpeg';
         }
 
         $url = $this->buildMessagesUrl($endpoint);
@@ -165,7 +172,7 @@ Format JSON wajib:
                             'type' => 'image',
                             'source' => [
                                 'type' => 'base64',
-                                'media_type' => $mimeType,
+                                'media_type' => $normalizedMime,
                                 'data' => $fileBase64,
                             ],
                         ],
@@ -180,7 +187,7 @@ Format JSON wajib:
 
         try {
             $response = Http::withHeaders([
-                'x-api-key' => $this->apiKey,
+                'x-api-key' => $apiKey,
                 'anthropic-version' => '2023-06-01',
                 'content-type' => 'application/json',
             ])->timeout(90)->post($url, $payload);
@@ -211,8 +218,9 @@ Format JSON wajib:
         }
 
         $status = $response->status();
-        $errBody = mb_strimwidth($response->body(), 0, 300, '...');
-        throw new \RuntimeException("Pemindaian OCR Anthropic Claude gagal (HTTP {$status}): {$errBody}");
+        $errData = $response->json();
+        $errMsg = $errData['error']['message'] ?? $errData['message'] ?? mb_strimwidth($response->body(), 0, 300, '...');
+        throw new \RuntimeException("Pemindaian OCR Anthropic Claude gagal (HTTP {$status}): {$errMsg}");
     }
 
     protected function normalizeReceiptData(array $raw): array

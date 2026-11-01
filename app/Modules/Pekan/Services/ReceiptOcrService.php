@@ -50,20 +50,27 @@ class ReceiptOcrService
         }
 
         $hasCustomKey = !empty($tenantSetting?->api_key);
-        $providerCode = $hasCustomKey
-            ? ($tenantSetting->provider ?: config('rudimah.ai.default_provider', '9router'))
-            : config('rudimah.ai.default_provider', '9router');
+        $providerCode = $hasCustomKey && !empty($tenantSetting?->provider)
+            ? $tenantSetting->provider
+            : config('rudimah.ai.default_provider', 'gemini');
 
-        $modelName = $hasCustomKey
-            ? ($tenantSetting->model ?: config("rudimah.ai.{$providerCode}_model", 'high-models-agent'))
-            : config("rudimah.ai.{$providerCode}_model", 'high-models-agent');
+        $normalizedCode = (strtolower($providerCode) === 'ninerouter') ? '9router' : strtolower($providerCode);
+
+        $modelName = $hasCustomKey && !empty($tenantSetting?->model)
+            ? $tenantSetting->model
+            : config("rudimah.ai.{$normalizedCode}_model", config('rudimah.ocr.model', 'gpt-4o-mini'));
+
+        // high-models-agent adalah router model teks dan tidak menerima input vision di 9Router
+        if ($normalizedCode === '9router' && ($modelName === 'high-models-agent' || empty($modelName))) {
+            $modelName = 'gpt-4o-mini';
+        }
 
         $endpoint = $hasCustomKey && !empty($tenantSetting?->api_endpoint)
             ? $tenantSetting->api_endpoint
-            : config("rudimah.ai.{$providerCode}_endpoint");
+            : config("rudimah.ai.{$normalizedCode}_endpoint", config('rudimah.ocr.endpoint'));
 
         $scanId = (string) Str::uuid();
-        $provider = $this->providerManager->resolve($providerCode, $tenantSetting);
+        $provider = $this->providerManager->resolve($normalizedCode, $tenantSetting);
 
         // Ekstraksi via AI Vision Provider dengan pra-optimasi resolusi gambar
         [$fileBase64, $preparedMime] = $this->prepareImageForOcr($file, $mimeType);

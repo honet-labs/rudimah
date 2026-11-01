@@ -30,10 +30,12 @@ class NineRouterProvider implements AiProviderInterface
         $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;
 
         if (empty($endpoint)) {
-            $endpoint = rtrim(config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1'), '/');
+            $endpoint = rtrim(config('rudimah.ai.9router_endpoint', config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1')), '/');
         }
 
-        if (empty($this->apiKey)) {
+        $apiKey = !empty($this->apiKey) ? $this->apiKey : (string) config('rudimah.ai.9router_key', config('rudimah.ai.ninerouter_key', ''));
+
+        if (empty($apiKey)) {
             throw new \RuntimeException('Token akses / API Key 9Router belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
         }
 
@@ -189,18 +191,21 @@ class NineRouterProvider implements AiProviderInterface
     public function extractReceipt(string $fileBase64, string $mimeType, array $options = []): array
     {
         $model = !empty($options['model']) ? $options['model'] : $this->defaultModel;
-        if (empty($model)) {
-            $model = 'high-models-agent';
+        // high-models-agent adalah virtual router teks dan tidak mendukung input vision/gambar di 9Router
+        if (empty($model) || $model === 'high-models-agent') {
+            $model = 'gpt-4o-mini';
         }
 
         $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;
 
         if (empty($endpoint)) {
-            $endpoint = rtrim(config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1'), '/');
+            $endpoint = rtrim(config('rudimah.ai.9router_endpoint', config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1')), '/');
         }
 
-        if (empty($this->apiKey)) {
-            throw new \RuntimeException('Token akses 9Router belum dikonfigurasi untuk pemindaian kuitansi OCR.');
+        $apiKey = !empty($this->apiKey) ? $this->apiKey : (string) config('rudimah.ai.9router_key', config('rudimah.ai.ninerouter_key', ''));
+
+        if (empty($apiKey)) {
+            throw new \RuntimeException('Token akses 9Router belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
         }
 
         $url = $this->buildChatCompletionsUrl($endpoint);
@@ -227,7 +232,12 @@ class NineRouterProvider implements AiProviderInterface
 }
 Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pastikan total_minor = subtotal_minor + tax_minor + service_charge_minor - discount_minor.';
 
-        $dataUrl = "data:{$mimeType};base64,{$fileBase64}";
+        $normalizedMime = strtolower(trim($mimeType));
+        if ($normalizedMime === 'image/jpg' || $normalizedMime === 'image/pjpeg') {
+            $normalizedMime = 'image/jpeg';
+        }
+
+        $dataUrl = "data:{$normalizedMime};base64,{$fileBase64}";
 
         $payload = [
             'model' => $model,
@@ -236,7 +246,13 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
                     'role' => 'user',
                     'content' => [
                         ['type' => 'text', 'text' => $prompt],
-                        ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]],
+                        [
+                            'type' => 'image_url',
+                            'image_url' => [
+                                'url' => $dataUrl,
+                                'detail' => 'auto',
+                            ],
+                        ],
                     ],
                 ],
             ],
@@ -246,7 +262,7 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
         ];
 
         try {
-            $response = Http::withToken($this->apiKey)
+            $response = Http::withToken($apiKey)
                 ->timeout(90)
                 ->post($url, $payload);
         } catch (\Throwable $e) {
@@ -256,6 +272,15 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
 
         if ($response->successful()) {
             $data = $response->json();
+
+            // Cek jika API mengembalikan payload error dengan HTTP 200
+            if (!empty($data['error'])) {
+                $errMsg = is_array($data['error'])
+                    ? ($data['error']['message'] ?? json_encode($data['error']))
+                    : (string) $data['error'];
+                throw new \RuntimeException("Layanan 9Router melaporkan kesalahan: {$errMsg}");
+            }
+
             $rawText = '';
 
             // 1. Ekstraksi format standar OpenAI choices[0].message.content
@@ -325,8 +350,9 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
         }
 
         $status = $response->status();
-        $errBody = mb_strimwidth($response->body(), 0, 300, '...');
-        throw new \RuntimeException("Pemindaian OCR 9Router gagal (HTTP {$status}): {$errBody}");
+        $errData = $response->json();
+        $errMsg = $errData['error']['message'] ?? $errData['message'] ?? mb_strimwidth($response->body(), 0, 300, '...');
+        throw new \RuntimeException("Pemindaian OCR 9Router gagal (HTTP {$status}): {$errMsg}");
     }
 
     protected function normalizeReceiptData(array $raw): array
