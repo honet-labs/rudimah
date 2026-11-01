@@ -216,17 +216,18 @@ function isCurrentRoute(targetPath: string): boolean {
           :tenant-slug="tenantSlug"
         />
 
-        <!-- Tenant Switcher atau Indikator Global Platform -->
-        <div v-if="appKey === 'admin'" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+        <!-- Tenant Switcher atau Indikator Global Platform (Khusus Desktop) -->
+        <div v-if="appKey === 'admin'" class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
           <span class="w-2 h-2 rounded-full bg-teal-600"></span>
           <span class="hidden sm:inline">Platform Global (Seluruh Ruang Kerja)</span>
           <span class="sm:hidden">Global Admin</span>
         </div>
-        <RdTenantSwitcher
-          v-else
-          :current-tenant="currentTenant"
-          :tenants="tenants && tenants.length > 0 ? tenants : [currentTenant]"
-        />
+        <div v-else class="hidden md:inline-block">
+          <RdTenantSwitcher
+            :current-tenant="currentTenant"
+            :tenants="tenants && tenants.length > 0 ? tenants : [currentTenant]"
+          />
+        </div>
       </div>
 
       <!-- Right Header Actions -->
@@ -422,10 +423,33 @@ function isCurrentRoute(targetPath: string): boolean {
             </a>
           </div>
 
-          <!-- Pengaturan Tema di Drawer Mobile -->
-          <div class="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between mt-auto">
-            <span class="text-xs text-slate-500 dark:text-slate-400">Mode Tampilan</span>
-            <RdThemeToggle show-label size="sm" />
+          <!-- Bagian Bawah Drawer Mobile: Mode Tema & Ruang Kerja Terpilih (Paling Bawah) -->
+          <div class="pt-3 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-3 mt-auto shrink-0">
+            <!-- Mode Tampilan -->
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-slate-500 dark:text-slate-400">Mode Tampilan</span>
+              <RdThemeToggle show-label size="sm" />
+            </div>
+
+            <!-- Ruang Kerja Terpilih (Selected Workspace diletakkan di paling bawah) -->
+            <div class="pt-2.5 border-t border-slate-200 dark:border-slate-800">
+              <div v-if="appKey === 'admin'" class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs">
+                <div class="font-semibold text-slate-900 dark:text-slate-100">Cakupan: Seluruh Platform</div>
+                <div class="text-[11px] text-teal-700 dark:text-teal-400 font-bold uppercase mt-0.5">Hak: Super Administrator</div>
+              </div>
+              <div v-else class="space-y-1.5">
+                <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  <span>Ruang Kerja</span>
+                  <span class="text-[10px] text-slate-400">{{ tenantRole }}</span>
+                </div>
+                <RdTenantSwitcher
+                  :current-tenant="currentTenant"
+                  :tenants="tenants && tenants.length > 0 ? tenants : [currentTenant]"
+                  full-width
+                  dropup
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

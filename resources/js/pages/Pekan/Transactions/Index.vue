@@ -377,19 +377,8 @@ const columns = [
 
           <!-- Baris 2: Rincian Barang / Keterangan Belanja -->
           <div v-if="item.items && item.items.length > 0" class="p-2.5 rounded bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs space-y-1">
-            <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+            <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
               <span>Item Belanja ({{ formatQuantity(item.items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 1), 0)) }} item)</span>
-              <button
-                v-if="item.items.length > 1"
-                type="button"
-                @click.stop="openItemsModal(item)"
-                class="text-[11px] text-teal-700 dark:text-teal-400 hover:underline font-semibold lowercase cursor-pointer inline-flex items-center gap-0.5"
-              >
-                <span>lihat semua ({{ item.items.length }})</span>
-                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
             </div>
             <div
               v-for="(it, idx) in item.items.slice(0, 3)"
@@ -407,10 +396,9 @@ const columns = [
               <button
                 type="button"
                 @click.stop="openItemsModal(item)"
-                class="w-full text-left text-[11px] text-teal-700 dark:text-teal-400 hover:text-teal-800 font-medium pt-1 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between cursor-pointer"
+                class="w-full text-left text-[11px] text-teal-700 dark:text-teal-400 hover:text-teal-800 font-medium pt-1 border-t border-slate-200 dark:border-slate-700 cursor-pointer"
               >
-                <span>+{{ item.items.length - 3 }} item lainnya</span>
-                <span class="text-[10px] font-semibold">Buka Rincian →</span>
+                +{{ item.items.length - 3 }} item lainnya
               </button>
             </div>
           </div>
