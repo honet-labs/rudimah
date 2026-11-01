@@ -56,7 +56,13 @@ function openPreview(url: string, title: string) {
         :key="s.id"
         padding
       >
-        <div class="flex items-center justify-end mb-1.5">
+        <div class="flex items-center justify-between mb-1.5">
+          <code
+            class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[10px] select-all cursor-default"
+            :title="s.id"
+          >
+            #{{ s.id && s.id.length > 8 ? s.id.substring(0, 8) : s.id }}
+          </code>
           <RdBadge variant="neutral">
             {{ Math.round(s.progress_percent) }}%
           </RdBadge>

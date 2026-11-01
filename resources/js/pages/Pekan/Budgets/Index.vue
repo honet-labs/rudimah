@@ -97,12 +97,20 @@ const displayedBudgets = computed(() => {
       >
         <div class="flex items-start justify-between mb-3">
           <div>
+            <div class="flex items-center gap-1.5 mb-1">
+              <code
+                class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[10px] select-all cursor-default"
+                :title="b.id"
+              >
+                #{{ b.id && b.id.length > 8 ? b.id.substring(0, 8) : b.id }}
+              </code>
+              <span class="text-xs text-slate-500">
+                {{ b.category_name || 'Umum' }}
+              </span>
+            </div>
             <h3 class="text-sm font-bold text-slate-900 dark:text-white">
               {{ b.name }}
             </h3>
-            <span class="text-xs text-slate-500">
-              Kategori: {{ b.category_name || 'Umum' }}
-            </span>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             <RdBadge v-if="activeTab === 'history'" :variant="b.progress_percent >= 100 ? 'danger' : 'neutral'">

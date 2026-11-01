@@ -37,6 +37,7 @@ const tenantSlug = computed(() => props.tenant?.slug || (props.tenant as any)?.c
 
 // Tabel Kolom
 const columns = [
+  { key: 'id', label: 'ID', width: '95px' },
   { key: 'title', label: 'Nama Tagihan' },
   { key: 'category_name', label: 'Kategori', width: '130px' },
   { key: 'due_date', label: 'Tanggal Jatuh Tempo', width: '150px' },
@@ -206,6 +207,16 @@ function statusLabel(status?: string): string {
         <RdCard padding>
           <RdTable :columns="columns" :items="reminders">
 
+            <!-- ID Tagihan -->
+            <template #id="{ value }">
+              <code
+                class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-nowrap select-all cursor-default"
+                :title="value"
+              >
+                #{{ value && value.length > 8 ? value.substring(0, 8) : value }}
+              </code>
+            </template>
+
             <!-- 2. Nama Tagihan -->
             <template #title="{ item }">
               <div class="space-y-1">
@@ -335,6 +346,12 @@ function statusLabel(status?: string): string {
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0 flex-1 space-y-1">
               <div class="flex items-center gap-1.5 flex-wrap">
+                <code
+                  class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[10px] select-all cursor-default"
+                  :title="rem.id"
+                >
+                  #{{ rem.id && rem.id.length > 8 ? rem.id.substring(0, 8) : rem.id }}
+                </code>
                 <span class="text-xs text-slate-500 dark:text-slate-400 font-normal">
                   {{ rem.category_name || rem.category?.name || 'Tanpa Kategori' }}
                 </span>
@@ -662,17 +679,20 @@ function statusLabel(status?: string): string {
       max-width="lg"
     >
       <div v-if="detailReminder" class="space-y-4">
-        <!-- Grid Informasi -->
         <div class="grid grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg text-xs">
           <div>
-            <span class="text-slate-400 block">Nama Tagihan:</span>
-            <span class="font-semibold text-slate-800 dark:text-slate-200">{{ detailReminder.title }}</span>
+            <span class="text-slate-400 block">ID Tagihan:</span>
+            <code class="font-mono text-xs text-slate-700 dark:text-slate-300 select-all font-semibold">#{{ detailReminder.id }}</code>
           </div>
           <div>
             <span class="text-slate-400 block">Status Tagihan:</span>
             <RdBadge :variant="statusVariant(detailReminder.status)" class="mt-0.5">
               {{ statusLabel(detailReminder.status) }}
             </RdBadge>
+          </div>
+          <div class="col-span-2">
+            <span class="text-slate-400 block">Nama Tagihan:</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-200">{{ detailReminder.title }}</span>
           </div>
           <div>
             <span class="text-slate-400 block">Kategori:</span>

@@ -117,6 +117,7 @@ const typeOptions = [
 ];
 
 const columns = [
+  { key: 'id', label: 'ID', width: '95px' },
   { key: 'transaction_date', label: 'Tanggal Transaksi', width: '130px' },
   { key: 'merchant_name', label: 'Nama Merchant', width: '150px' },
   { key: 'description', label: 'Nama Transaksi' },
@@ -192,6 +193,15 @@ const columns = [
       <!-- 1. Tampilan Layar Lebar & Desktop (Tabel Komprehensif 10 Kolom) -->
       <div class="hidden lg:block">
         <RdTable :columns="columns" :items="transactions">
+
+          <template #id="{ value }">
+            <code
+              class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-nowrap select-all cursor-default"
+              :title="value"
+            >
+              #{{ value && value.length > 8 ? value.substring(0, 8) : value }}
+            </code>
+          </template>
 
           <template #transaction_date="{ value }">
             <RdDateTime :value="value" format="date" />
@@ -331,6 +341,12 @@ const columns = [
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0 space-y-1">
               <div class="flex items-center gap-1.5 flex-wrap">
+                <code
+                  class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[10px] select-all cursor-default"
+                  :title="item.id"
+                >
+                  #{{ item.id && item.id.length > 8 ? item.id.substring(0, 8) : item.id }}
+                </code>
                 <span class="text-xs text-slate-500 font-medium">
                   <RdDateTime :value="item.transaction_date" format="date" />
                 </span>
