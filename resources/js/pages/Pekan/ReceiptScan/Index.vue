@@ -197,7 +197,13 @@ async function handleFileSelected(file: File) {
       signal: abortCtrl.signal,
     });
 
-    const data = await res.json().catch(() => ({}));
+    let data: any = {};
+    const rawText = await res.text();
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      data = {};
+    }
 
     if (res.ok && data.success) {
       scanId.value = data.scan_id;
@@ -236,11 +242,24 @@ async function handleFileSelected(file: File) {
       recalculateGrandTotal();
       hasResult.value = true;
     } else {
-      errorMessage.value =
+      const explicitError =
         data.message ||
         data.error ||
-        (data.errors ? Object.values(data.errors).flat().join(', ') : '') ||
-        'Gagal memproses pemindaian berkas struk. Pastikan berkas struk terbaca jelas.';
+        (data.errors ? Object.values(data.errors).flat().join(', ') : '');
+
+      if (explicitError) {
+        errorMessage.value = explicitError;
+      } else if (!res.ok) {
+        if (res.status === 419) {
+          errorMessage.value = 'Sesi formulir telah kedaluwarsa (CSRF token expired). Silakan muat ulang halaman (tekan Ctrl+F5) lalu coba unggah kembali.';
+        } else if (res.status === 413) {
+          errorMessage.value = 'Ukuran berkas struk melampaui batas maksimum yang diizinkan server web.';
+        } else {
+          errorMessage.value = `Kendala respons server (HTTP ${res.status}${res.statusText ? ': ' + res.statusText : ''}). Silakan periksa koneksi atau model vision di Administrasi Sistem.`;
+        }
+      } else {
+        errorMessage.value = 'Gagal memproses pemindaian berkas struk. Pastikan berkas struk terbaca jelas.';
+      }
     }
   } catch (err: any) {
     if (err?.name === 'AbortError') {

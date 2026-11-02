@@ -91,7 +91,7 @@ class ReceiptScanController
         ]);
     }
 
-    public function upload(Request $request, ?string $tenantSlug = null): JsonResponse|RedirectResponse
+    public function upload(Request $request, ?string $tenantSlug = null): JsonResponse
     {
         $request->validate([
             'receipt_file' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:10240',
@@ -100,28 +100,21 @@ class ReceiptScanController
         try {
             $scan = $this->ocrService->processUpload($request->file('receipt_file'));
 
-            if ($request->wantsJson() || $request->ajax()) {
-                return response()->json([
-                    'success' => true,
-                    'scan_id' => $scan->id,
-                    'extracted' => $scan->extracted_json,
-                    'images' => $scan->images ?: ($scan->extracted_json['_receipt_images'] ?? []),
-                ]);
-            }
-
-            $tenant = TenantContext::get();
-            $slug = $tenant?->slug ?: $tenantSlug;
-            return redirect("/t/{$slug}/apps/pekan/receipt-scan")
-                ->with('status', 'Struk berhasil diproses untuk ditinjau.');
+            return response()->json([
+                'success' => true,
+                'scan_id' => $scan->id,
+                'extracted' => $scan->extracted_json,
+                'images' => $scan->images ?: ($scan->extracted_json['_receipt_images'] ?? []),
+            ]);
         } catch (\Throwable $e) {
-            if ($request->wantsJson() || $request->ajax()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $e->getMessage(),
-                ], 422);
-            }
+            \Illuminate\Support\Facades\Log::error('[ReceiptScanController] Gagal memproses berkas struk: ' . $e->getMessage(), [
+                'exception' => $e,
+            ]);
 
-            return back()->with('error', $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage() ?: 'Gagal memproses struk belanja. Pastikan berkas struk terbaca jelas dan model AI vision aktif.',
+            ], 422);
         }
     }
 

@@ -353,6 +353,8 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
             }
 
             $cleanJson = preg_replace('/```(?:json)?\s*([\s\S]*?)\s*```/', '$1', trim($rawText));
+            // Hapus blok pemikiran/reasoning <think>...</think> jika dihasilkan model AI reasoning (seperti DeepSeek-R1/QwQ)
+            $cleanJson = preg_replace('/<think>[\s\S]*?<\/think>/', '', $cleanJson);
             if (preg_match('/\{[\s\S]*\}/', $cleanJson, $matches)) {
                 $parsed = json_decode($matches[0], true);
                 if (is_array($parsed)) {

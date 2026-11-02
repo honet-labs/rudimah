@@ -97,19 +97,23 @@ class ReceiptOcrService
         } catch (\Throwable $e) {
             Log::error("[ReceiptOcrService] Ekstraksi OCR gagal ({$providerCode} - {$modelName}): " . $e->getMessage());
 
-            FinanceReceiptScan::create([
-                'id' => $scanId,
-                'tenant_id' => $tenantId,
-                'provider_code' => $normalizedCode,
-                'model_name' => $modelName,
-                'status' => 'failed',
-                'original_filename' => $file->getClientOriginalName(),
-                'mime_type' => $mimeType,
-                'images' => $savedImages,
-                'extracted_json' => null,
-                'error_message' => $e->getMessage(),
-                'created_by' => auth()->id() ?? 'system',
-            ]);
+            try {
+                FinanceReceiptScan::create([
+                    'id' => $scanId,
+                    'tenant_id' => $tenantId,
+                    'provider_code' => $normalizedCode,
+                    'model_name' => $modelName,
+                    'status' => 'failed',
+                    'original_filename' => $file->getClientOriginalName(),
+                    'mime_type' => $mimeType,
+                    'images' => $savedImages,
+                    'extracted_json' => null,
+                    'error_message' => $e->getMessage(),
+                    'created_by' => auth()->id() ?: null,
+                ]);
+            } catch (\Throwable $dbErr) {
+                Log::warning('[ReceiptOcrService] Gagal mencatat status gagal ke database: ' . $dbErr->getMessage());
+            }
 
             throw new \RuntimeException($e->getMessage());
         }
@@ -128,7 +132,7 @@ class ReceiptOcrService
             'mime_type' => $mimeType,
             'images' => $savedImages,
             'extracted_json' => $extractedDraft,
-            'created_by' => auth()->id() ?? 'system',
+            'created_by' => auth()->id() ?: null,
         ]);
 
         AuditLogger::log('ocr_scan_created', 'finance_receipt_scans', $scanId, null, [

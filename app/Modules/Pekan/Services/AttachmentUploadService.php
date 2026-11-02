@@ -35,18 +35,22 @@ class AttachmentUploadService
 
             $uuid = (string) Str::uuid();
             $filename = "{$uuid}.{$ext}";
-            $file->move($targetDir, $filename);
 
-            $filePath = "{$targetDir}/{$filename}";
-            $fileSize = file_exists($filePath) ? filesize($filePath) : 0;
+            try {
+                $file->move($targetDir, $filename);
+                $filePath = "{$targetDir}/{$filename}";
+                $fileSize = file_exists($filePath) ? filesize($filePath) : 0;
 
-            $uploaded[] = [
-                'id' => $uuid,
-                'name' => $file->getClientOriginalName(),
-                'url' => "/uploads/{$folder}/{$filename}",
-                'size' => $fileSize,
-                'created_at' => now()->toIso8601String(),
-            ];
+                $uploaded[] = [
+                    'id' => $uuid,
+                    'name' => $file->getClientOriginalName(),
+                    'url' => "/uploads/{$folder}/{$filename}",
+                    'size' => $fileSize,
+                    'created_at' => now()->toIso8601String(),
+                ];
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("[AttachmentUploadService] Gagal menyimpan salinan fisik berkas {$filename}: " . $e->getMessage());
+            }
         }
 
         return $uploaded;
