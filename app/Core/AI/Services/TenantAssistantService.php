@@ -574,7 +574,10 @@ class TenantAssistantService
             }
         }
 
-        // 7. Simpan respon asisten
+        // 7. Bersihkan kalimat penutup klise repetitif (seperti "Ada transaksi lain?", "Transaksi lain?")
+        $replyContent = $this->cleanRepetitiveClosingPhrases($replyContent);
+
+        // 8. Simpan respon asisten
         $assistantMessage = AiMessage::create([
             'id' => (string) Str::uuid(),
             'conversation_id' => $conversation->id,
@@ -865,6 +868,37 @@ class TenantAssistantService
             'quantity' => 1,
             'unit' => $unit,
         ];
+    }
+
+    /**
+     * Membersihkan pertanyaan penutup klise/basi yang berulang dari balasan AI
+     * (contoh: "Ada transaksi lain?", "Transaksi lain?", "Ada mutasi lain?").
+     */
+    protected function cleanRepetitiveClosingPhrases(string $content): string
+    {
+        $patterns = [
+            '/(?:[\.\,\s]*)?\b(?:ada\s+)?transaksi\s+lain(?:\s+yang\s+(?:ingin|mau|perlu|bisa)\s+(?:saya\s+bantu\s+)?(?:di)?(?:catat|bantu)?)?\s*[\?\.]*\s*$/i',
+            '/(?:[\.\,\s]*)?\b(?:ada\s+)?mutasi\s+lain(?:\s+yang\s+(?:ingin|mau|perlu|bisa)\s+(?:saya\s+bantu\s+)?(?:di)?(?:catat|bantu)?)?\s*[\?\.]*\s*$/i',
+            '/(?:[\.\,\s]*)?\bada\s+yang\s+ingin\s+(?:saya\s+bantu\s+)?(?:di)?catat\s+lagi\s*[\?\.]*\s*$/i',
+            '/(?:[\.\,\s]*)?\bada\s+transaksi\s+atau\s+data\s+keuangan\s+yang\s+ingin\s+saya\s+bantu\s+catat\s*[\?\.]*\s*$/i',
+            '/(?:[\.\,\s]*)?\btransaksi\s+lain\s*\?\s*$/i',
+        ];
+
+        $cleaned = $content;
+        foreach ($patterns as $pattern) {
+            $cleaned = preg_replace($pattern, '', $cleaned);
+        }
+
+        $trimmed = trim($cleaned);
+        if (!empty($trimmed)) {
+            // Jika kalimat terpotong tanpa tanda baca di ujungnya setelah pembersihan, tambahkan tanda titik rapi
+            if (!preg_match('/[\.\?\!]$/', $trimmed) && preg_match('/[\.\?\!]/', $content)) {
+                $trimmed .= '.';
+            }
+            return $trimmed;
+        }
+
+        return $content;
     }
 }
 
