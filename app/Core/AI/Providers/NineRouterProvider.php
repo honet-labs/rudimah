@@ -190,10 +190,9 @@ class NineRouterProvider implements AiProviderInterface
 
     public function extractReceipt(string $fileBase64, string $mimeType, array $options = []): array
     {
-        $model = !empty($options['model']) ? $options['model'] : $this->defaultModel;
-        // high-models-agent adalah virtual router teks dan tidak mendukung input vision/gambar di 9Router
-        if (empty($model) || $model === 'high-models-agent') {
-            $model = 'gpt-4o-mini';
+        $primaryModel = !empty($options['model']) ? $options['model'] : $this->defaultModel;
+        if (empty($primaryModel)) {
+            $primaryModel = 'high-models-agent';
         }
 
         $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;
@@ -239,120 +238,157 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
 
         $dataUrl = "data:{$normalizedMime};base64,{$fileBase64}";
 
-        $payload = [
-            'model' => $model,
-            'messages' => [
-                [
-                    'role' => 'user',
-                    'content' => [
-                        ['type' => 'text', 'text' => $prompt],
-                        [
-                            'type' => 'image_url',
-                            'image_url' => [
-                                'url' => $dataUrl,
-                                'detail' => 'auto',
+        // Prioritaskan model utama yang dikonfigurasi pengguna/sistem,
+        // dan sediakan kandidat fallback jika model utama terkendala ketiadaan kredensial provider di 9Router
+        $candidateModels = array_values(array_unique(array_filter([
+            $primaryModel,
+            'high-models-agent',
+            'gemini-1.5-flash',
+            'gemini-2.0-flash',
+            'claude-3-5-sonnet',
+            'deepseek-chat',
+        ])));
+
+        $lastException = null;
+
+        foreach ($candidateModels as $model) {
+            $payload = [
+                'model' => $model,
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            ['type' => 'text', 'text' => $prompt],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => $dataUrl,
+                                    'detail' => 'auto',
+                                ],
                             ],
                         ],
                     ],
                 ],
-            ],
-            'temperature' => 0.1,
-            'max_tokens' => 2048,
-            'stream' => false,
-        ];
+                'temperature' => 0.1,
+                'max_tokens' => 2048,
+                'stream' => false,
+            ];
 
-        try {
-            $response = Http::withToken($apiKey)
-                ->timeout(90)
-                ->post($url, $payload);
-        } catch (\Throwable $e) {
-            Log::error('9Router OCR API connection exception', ['error' => $e->getMessage()]);
-            throw new \RuntimeException("Gagal menghubungi layanan OCR 9Router ({$url}): " . $e->getMessage());
-        }
-
-        if ($response->successful()) {
-            $data = $response->json();
-
-            // Cek jika API mengembalikan payload error dengan HTTP 200
-            if (!empty($data['error'])) {
-                $errMsg = is_array($data['error'])
-                    ? ($data['error']['message'] ?? json_encode($data['error']))
-                    : (string) $data['error'];
-                throw new \RuntimeException("Layanan 9Router melaporkan kesalahan: {$errMsg}");
+            try {
+                $response = Http::withToken($apiKey)
+                    ->timeout(90)
+                    ->post($url, $payload);
+            } catch (\Throwable $e) {
+                Log::error('9Router OCR API connection exception', ['model' => $model, 'error' => $e->getMessage()]);
+                $lastException = new \RuntimeException("Gagal menghubungi layanan OCR 9Router ({$url}): " . $e->getMessage());
+                continue;
             }
 
-            $rawText = '';
+            if ($response->successful()) {
+                $data = $response->json();
 
-            // 1. Ekstraksi format standar OpenAI choices[0].message.content
-            if (isset($data['choices'][0]['message']['content'])) {
-                $rawContent = $data['choices'][0]['message']['content'];
-                if (is_array($rawContent)) {
-                    $parts = [];
-                    foreach ($rawContent as $part) {
-                        if (is_string($part)) {
-                            $parts[] = $part;
-                        } elseif (is_array($part) && isset($part['text'])) {
-                            $parts[] = $part['text'];
-                        }
+                // Cek jika API mengembalikan payload error dengan HTTP 200
+                if (!empty($data['error'])) {
+                    $errMsg = is_array($data['error'])
+                        ? ($data['error']['message'] ?? json_encode($data['error']))
+                        : (string) $data['error'];
+
+                    if (str_contains($errMsg, 'No active credentials for provider') || str_contains($errMsg, 'not supported')) {
+                        Log::warning("[NineRouterProvider] Model {$model} melaporkan kendala kredensial di 9Router ({$errMsg}), mencoba kandidat lain...");
+                        $lastException = new \RuntimeException("Layanan 9Router melaporkan kesalahan pada model {$model}: {$errMsg}");
+                        continue;
                     }
-                    $rawText = implode("\n", $parts);
-                } else {
-                    $rawText = (string) $rawContent;
+
+                    throw new \RuntimeException("Layanan 9Router melaporkan kesalahan: {$errMsg}");
                 }
-            }
 
-            // 2. Format reasoning_content (DeepSeek-R1 / QwQ / thinking vision)
-            if (empty(trim($rawText)) && !empty($data['choices'][0]['message']['reasoning_content'])) {
-                $rawText = (string) $data['choices'][0]['message']['reasoning_content'];
-            }
+                $rawText = '';
 
-            // 3. Format reasoning alternatif
-            if (empty(trim($rawText)) && !empty($data['choices'][0]['message']['reasoning'])) {
-                $rawText = (string) $data['choices'][0]['message']['reasoning'];
-            }
-
-            // 4. Format delta content
-            if (empty(trim($rawText)) && !empty($data['choices'][0]['delta']['content'])) {
-                $rawText = (string) $data['choices'][0]['delta']['content'];
-            }
-
-            // 5. Format streaming SSE chunk text fallback
-            if (empty(trim($rawText))) {
-                $rawBody = $response->body();
-                if (str_contains($rawBody, 'data:')) {
-                    $lines = explode("\n", $rawBody);
-                    $streamText = '';
-                    foreach ($lines as $line) {
-                        $line = trim($line);
-                        if (str_starts_with($line, 'data:') && !str_contains($line, '[DONE]')) {
-                            $chunkJson = json_decode(trim(substr($line, 5)), true);
-                            if (!empty($chunkJson['choices'][0]['delta']['content'])) {
-                                $streamText .= $chunkJson['choices'][0]['delta']['content'];
-                            } elseif (!empty($chunkJson['choices'][0]['message']['content'])) {
-                                $streamText .= $chunkJson['choices'][0]['message']['content'];
+                // 1. Ekstraksi format standar OpenAI choices[0].message.content
+                if (isset($data['choices'][0]['message']['content'])) {
+                    $rawContent = $data['choices'][0]['message']['content'];
+                    if (is_array($rawContent)) {
+                        $parts = [];
+                        foreach ($rawContent as $part) {
+                            if (is_string($part)) {
+                                $parts[] = $part;
+                            } elseif (is_array($part) && isset($part['text'])) {
+                                $parts[] = $part['text'];
                             }
                         }
-                    }
-                    if (!empty(trim($streamText))) {
-                        $rawText = $streamText;
+                        $rawText = implode("\n", $parts);
+                    } else {
+                        $rawText = (string) $rawContent;
                     }
                 }
+
+                // 2. Format reasoning_content (DeepSeek-R1 / QwQ / thinking vision)
+                if (empty(trim($rawText)) && !empty($data['choices'][0]['message']['reasoning_content'])) {
+                    $rawText = (string) $data['choices'][0]['message']['reasoning_content'];
+                }
+
+                // 3. Format reasoning alternatif
+                if (empty(trim($rawText)) && !empty($data['choices'][0]['message']['reasoning'])) {
+                    $rawText = (string) $data['choices'][0]['message']['reasoning'];
+                }
+
+                // 4. Format delta content
+                if (empty(trim($rawText)) && !empty($data['choices'][0]['delta']['content'])) {
+                    $rawText = (string) $data['choices'][0]['delta']['content'];
+                }
+
+                // 5. Format streaming SSE chunk text fallback
+                if (empty(trim($rawText))) {
+                    $rawBody = $response->body();
+                    if (str_contains($rawBody, 'data:')) {
+                        $lines = explode("\n", $rawBody);
+                        $streamText = '';
+                        foreach ($lines as $line) {
+                            $line = trim($line);
+                            if (str_starts_with($line, 'data:') && !str_contains($line, '[DONE]')) {
+                                $chunkJson = json_decode(trim(substr($line, 5)), true);
+                                if (!empty($chunkJson['choices'][0]['delta']['content'])) {
+                                    $streamText .= $chunkJson['choices'][0]['delta']['content'];
+                                } elseif (!empty($chunkJson['choices'][0]['message']['content'])) {
+                                    $streamText .= $chunkJson['choices'][0]['message']['content'];
+                                }
+                            }
+                        }
+                        if (!empty(trim($streamText))) {
+                            $rawText = $streamText;
+                        }
+                    }
+                }
+
+                $cleanJson = preg_replace('/```(?:json)?\s*([\s\S]*?)\s*```/', '$1', trim($rawText));
+                if (preg_match('/\{[\s\S]*\}/', $cleanJson, $matches)) {
+                    $parsed = json_decode($matches[0], true);
+                    if (is_array($parsed)) {
+                        return $this->normalizeReceiptData($parsed);
+                    }
+                }
+                throw new \RuntimeException('Respon model OCR 9Router tidak berisi format JSON kuitansi yang valid.');
             }
 
-            $cleanJson = preg_replace('/```(?:json)?\s*([\s\S]*?)\s*```/', '$1', trim($rawText));
-            if (preg_match('/\{[\s\S]*\}/', $cleanJson, $matches)) {
-                $parsed = json_decode($matches[0], true);
-                if (is_array($parsed)) {
-                    return $this->normalizeReceiptData($parsed);
-                }
+            $status = $response->status();
+            $errData = $response->json();
+            $errMsg = $errData['error']['message'] ?? $errData['message'] ?? mb_strimwidth($response->body(), 0, 300, '...');
+
+            // Jika error adalah 404/400 terkait ketiadaan kredensial provider, coba model kandidat berikutnya
+            if (str_contains($errMsg, 'No active credentials for provider') || str_contains($errMsg, 'not supported')) {
+                Log::warning("[NineRouterProvider] Model {$model} gagal di 9Router (HTTP {$status}: {$errMsg}), mencoba kandidat berikutnya...");
+                $lastException = new \RuntimeException("Pemindaian OCR 9Router gagal (HTTP {$status}): {$errMsg}");
+                continue;
             }
-            throw new \RuntimeException('Respon model OCR 9Router tidak berisi format JSON kuitansi yang valid.');
+
+            throw new \RuntimeException("Pemindaian OCR 9Router gagal (HTTP {$status}): {$errMsg}");
         }
 
-        $status = $response->status();
-        $errData = $response->json();
-        $errMsg = $errData['error']['message'] ?? $errData['message'] ?? mb_strimwidth($response->body(), 0, 300, '...');
-        throw new \RuntimeException("Pemindaian OCR 9Router gagal (HTTP {$status}): {$errMsg}");
+        if ($lastException) {
+            throw $lastException;
+        }
+
+        throw new \RuntimeException('Pemindaian OCR 9Router tidak dapat diproses dengan model yang tersedia.');
     }
 
     protected function normalizeReceiptData(array $raw): array
