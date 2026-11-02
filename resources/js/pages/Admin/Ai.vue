@@ -845,8 +845,8 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
               <RdInput
                 v-model="aiForm['9router'].model"
                 label="Model Default 9Router"
-                placeholder="high-models-agent"
-                hint="Nama model tujuan di 9Router (misal: high-models-agent, openai/gpt-4o, claude-3-5-sonnet)"
+                placeholder="gpt-4o-mini"
+                hint="Nama model tujuan di 9Router. Untuk pemindaian struk (OCR), pastikan memilih model yang mendukung vision (contoh: gpt-4o-mini, gpt-4o, gemini-1.5-flash, claude-3-5-sonnet)"
                 required
               />
 

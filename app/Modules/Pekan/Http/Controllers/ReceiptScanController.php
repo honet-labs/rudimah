@@ -46,8 +46,8 @@ class ReceiptScanController
         $activeDetails = $isUsingCustom ? [] : ($platformSettings['providers'][$effectiveNormalized] ?? []);
 
         $effectiveModel = $isUsingCustom
-            ? ($tenantSetting->model ?: ($activeProviderDetails['model'] ?? ''))
-            : ($activeProviderDetails['model'] ?? config("rudimah.ai.{$effectiveNormalized}_model", ''));
+            ? ($tenantSetting->model ?: ($activeDetails['model'] ?? ''))
+            : ($activeDetails['model'] ?? config("rudimah.ai.{$effectiveNormalized}_model", ''));
 
         $providerNames = [
             'openai' => 'OpenAI',

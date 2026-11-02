@@ -129,7 +129,7 @@ Format JSON wajib:
         $endpoint = "{$baseEndpoint}/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
         try {
-            $response = Http::timeout(90)->post($endpoint, [
+            $response = Http::timeout(45)->post($endpoint, [
                 'contents' => [
                     [
                         'role' => 'user',
@@ -151,6 +151,9 @@ Format JSON wajib:
             ]);
         } catch (\Throwable $e) {
             Log::error('Gemini Vision exception', ['error' => $e->getMessage()]);
+            if (str_contains(strtolower($e->getMessage()), 'timed out') || str_contains(strtolower($e->getMessage()), 'timeout') || str_contains(strtolower($e->getMessage()), '28')) {
+                throw new \RuntimeException("Pemindaian struk melebihi batas waktu (45 detik). Model '{$model}' pada Google Gemini kemungkinan sedang mengalami antrian tinggi atau tidak mendukung vision.");
+            }
             throw new \RuntimeException('Gagal menghubungi model Vision Google Gemini: ' . $e->getMessage());
         }
 

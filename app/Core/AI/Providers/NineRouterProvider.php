@@ -263,10 +263,13 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
 
         try {
             $response = Http::withToken($apiKey)
-                ->timeout(90)
+                ->timeout(45)
                 ->post($url, $payload);
         } catch (\Throwable $e) {
             Log::error('9Router OCR API connection exception', ['model' => $model, 'error' => $e->getMessage()]);
+            if (str_contains(strtolower($e->getMessage()), 'timed out') || str_contains(strtolower($e->getMessage()), 'timeout') || str_contains(strtolower($e->getMessage()), '28')) {
+                throw new \RuntimeException("Pemindaian struk melebihi batas waktu (45 detik). Model '{$model}' di 9Router kemungkinan tidak mendukung vision atau sedang mengalami latensi tinggi. Silakan pilih model vision (seperti gpt-4o-mini atau gemini-1.5-flash) di Administrasi Sistem.");
+            }
             throw new \RuntimeException("Gagal menghubungi layanan OCR 9Router ({$url}): " . $e->getMessage());
         }
 

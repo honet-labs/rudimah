@@ -53,6 +53,9 @@ return [
         'ninerouter_key' => env('NINEROUTER_API_KEY', ''),
         'ninerouter_endpoint' => env('NINEROUTER_API_ENDPOINT', 'https://api.9router.com/v1'),
         'ninerouter_model' => env('NINEROUTER_MODEL', 'high-models-agent'),
+        '9router_key' => env('NINEROUTER_API_KEY', ''),
+        '9router_endpoint' => env('NINEROUTER_API_ENDPOINT', 'https://api.9router.com/v1'),
+        '9router_model' => env('NINEROUTER_MODEL', 'high-models-agent'),
         'hermes_key' => env('HERMES_API_KEY', ''),
         'hermes_endpoint' => env('HERMES_API_ENDPOINT', 'http://localhost:11434/v1'),
         'openclaw_key' => env('OPENCLAW_API_KEY', ''),
@@ -62,7 +65,7 @@ return [
 
     'ocr' => [
         'provider' => env('OCR_PROVIDER', env('AI_DEFAULT_PROVIDER', 'gemini')),
-        'model' => env('OCR_MODEL', 'high-models-agent'),
+        'model' => env('OCR_MODEL', ''),
         'max_file_size_bytes' => 10 * 1024 * 1024,
         'allowed_mimes' => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
         'auto_commit' => false,

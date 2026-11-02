@@ -65,6 +65,16 @@ class ReceiptOcrService
             ? ($tenantSetting->model ?: ($activeDetails['model'] ?? ''))
             : ($activeDetails['model'] ?? config("rudimah.ai.{$normalizedCode}_model", ''));
 
+        if (empty($modelName)) {
+            $modelName = match ($normalizedCode) {
+                'openai' => 'gpt-4o-mini',
+                'gemini' => 'gemini-1.5-flash',
+                'claude' => 'claude-3-5-sonnet-20241022',
+                '9router' => config('rudimah.ai.9router_model', config('rudimah.ai.ninerouter_model', 'gpt-4o-mini')),
+                default => 'gpt-4o-mini',
+            };
+        }
+
         $endpoint = $isUsingCustom
             ? $tenantSetting->api_endpoint
             : ($activeDetails['api_endpoint'] ?? config("rudimah.ai.{$normalizedCode}_endpoint"));
@@ -161,7 +171,7 @@ class ReceiptOcrService
             $width = imagesx($img);
             $height = imagesy($img);
 
-            $maxDim = 1600;
+            $maxDim = 1280;
             if ($width > $maxDim || $height > $maxDim) {
                 if ($width >= $height) {
                     $newWidth = $maxDim;
@@ -180,7 +190,7 @@ class ReceiptOcrService
             }
 
             ob_start();
-            imagejpeg($img, null, 85);
+            imagejpeg($img, null, 75);
             $compressedData = ob_get_clean();
             imagedestroy($img);
 

@@ -62,8 +62,8 @@ class TenantAssistantService
         $activeDetails = $isUsingCustom ? [] : ($platformSettings['providers'][$normalizedProvider] ?? []);
 
         $activeModel = $isUsingCustom
-            ? ($setting->model ?: ($activeProviderDetails['model'] ?? ''))
-            : ($activeProviderDetails['model'] ?? config("rudimah.ai.{$normalizedProvider}_model", ''));
+            ? ($setting->model ?: ($activeDetails['model'] ?? ''))
+            : ($activeDetails['model'] ?? config("rudimah.ai.{$normalizedProvider}_model", ''));
 
         $conversation = AiConversation::create([
             'id' => (string) Str::uuid(),

@@ -108,11 +108,11 @@ async function compressImageForUpload(file: File): Promise<File> {
       img.onload = () => {
         URL.revokeObjectURL(objectUrl);
 
-        const maxDim = 1500;
+        const maxDim = 1280;
         let width = img.width;
         let height = img.height;
 
-        if (width <= maxDim && height <= maxDim && file.size <= 800 * 1024) {
+        if (width <= maxDim && height <= maxDim && file.size <= 400 * 1024) {
           resolve(file);
           return;
         }
@@ -158,7 +158,7 @@ async function compressImageForUpload(file: File): Promise<File> {
             resolve(compressed);
           },
           'image/jpeg',
-          0.82
+          0.78
         );
       };
 
@@ -185,7 +185,7 @@ async function handleFileSelected(file: File) {
   formData.append('receipt_file', fileToUpload);
 
   const abortCtrl = new AbortController();
-  const timeoutId = setTimeout(() => abortCtrl.abort(), 90000);
+  const timeoutId = setTimeout(() => abortCtrl.abort(), 50000);
 
   try {
     const res = await secureFetch(`/t/${props.tenant.slug}/apps/pekan/receipt-scan/upload`, {
@@ -244,7 +244,7 @@ async function handleFileSelected(file: File) {
     }
   } catch (err: any) {
     if (err?.name === 'AbortError') {
-      errorMessage.value = 'Waktu proses pemindaian struk melebihi batas (timeout 90 detik). Silakan coba unggah kembali dengan foto struk yang lebih fokus atau terang.';
+      errorMessage.value = 'Waktu proses pemindaian struk melebihi batas (timeout 50 detik). Silakan coba unggah kembali dengan foto struk yang lebih fokus atau periksa model vision di Administrasi Sistem.';
     } else {
       errorMessage.value = 'Terjadi gangguan jaringan saat mengunggah struk: ' + (err.message || 'Koneksi gagal');
     }
@@ -358,7 +358,7 @@ const categoryOptions = computed(() => {
       ]"
     >
       <template #actions>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <RdBadge
             :variant="isAiConnected ? 'success' : 'danger'"
             size="sm"
@@ -366,7 +366,18 @@ const categoryOptions = computed(() => {
             :title="isAiConnected ? 'Layanan AI terhubung dan siap digunakan' : 'Layanan AI belum terhubung atau kunci API belum dikonfigurasi'"
           >
             <span :class="['w-1.5 h-1.5 rounded-full inline-block shrink-0', isAiConnected ? 'bg-teal-600 dark:bg-teal-400' : 'bg-red-500']"></span>
-            <span>Status AI: {{ isAiConnected ? 'Connected' : 'Not Connected' }}</span>
+            <span>Status: {{ isAiConnected ? 'Terhubung' : 'Terputus' }}</span>
+          </RdBadge>
+
+          <RdBadge
+            v-if="props.ai_engine?.model"
+            variant="neutral"
+            size="sm"
+            class="items-center gap-1 font-mono text-[11px]"
+            :title="'Penyedia & Model aktif dari Administrasi Sistem: ' + (props.ai_engine?.provider_name || '') + ' (' + props.ai_engine?.model + ')'"
+          >
+            <span class="text-slate-500">{{ props.ai_engine?.provider_name }}:</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-200">{{ props.ai_engine?.model }}</span>
           </RdBadge>
         </div>
       </template>

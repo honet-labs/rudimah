@@ -186,7 +186,7 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
 
         try {
             $response = Http::withToken($apiKey)
-                ->timeout(90)
+                ->timeout(45)
                 ->post($url, [
                     'model' => $model,
                     'messages' => [
@@ -211,6 +211,9 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
                 ]);
         } catch (\Throwable $e) {
             Log::error('OpenAI Vision exception', ['error' => $e->getMessage()]);
+            if (str_contains(strtolower($e->getMessage()), 'timed out') || str_contains(strtolower($e->getMessage()), 'timeout') || str_contains(strtolower($e->getMessage()), '28')) {
+                throw new \RuntimeException("Pemindaian struk melebihi batas waktu (45 detik). Model '{$model}' pada OpenAI kemungkinan sedang mengalami antrian tinggi atau tidak mendukung vision.");
+            }
             throw new \RuntimeException("Gagal menghubungi model Vision OpenAI: " . $e->getMessage());
         }
 
