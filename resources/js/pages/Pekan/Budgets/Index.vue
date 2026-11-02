@@ -229,7 +229,7 @@ function handleDelete() {
     <RdEmptyState
       v-else
       title="Belum Ada Histori Anggaran"
-      description="Anggaran belanja dari bulan-bulan atau periode sebelumnya yang telah berakhir akan otomatis terarsip di sini untuk dievaluasi."
+      description="Anggaran belanja yang telah diarsipkan atau telah melewati batas akhir berlaku akan tersimpan di sini untuk dievaluasi."
     />
 
     <!-- Dialog Konfirmasi Hapus Anggaran -->

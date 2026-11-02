@@ -65,24 +65,46 @@ class FinanceBudget extends Model
         return $this->category?->name;
     }
 
-    public function getDateRange(): array
+    public function getDateRange(?\Carbon\Carbon $referenceDate = null): array
     {
-        $start = $this->start_date ? \Carbon\Carbon::parse($this->start_date) : now();
+        $ref = $referenceDate ? $referenceDate->copy() : now();
+        $start = $this->start_date ? \Carbon\Carbon::parse($this->start_date) : $ref;
         $period = $this->period ?: 'monthly';
 
+        // Jika memiliki tanggal batas akhir spesifik (misal anggaran berjangka tertentu)
         if ($this->end_date) {
             $startDate = $start->copy()->startOfDay();
             $endDate = \Carbon\Carbon::parse($this->end_date)->endOfDay();
-        } elseif ($period === 'weekly') {
-            $startDate = $start->copy()->startOfWeek()->startOfDay();
-            $endDate = $start->copy()->endOfWeek()->endOfDay();
-        } elseif ($period === 'yearly') {
-            $startDate = $start->copy()->startOfYear()->startOfDay();
-            $endDate = $start->copy()->endOfYear()->endOfDay();
-        } else { // monthly
-            $startDate = $start->copy()->startOfMonth()->startOfDay();
-            $endDate = $start->copy()->endOfMonth()->endOfDay();
+            return [$startDate, $endDate];
         }
+
+        // Anggaran berulang (recurring): evaluasi siklus periode berjalan saat ini
+        if ($period === 'weekly') {
+            $cycleStart = $ref->copy()->startOfWeek()->startOfDay();
+            $cycleEnd = $ref->copy()->endOfWeek()->endOfDay();
+        } elseif ($period === 'yearly') {
+            $cycleStart = $ref->copy()->startOfYear()->startOfDay();
+            $cycleEnd = $ref->copy()->endOfYear()->endOfDay();
+        } else { // monthly
+            $cycleStart = $ref->copy()->startOfMonth()->startOfDay();
+            $cycleEnd = $ref->copy()->endOfMonth()->endOfDay();
+        }
+
+        // Jika tanggal mulai berlaku berada di dalam siklus berjalan saat ini
+        if ($start->greaterThan($cycleStart) && $start->lessThanOrEqualTo($cycleEnd)) {
+            $startDate = $start->copy()->startOfDay();
+        } elseif ($start->greaterThan($cycleEnd)) {
+            // Anggaran dijadwalkan mulai berlaku di masa depan
+            $startDate = $start->copy()->startOfDay();
+            $endDate = ($period === 'weekly')
+                ? $start->copy()->endOfWeek()->endOfDay()
+                : (($period === 'yearly') ? $start->copy()->endOfYear()->endOfDay() : $start->copy()->endOfMonth()->endOfDay());
+            return [$startDate, $endDate];
+        } else {
+            $startDate = $cycleStart;
+        }
+
+        $endDate = $cycleEnd;
 
         return [$startDate, $endDate];
     }
@@ -166,39 +188,48 @@ class FinanceBudget extends Model
 
     public function getIsPastAttribute(): bool
     {
-        if ($this->status === 'archived') {
+        // Anggaran yang diarsipkan secara manual
+        if ($this->status === 'archived' || $this->status === 'inactive') {
             return true;
         }
 
+        // Hanya dianggap telah lewat/berakhir jika memiliki tanggal batas akhir spesifik dan tanggal tersebut telah lewat
         if ($this->end_date && \Carbon\Carbon::parse($this->end_date)->endOfDay()->isPast()) {
             return true;
         }
 
-        if ($this->start_date) {
-            $start = \Carbon\Carbon::parse($this->start_date);
-            $period = $this->period ?: 'monthly';
-            if ($period === 'monthly') {
-                return $start->copy()->endOfMonth()->endOfDay()->isPast();
-            } elseif ($period === 'weekly') {
-                return $start->copy()->endOfWeek()->endOfDay()->isPast();
-            } elseif ($period === 'yearly') {
-                return $start->copy()->endOfYear()->endOfDay()->isPast();
-            }
-        }
-
+        // Anggaran berulang tanpa tanggal akhir (ongoing recurring budget) adalah anggaran berjalan
         return false;
     }
 
     public function getPeriodLabelAttribute(): string
     {
-        if (!$this->start_date) return 'Bulanan';
-        $start = \Carbon\Carbon::parse($this->start_date);
         $period = $this->period ?: 'monthly';
-        if ($period === 'monthly') {
-            return $start->translatedFormat('F Y');
-        } elseif ($period === 'weekly') {
-            return 'Pekan ' . $start->weekOfYear . ' (' . $start->format('d M Y') . ')';
+        $now = now();
+
+        if ($this->end_date) {
+            $start = $this->start_date ? \Carbon\Carbon::parse($this->start_date) : null;
+            $end = \Carbon\Carbon::parse($this->end_date);
+            return ($start ? $start->translatedFormat('d M Y') . ' - ' : '') . $end->translatedFormat('d M Y');
         }
-        return 'Tahun ' . $start->format('Y');
+
+        if ($this->status === 'archived') {
+            $ref = $this->updated_at ? \Carbon\Carbon::parse($this->updated_at) : ($this->start_date ? \Carbon\Carbon::parse($this->start_date) : $now);
+            return 'Diarsipkan (' . $ref->translatedFormat('F Y') . ')';
+        }
+
+        if ($this->start_date && \Carbon\Carbon::parse($this->start_date)->startOfDay()->isFuture()) {
+            return 'Mulai ' . \Carbon\Carbon::parse($this->start_date)->translatedFormat('d F Y');
+        }
+
+        if ($period === 'monthly') {
+            return 'Bulanan (' . $now->translatedFormat('F Y') . ')';
+        } elseif ($period === 'weekly') {
+            return 'Mingguan (Pekan ' . $now->weekOfYear . ')';
+        } elseif ($period === 'yearly') {
+            return 'Tahunan (' . $now->format('Y') . ')';
+        }
+
+        return 'Bulanan';
     }
 }

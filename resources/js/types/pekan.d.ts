@@ -52,6 +52,7 @@ export interface FinanceBudget {
   progress_percent: number;
   period: 'weekly' | 'monthly' | 'yearly';
   start_date: string;
+  end_date?: string | null;
   alert_threshold_pct: number;
   status: 'active' | 'exceeded' | 'archived';
   is_past?: boolean;

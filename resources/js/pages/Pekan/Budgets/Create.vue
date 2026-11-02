@@ -24,6 +24,7 @@ const form = useForm({
   amount_limit_minor: 1000000,
   period: 'monthly',
   start_date: new Date().toISOString().substring(0, 10),
+  end_date: '',
   alert_threshold_pct: 80,
   notes: '',
 });
@@ -106,7 +107,7 @@ function submit() {
             </div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Periode Alokasi
@@ -114,17 +115,6 @@ function submit() {
               <RdSelect
                 v-model="form.period"
                 :options="periodOptions"
-                required
-              />
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Tanggal Mulai Efektif
-              </label>
-              <RdInput
-                v-model="form.start_date"
-                type="date"
                 required
               />
             </div>
@@ -141,6 +131,33 @@ function submit() {
                 required
               />
               <span class="text-[11px] text-slate-400 mt-0.5 block">Kirim alert saat belanja mencapai % ini</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Tanggal Mulai Berlaku
+              </label>
+              <RdInput
+                v-model="form.start_date"
+                type="date"
+                required
+              />
+              <span class="text-[11px] text-slate-400 mt-0.5 block">Anggaran aktif berulang setiap periode sejak tanggal ini</span>
+              <p v-if="form.errors.start_date" class="text-xs text-red-600 mt-1">{{ form.errors.start_date }}</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Tanggal Selesai Berlaku (Opsional)
+              </label>
+              <RdInput
+                v-model="form.end_date"
+                type="date"
+              />
+              <span class="text-[11px] text-slate-400 mt-0.5 block">Kosongkan jika anggaran berulang tanpa batas akhir</span>
+              <p v-if="form.errors.end_date" class="text-xs text-red-600 mt-1">{{ form.errors.end_date }}</p>
             </div>
           </div>
 

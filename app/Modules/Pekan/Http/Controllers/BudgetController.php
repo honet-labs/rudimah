@@ -77,7 +77,9 @@ class BudgetController
             'amount_limit_minor' => 'required|integer|min:1',
             'period' => 'required|in:weekly,monthly,yearly',
             'start_date' => 'required|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
             'alert_threshold_pct' => 'required|integer|min:1|max:100',
+            'status' => 'nullable|in:active,archived',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -91,8 +93,9 @@ class BudgetController
         $budget->currency = 'Rp';
         $budget->period = $validated['period'];
         $budget->start_date = $validated['start_date'];
+        $budget->end_date = !empty($validated['end_date']) ? $validated['end_date'] : null;
         $budget->alert_threshold_pct = $validated['alert_threshold_pct'];
-        $budget->status = 'active';
+        $budget->status = $validated['status'] ?? 'active';
         $budget->notes = $validated['notes'] ?? null;
         $budget->created_by = auth()->id();
         $budget->save();
@@ -140,7 +143,9 @@ class BudgetController
             'amount_limit_minor' => 'required|integer|min:1',
             'period' => 'required|in:weekly,monthly,yearly',
             'start_date' => 'required|date',
+            'end_date' => 'nullable|date',
             'alert_threshold_pct' => 'required|integer|min:1|max:100',
+            'status' => 'nullable|in:active,archived',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -150,7 +155,9 @@ class BudgetController
             'amount_limit_minor' => $validated['amount_limit_minor'],
             'period' => $validated['period'],
             'start_date' => $validated['start_date'],
+            'end_date' => !empty($validated['end_date']) ? $validated['end_date'] : null,
             'alert_threshold_pct' => $validated['alert_threshold_pct'],
+            'status' => $validated['status'] ?? $budget->status,
             'notes' => $validated['notes'] ?? null,
         ]);
 

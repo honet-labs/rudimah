@@ -30,6 +30,8 @@ const categoryId = ref(props.budget.category_id || (props.categories?.[0]?.id ||
 const amountLimitMinor = ref(props.budget.amount_limit_minor || 1000000);
 const period = ref<'weekly' | 'monthly' | 'yearly'>((props.budget.period as any) || 'monthly');
 const startDate = ref(props.budget.start_date ? props.budget.start_date.substring(0, 10) : new Date().toISOString().substring(0, 10));
+const endDate = ref(props.budget.end_date ? props.budget.end_date.substring(0, 10) : '');
+const status = ref<'active' | 'archived'>((props.budget.status === 'archived') ? 'archived' : 'active');
 const alertThresholdPct = ref(props.budget.alert_threshold_pct || 80);
 const notes = ref(props.budget.notes || '');
 
@@ -55,6 +57,8 @@ function handleSubmit() {
     amount_limit_minor: Number(amountLimitMinor.value),
     period: period.value,
     start_date: startDate.value,
+    end_date: endDate.value || null,
+    status: status.value,
     alert_threshold_pct: Number(alertThresholdPct.value),
     notes: notes.value,
   }, {
@@ -137,12 +141,34 @@ function handleDelete() {
               required
             />
 
+            <RdSelect
+              id="status"
+              v-model="status"
+              label="Status Anggaran"
+              :options="[
+                { label: 'Aktif Berjalan', value: 'active' },
+                { label: 'Diarsipkan (Masuk Histori)', value: 'archived' }
+              ]"
+              required
+            />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <RdInput
               id="start_date"
               v-model="startDate"
               type="date"
               label="Tanggal Mulai Berlaku"
+              description="Anggaran aktif berulang setiap periode sejak tanggal ini"
               required
+            />
+
+            <RdInput
+              id="end_date"
+              v-model="endDate"
+              type="date"
+              label="Tanggal Selesai Berlaku (Opsional)"
+              description="Kosongkan jika anggaran berulang tanpa batas waktu"
             />
           </div>
 
