@@ -8,6 +8,7 @@ import RdBadge from '../../design-system/RdBadge.vue';
 import RdModal from '../../design-system/RdModal.vue';
 import RdAlert from '../../design-system/RdAlert.vue';
 import RdInfoTooltip from '../../design-system/RdInfoTooltip.vue';
+import RdChart from '../../design-system/RdChart.vue';
 import { secureFetch } from '../../utils/csrf';
 import type { Tenant, AppManifest, User } from '../../types/core';
 
@@ -105,7 +106,29 @@ const quickPrompts = [
   'Bagaimana status keterpakaian anggaran bulan ini?',
   'Apakah ada pengingat tagihan yang mendekati jatuh tempo?',
   'Tampilkan rincian transaksi pengeluaran terbaru',
+  'Buatkan grafik visualisasi mutasi transaksi pengeluaran',
 ];
+
+function getChartOption(msg: Message): Record<string, any> | null {
+  if (msg.metadata?.chart_option && typeof msg.metadata.chart_option === 'object') {
+    return msg.metadata.chart_option;
+  }
+  if (!msg.content) return null;
+  const match = msg.content.match(/```(?:json:echarts|echarts|json)?\s*(\{[\s\S]*?"series"[\s\S]*?\})\s*```/);
+  if (match && match[1]) {
+    try {
+      return JSON.parse(match[1]);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function getDisplayContent(msg: Message): string {
+  if (!msg.content) return '';
+  return msg.content.replace(/```(?:json:echarts|echarts|json)?\s*\{[\s\S]*?"series"[\s\S]*?\}\s*```/g, '').trim();
+}
 
 function scrollToBottom() {
   nextTick(() => {
@@ -564,7 +587,28 @@ onMounted(() => {
                     : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none'
                 ]"
               >
-                {{ msg.content }}
+                {{ getDisplayContent(msg) || (getChartOption(msg) ? 'Berikut grafik visualisasi data transaksi keuangan untuk Anda:' : msg.content) }}
+              </div>
+
+              <!-- Kartu Visualisasi Grafik Apache ECharts (Jika Ada) -->
+              <div
+                v-if="getChartOption(msg)"
+                class="mt-2.5 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 w-full text-xs shadow-sm"
+              >
+                <div class="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <div class="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                    <svg class="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <span>Grafik Visualisasi Keuangan</span>
+                  </div>
+                  <span class="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-mono">
+                    Apache ECharts
+                  </span>
+                </div>
+                <div class="pt-1">
+                  <RdChart :option="getChartOption(msg)!" height="320px" />
+                </div>
               </div>
 
               <!-- Kartu Status Transaksi Berhasil Dicatat / Diperbarui (Jika Ada) -->

@@ -115,7 +115,7 @@ class TenantAssistantService
 
         // 2. Evaluasi Perlindungan Keamanan & Anti-Injeksi Prompt Cepat
         if ($this->isExplicitOutOfScopeOrInjection($userMessageText)) {
-            $refusalText = "Maaf, sebagai Asisten Cerdas RUDIMAH, peran saya dikhususkan untuk membantu manajemen keuangan harian (PEKAN), pencatatan transaksi, pos anggaran, target tabungan, dan pengingat tagihan pada ruang kerja ini. Saya tidak dapat melayani permintaan penulisan kode program/skrip atau topik di luar manajemen keuangan platform RUDIMAH. Ada transaksi atau data keuangan yang ingin saya bantu catat?";
+            $refusalText = "Maaf, sebagai Asisten Cerdas RUDIMAH, peran saya dikhususkan untuk membantu manajemen keuangan harian (PEKAN), pencatatan transaksi, pos anggaran, target tabungan, pengingat tagihan, dan visualisasi grafik keuangan pada ruang kerja ini. Saya tidak dapat melayani permintaan penulisan kode program/skrip atau topik di luar manajemen keuangan platform RUDIMAH.";
 
             return AiMessage::create([
                 'id' => (string) Str::uuid(),
@@ -577,6 +577,12 @@ class TenantAssistantService
         // 7. Bersihkan kalimat penutup klise repetitif (seperti "Ada transaksi lain?", "Transaksi lain?")
         $replyContent = $this->cleanRepetitiveClosingPhrases($replyContent);
 
+        // 7b. Ekstraksi atau Pembuatan Visualisasi Grafik Apache ECharts
+        $chartOption = $this->extractChartOption($replyContent, $userMessageText, $tenantId);
+        if (!empty($chartOption)) {
+            $meta['chart_option'] = $chartOption;
+        }
+
         // 8. Simpan respon asisten
         $assistantMessage = AiMessage::create([
             'id' => (string) Str::uuid(),
@@ -686,6 +692,11 @@ class TenantAssistantService
     {
         $normalized = strtolower(trim($text));
 
+        // Permintaan visualisasi grafik Apache ECharts adalah kemampuan resmi platform
+        if (preg_match('/\b(grafik|chart|diagram|plot|visualisasi|echarts)\b/i', $normalized)) {
+            return false;
+        }
+
         // 1. Pola eksplisit pembuatan/penulisan skrip atau kode program
         if (preg_match('/\b(buatkan|bikin|tulis|generate|create)\s+(script|skrip|koding|coding|code|fungsi|function|source\s*code|program|algoritma)\b/i', $normalized)) {
             // Kecuali jika jelas sedang meminta catat transaksi (misal: "buatkan catatan transaksi...", "catat pengeluaran...")
@@ -713,6 +724,174 @@ class TenantAssistantService
         }
 
         return false;
+    }
+
+    /**
+     * Mengekstrak opsi grafik Apache ECharts dari balasan AI atau membuat visualisasi fallback
+     * otomatis dari data mutasi riil ruang kerja jika diminta oleh pengguna.
+     */
+    protected function extractChartOption(string &$replyContent, string $userMessageText, string $tenantId): ?array
+    {
+        // 1. Ekstraksi dari blok kode json:echarts atau echarts
+        if (preg_match('/```(?:json:echarts|echarts|json)?\s*(\{[\s\S]*?"series"[\s\S]*?\})\s*```/i', $replyContent, $m)) {
+            $decoded = json_decode($m[1], true);
+            if (is_array($decoded) && !empty($decoded['series'])) {
+                // Hapus blok kode dari teks balasan agar bubble chat tetap rapi
+                $replyContent = trim(str_replace($m[0], '', $replyContent));
+                return $decoded;
+            }
+        }
+
+        // 2. Deteksi apakah pengguna meminta visualisasi grafik / chart secara eksplisit
+        $isChartRequest = (bool) preg_match('/\b(grafik|chart|diagram|plot|visualisasi|echarts)\b/i', $userMessageText);
+        if ($isChartRequest) {
+            // Jika balasan AI keliru menolak ("Maaf, sebagai Asisten Cerdas RUDIMAH..."), ganti dengan teks pengantar yang ramah
+            if (preg_match('/Maaf,\s*sebagai\s*Asisten\s*Cerdas\s*RUDIMAH/i', $replyContent) ||
+                preg_match('/tidak\s*dapat\s*melayani\s*permintaan\s*penulisan\s*kode/i', $replyContent)) {
+                $replyContent = "Berikut grafik visualisasi data transaksi keuangan untuk ruang kerja Anda:";
+            }
+
+            return $this->buildFallbackChartOption($userMessageText, $tenantId);
+        }
+
+        return null;
+    }
+
+    /**
+     * Membangun opsi Apache ECharts dari transaksi keuangan riil di ruang kerja.
+     */
+    protected function buildFallbackChartOption(string $userMessageText, string $tenantId): array
+    {
+        $query = FinanceTransaction::where('tenant_id', $tenantId);
+
+        // Filter jika menanyakan bensin/BBM spesifik
+        if (preg_match('/\b(bensin|bbm|pertamax|pertalite|solar|spbu|shell)\b/i', $userMessageText)) {
+            $query->where(function ($q) {
+                $q->where('description', 'like', '%bensin%')
+                  ->orWhere('description', 'like', '%bbm%')
+                  ->orWhere('description', 'like', '%pertamax%')
+                  ->orWhere('description', 'like', '%pertalite%')
+                  ->orWhere('description', 'like', '%solar%')
+                  ->orWhere('merchant_name', 'like', '%spbu%')
+                  ->orWhere('merchant_name', 'like', '%pertamina%')
+                  ->orWhere('merchant_name', 'like', '%shell%');
+            });
+        }
+
+        // Ambil transaksi mutasi terbaru
+        $transactions = (clone $query)->orderBy('transaction_date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->take(15)
+            ->get()
+            ->sortBy('transaction_date')
+            ->values();
+
+        if ($transactions->isEmpty()) {
+            $transactions = FinanceTransaction::where('tenant_id', $tenantId)
+                ->orderBy('transaction_date', 'desc')
+                ->take(10)
+                ->get()
+                ->sortBy('transaction_date')
+                ->values();
+        }
+
+        // Cek apakah meminta grafik distribusi kategori (Pie Chart)
+        $isPie = (bool) preg_match('/\b(kategori|distribusi|pos|alokasi|pie|lingkaran)\b/i', $userMessageText);
+
+        if ($isPie && $transactions->isNotEmpty()) {
+            $categoryMap = [];
+            foreach ($transactions as $tx) {
+                $cat = $tx->category_name ?: ($tx->merchant_name ?: 'Lainnya');
+                $categoryMap[$cat] = ($categoryMap[$cat] ?? 0) + $tx->amount_minor;
+            }
+            $pieData = [];
+            foreach ($categoryMap as $name => $val) {
+                $pieData[] = [
+                    'name' => $name,
+                    'value' => $val,
+                ];
+            }
+
+            return [
+                'title' => [
+                    'text' => 'Distribusi Pengeluaran',
+                    'left' => 'center',
+                    'textStyle' => ['fontSize' => 14],
+                ],
+                'tooltip' => [
+                    'trigger' => 'item',
+                    'formatter' => '{b}: Rp {c} ({d}%)',
+                ],
+                'series' => [
+                    [
+                        'name' => 'Kategori',
+                        'type' => 'pie',
+                        'radius' => ['35%', '65%'],
+                        'avoidLabelOverlap' => true,
+                        'itemStyle' => [
+                            'borderRadius' => 6,
+                            'borderColor' => '#fff',
+                            'borderWidth' => 2,
+                        ],
+                        'data' => $pieData,
+                    ],
+                ],
+            ];
+        }
+
+        // Grafik Batang (Bar Chart) Riwayat Transaksi
+        $categories = [];
+        $seriesData = [];
+
+        if ($transactions->isNotEmpty()) {
+            foreach ($transactions as $tx) {
+                $dateLabel = $tx->transaction_date ? \Carbon\Carbon::parse($tx->transaction_date)->format('d M') : 'Hari ini';
+                $shortDesc = mb_strimwidth($tx->description ?: 'Transaksi', 0, 15, '..');
+                $categories[] = "{$dateLabel}\n({$shortDesc})";
+                $seriesData[] = $tx->amount_minor;
+            }
+        } else {
+            $categories = ['Belum Ada Transaksi'];
+            $seriesData = [0];
+        }
+
+        return [
+            'title' => [
+                'text' => 'Grafik Riwayat Transaksi Keuangan',
+                'left' => 'center',
+                'textStyle' => ['fontSize' => 14],
+            ],
+            'tooltip' => [
+                'trigger' => 'axis',
+                'formatter' => '{b}<br/>Nominal: Rp {c}',
+            ],
+            'xAxis' => [
+                'type' => 'category',
+                'data' => $categories,
+                'axisLabel' => [
+                    'interval' => 0,
+                    'fontSize' => 10,
+                ],
+            ],
+            'yAxis' => [
+                'type' => 'value',
+                'axisLabel' => [
+                    'formatter' => 'Rp {value}',
+                ],
+            ],
+            'series' => [
+                [
+                    'name' => 'Nominal (Rp)',
+                    'type' => 'bar',
+                    'barMaxWidth' => 36,
+                    'itemStyle' => [
+                        'borderRadius' => [4, 4, 0, 0],
+                        'color' => '#0d9488',
+                    ],
+                    'data' => $seriesData,
+                ],
+            ],
+        ];
     }
 
     /**
