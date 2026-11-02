@@ -234,6 +234,16 @@ Semua nominal berupa integer tanpa sen. Kembalikan hanya valid JSON.';
         $status = $response->status();
         $errData = $response->json();
         $errMsg = $errData['error']['message'] ?? $errData['message'] ?? mb_strimwidth($response->body(), 0, 300, '...');
+
+        if (
+            str_contains(strtolower($errMsg), 'image') ||
+            str_contains(strtolower($errMsg), 'vision') ||
+            str_contains(strtolower($errMsg), 'not support') ||
+            str_contains(strtolower($errMsg), 'unsupported')
+        ) {
+            throw new \RuntimeException("Model AI '{$model}' tidak mendukung fitur vision / pemindaian gambar (pesan OpenAI: {$errMsg}). Silakan pilih model yang mendukung vision di Administrasi Sistem.");
+        }
+
         throw new \RuntimeException("Pemindaian OCR OpenAI gagal (HTTP {$status}): {$errMsg}");
     }
 

@@ -56,23 +56,21 @@ class ReceiptOcrService
         $hasCustomKey = !empty($tenantSetting?->api_key_encrypted) && !empty($tenantSetting?->api_key);
         $isUsingCustom = $hasCustomKey && !empty($tenantSetting?->provider);
 
-        // 1. Tentukan penyedia utama aktif
+        // Ambil penyedia dan model yang dikonfigurasi di Administrasi Sistem atau Ruang Kerja
         $providerCode = $isUsingCustom ? $tenantSetting->provider : $activePlatformProvider;
-        $primaryNormalized = (strtolower($providerCode) === 'ninerouter') ? '9router' : strtolower($providerCode);
+        $normalizedCode = (strtolower($providerCode) === 'ninerouter') ? '9router' : strtolower($providerCode);
+        $activeDetails = $isUsingCustom ? [] : ($platformSettings['providers'][$normalizedCode] ?? []);
 
-        // 2. Susun daftar penyedia terkonfigurasi untuk dicoba secara berurutan:
-        //    Prioritaskan penyedia utama, lalu coba penyedia lain yang memiliki kunci API terkonfigurasi di Administrasi Sistem
-        $providersToTry = [$primaryNormalized];
+        $modelName = $isUsingCustom
+            ? ($tenantSetting->model ?: ($activeDetails['model'] ?? ''))
+            : ($activeDetails['model'] ?? config("rudimah.ai.{$normalizedCode}_model", ''));
 
-        if (!$isUsingCustom && !empty($platformSettings['providers'])) {
-            foreach (['gemini', 'openai', 'claude', '9router'] as $pCode) {
-                if ($pCode !== $primaryNormalized && !empty($platformSettings['providers'][$pCode]['is_configured'])) {
-                    $providersToTry[] = $pCode;
-                }
-            }
-        }
+        $endpoint = $isUsingCustom
+            ? $tenantSetting->api_endpoint
+            : ($activeDetails['api_endpoint'] ?? config("rudimah.ai.{$normalizedCode}_endpoint"));
 
         $scanId = (string) Str::uuid();
+        $provider = $this->providerManager->resolve($normalizedCode, $tenantSetting);
 
         // Ekstraksi via AI Vision Provider dengan pra-optimasi resolusi gambar
         [$fileBase64, $preparedMime] = $this->prepareImageForOcr($file, $mimeType);
@@ -81,67 +79,40 @@ class ReceiptOcrService
         $uploadService = new AttachmentUploadService();
         $savedImages = $uploadService->uploadMultiple([$file], 'receipts');
 
-        $extractedDraft = null;
-        $successfulProvider = $primaryNormalized;
-        $successfulModel = null;
-        $errors = [];
-
-        foreach ($providersToTry as $pCode) {
-            $pDetails = $platformSettings['providers'][$pCode] ?? [];
-            $mName = ($pCode === $primaryNormalized && $isUsingCustom)
-                ? ($tenantSetting->model ?: ($pDetails['model'] ?? ''))
-                : ($pDetails['model'] ?? config("rudimah.ai.{$pCode}_model", ''));
-
-            $ePoint = ($pCode === $primaryNormalized && $isUsingCustom)
-                ? $tenantSetting->api_endpoint
-                : ($pDetails['api_endpoint'] ?? config("rudimah.ai.{$pCode}_endpoint"));
-
-            try {
-                $providerInstance = $this->providerManager->resolve($pCode, $pCode === $primaryNormalized ? $tenantSetting : null);
-                $result = $providerInstance->extractReceipt($fileBase64, $preparedMime, [
-                    'model' => $mName,
-                    'api_endpoint' => $ePoint,
-                ]);
-
-                if (is_array($result) && !empty($result)) {
-                    $extractedDraft = $result;
-                    $successfulProvider = $providerInstance->getName();
-                    $successfulModel = $mName;
-                    break;
-                }
-            } catch (\Throwable $e) {
-                Log::warning("[ReceiptOcrService] Ekstraksi OCR dengan penyedia {$pCode} ({$mName}) gagal: " . $e->getMessage());
-                $errors[$pCode] = $e->getMessage();
-            }
-        }
-
-        if (!$extractedDraft) {
-            $errorSummary = implode('; ', array_map(fn($p, $msg) => "{$p}: {$msg}", array_keys($errors), $errors));
+        try {
+            $extractedDraft = $provider->extractReceipt($fileBase64, $preparedMime, [
+                'model' => $modelName,
+                'api_endpoint' => $endpoint,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("[ReceiptOcrService] Ekstraksi OCR gagal ({$providerCode} - {$modelName}): " . $e->getMessage());
 
             FinanceReceiptScan::create([
                 'id' => $scanId,
                 'tenant_id' => $tenantId,
-                'provider_code' => $primaryNormalized,
-                'model_name' => $successfulModel ?: 'unknown',
+                'provider_code' => $normalizedCode,
+                'model_name' => $modelName,
                 'status' => 'failed',
                 'original_filename' => $file->getClientOriginalName(),
                 'mime_type' => $mimeType,
                 'images' => $savedImages,
                 'extracted_json' => null,
-                'error_message' => $errorSummary,
+                'error_message' => $e->getMessage(),
                 'created_by' => auth()->id() ?? 'system',
             ]);
 
-            throw new \RuntimeException("Gagal memproses struk dengan seluruh penyedia AI terkonfigurasi: {$errorSummary}");
+            throw new \RuntimeException($e->getMessage());
         }
 
-        $extractedDraft['_receipt_images'] = $savedImages;
+        if (is_array($extractedDraft)) {
+            $extractedDraft['_receipt_images'] = $savedImages;
+        }
 
         $scan = FinanceReceiptScan::create([
             'id' => $scanId,
             'tenant_id' => $tenantId,
-            'provider_code' => $successfulProvider,
-            'model_name' => $successfulModel,
+            'provider_code' => $provider->getName(),
+            'model_name' => $modelName,
             'status' => 'pending_review',
             'original_filename' => $file->getClientOriginalName(),
             'mime_type' => $mimeType,

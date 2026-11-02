@@ -156,8 +156,8 @@ class TenantAssistantService
         $activeDetails = $isUsingCustom ? [] : ($platformSettings['providers'][$normalizedProvider] ?? []);
 
         $activeModel = $isUsingCustom
-            ? ($setting->model ?: ($activeProviderDetails['model'] ?? ''))
-            : ($activeProviderDetails['model'] ?? config("rudimah.ai.{$normalizedProvider}_model", ''));
+            ? ($setting->model ?: ($activeDetails['model'] ?? ''))
+            : ($activeDetails['model'] ?? config("rudimah.ai.{$normalizedProvider}_model", ''));
 
         $activeEndpoint = $isUsingCustom && !empty($setting?->api_endpoint)
             ? $setting->api_endpoint
@@ -209,65 +209,33 @@ class TenantAssistantService
             ];
         }
 
-        // 5. Panggil provider AI yang sesuai dengan mekanisme multi-provider fallback otomatis
-        $providersToTry = [$normalizedProvider];
-        if (!$isUsingCustom && !empty($platformSettings['providers'])) {
-            foreach (['gemini', 'openai', 'claude', '9router'] as $pCode) {
-                if ($pCode !== $normalizedProvider && !empty($platformSettings['providers'][$pCode]['is_configured'])) {
-                    $providersToTry[] = $pCode;
-                }
-            }
-        }
+        // 5. Panggil provider AI yang sesuai
+        $provider = $this->providerManager->resolve($activeProvider, $setting);
+        $options = [
+            'model' => $activeModel,
+            'temperature' => $setting?->temperature ?? 0.7,
+            'api_endpoint' => $activeEndpoint,
+        ];
 
-        $replyContent = '';
-        $tokensUsed = 0;
-        $meta = [];
-        $lastException = null;
-
-        foreach ($providersToTry as $pCode) {
-            $pDetails = $platformSettings['providers'][$pCode] ?? [];
-            $currentModel = ($pCode === $normalizedProvider && $isUsingCustom)
-                ? ($setting->model ?: ($pDetails['model'] ?? ''))
-                : ($pDetails['model'] ?? config("rudimah.ai.{$pCode}_model", ''));
-
-            $currentEndpoint = ($pCode === $normalizedProvider && $isUsingCustom)
-                ? $setting->api_endpoint
-                : ($pDetails['api_endpoint'] ?? config("rudimah.ai.{$pCode}_endpoint"));
-
-            $providerInstance = $this->providerManager->resolve($pCode, $pCode === $normalizedProvider ? $setting : null);
-            $options = [
-                'model' => $currentModel,
-                'temperature' => $setting?->temperature ?? 0.7,
-                'api_endpoint' => $currentEndpoint,
-            ];
-
-            try {
-                $response = $providerInstance->chat($messagesPayload, $options);
-                $replyContent = $response['content'] ?? '';
-                $tokensUsed = (int) ($response['tokens_used'] ?? 0);
-                $meta = array_merge($response['metadata'] ?? [], [
-                    'provider' => $providerInstance->getName(),
-                    'model' => $response['model'] ?? $currentModel,
-                    'tokens_used' => $tokensUsed,
-                    'tenant_verified' => $tenantId,
-                ]);
-                $lastException = null;
-                break;
-            } catch (\Throwable $e) {
-                Log::warning("[TenantAssistantService] Provider {$pCode} ({$currentModel}) gagal: " . $e->getMessage());
-                $lastException = $e;
-            }
-        }
-
-        if ($lastException && empty(trim($replyContent))) {
-            Log::error("[TenantAssistantService] Seluruh provider AI terkonfigurasi gagal: " . $lastException->getMessage());
-            $replyContent = "Terjadi kendala saat menghubungi layanan AI: " . $lastException->getMessage();
+        try {
+            $response = $provider->chat($messagesPayload, $options);
+            $replyContent = $response['content'] ?? '';
+            $tokensUsed = (int) ($response['tokens_used'] ?? 0);
+            $meta = array_merge($response['metadata'] ?? [], [
+                'provider' => $provider->getName(),
+                'model' => $response['model'] ?? $activeModel,
+                'tokens_used' => $tokensUsed,
+                'tenant_verified' => $tenantId,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("[TenantAssistantService] Gagal memproses respon AI ({$activeProvider}): " . $e->getMessage());
+            $replyContent = "Terjadi kendala saat menghubungi layanan AI ({$activeProvider}): " . $e->getMessage();
             $tokensUsed = 0;
             $meta = [
                 'error' => true,
-                'provider' => $normalizedProvider,
+                'provider' => $activeProvider,
                 'model' => $activeModel,
-                'error_detail' => $lastException->getMessage(),
+                'error_detail' => $e->getMessage(),
             ];
         }
 

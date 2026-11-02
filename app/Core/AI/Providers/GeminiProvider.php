@@ -167,6 +167,16 @@ Format JSON wajib:
         $status = $response->status();
         $errData = $response->json();
         $errMsg = $errData['error']['message'] ?? $errData['message'] ?? mb_strimwidth($response->body(), 0, 300, '...');
+
+        if (
+            str_contains(strtolower($errMsg), 'image') ||
+            str_contains(strtolower($errMsg), 'vision') ||
+            str_contains(strtolower($errMsg), 'not support') ||
+            str_contains(strtolower($errMsg), 'unsupported')
+        ) {
+            throw new \RuntimeException("Model AI '{$model}' tidak mendukung fitur vision / pemindaian gambar (pesan Google Gemini: {$errMsg}). Silakan pilih model yang mendukung vision di Administrasi Sistem.");
+        }
+
         throw new \RuntimeException("Pemindaian OCR Google Gemini gagal (HTTP {$status}): {$errMsg}");
     }
 
