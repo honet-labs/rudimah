@@ -32,16 +32,49 @@ class ChatWebhookController
             }
 
             $from = $payload['from'] ?? $request->input('from');
-            $body = $payload['body'] ?? $request->input('body', '');
+            $body = $payload['body'] ?? $payload['caption'] ?? $request->input('body', '');
             $senderName = $payload['_data']['notifyName'] ?? $payload['notifyName'] ?? null;
 
-            if (empty($from) || empty(trim($body))) {
-                return response()->json(['status' => 'ignored_empty_payload']);
+            if (empty($from)) {
+                return response()->json(['status' => 'ignored_empty_from']);
             }
 
             // Abaikan pesan broadcast status/story WhatsApp
             if (str_contains($from, 'status@broadcast')) {
                 return response()->json(['status' => 'ignored_status_broadcast']);
+            }
+
+            // 1. Cek apakah pesan berisi gambar / media (misal foto struk belanja)
+            $hasMedia = $payload['hasMedia'] ?? $request->input('hasMedia', false);
+            $media = $payload['media'] ?? $request->input('media', null);
+
+            if ($hasMedia && is_array($media)) {
+                $base64 = $media['data'] ?? '';
+                $mimeType = $media['mimetype'] ?? 'image/jpeg';
+                $url = $media['url'] ?? '';
+
+                if (empty($base64) && !empty($url)) {
+                    try {
+                        $imgRes = \Illuminate\Support\Facades\Http::timeout(20)->get($url);
+                        if ($imgRes->successful()) {
+                            $base64 = base64_encode($imgRes->body());
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('[ChatWebhookController] Gagal mengunduh media WAHA: ' . $e->getMessage());
+                    }
+                }
+
+                if (!empty($base64)) {
+                    $reply = $this->gateway->handleIncomingMedia('whatsapp', $from, $base64, $mimeType, $body, $senderName);
+                    if ($reply) {
+                        $this->gateway->sendReply('whatsapp', $from, $reply);
+                    }
+                    return response()->json(['status' => 'processed_media']);
+                }
+            }
+
+            if (empty(trim($body))) {
+                return response()->json(['status' => 'ignored_empty_payload']);
             }
 
             $reply = $this->gateway->handleIncomingMessage('whatsapp', $from, $body, $senderName);
@@ -69,16 +102,46 @@ class ChatWebhookController
     {
         try {
             $message = $request->input('message');
-            if (!$message || empty($message['text'])) {
-                return response()->json(['ok' => true, 'status' => 'no_text_message']);
+            if (!$message) {
+                return response()->json(['ok' => true, 'status' => 'no_message']);
             }
 
             $chatId = (string) ($message['chat']['id'] ?? '');
-            $text = (string) ($message['text'] ?? '');
+            $text = (string) ($message['text'] ?? $message['caption'] ?? '');
             $senderName = $message['from']['first_name'] ?? ($message['from']['username'] ?? null);
 
-            if (empty($chatId) || empty(trim($text))) {
-                return response()->json(['ok' => true, 'status' => 'empty_chat_or_text']);
+            if (empty($chatId)) {
+                return response()->json(['ok' => true, 'status' => 'empty_chat_id']);
+            }
+
+            // 1. Cek apakah pesan berisi foto struk/kuitansi
+            $photos = $message['photo'] ?? null;
+            if (!empty($photos) && is_array($photos)) {
+                $largestPhoto = end($photos);
+                $fileId = $largestPhoto['file_id'] ?? null;
+
+                if ($fileId) {
+                    $token = \App\Core\Identity\Models\SystemSetting::get('telegram_bot_token', env('TELEGRAM_BOT_TOKEN', ''));
+                    if (!empty($token)) {
+                        $fileRes = \Illuminate\Support\Facades\Http::timeout(10)->get("https://api.telegram.org/bot{$token}/getFile?file_id={$fileId}");
+                        if ($fileRes->successful() && !empty($fileRes->json('result.file_path'))) {
+                            $filePath = $fileRes->json('result.file_path');
+                            $downRes = \Illuminate\Support\Facades\Http::timeout(25)->get("https://api.telegram.org/file/bot{$token}/{$filePath}");
+                            if ($downRes->successful()) {
+                                $base64 = base64_encode($downRes->body());
+                                $reply = $this->gateway->handleIncomingMedia('telegram', $chatId, $base64, 'image/jpeg', $text, $senderName);
+                                if ($reply) {
+                                    $this->gateway->sendReply('telegram', $chatId, $reply);
+                                }
+                                return response()->json(['ok' => true, 'status' => 'processed_media']);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (empty(trim($text))) {
+                return response()->json(['ok' => true, 'status' => 'empty_text']);
             }
 
             $reply = $this->gateway->handleIncomingMessage('telegram', $chatId, $text, $senderName);

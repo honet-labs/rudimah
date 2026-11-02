@@ -2,7 +2,9 @@
 
 namespace App\Core\Notifications\Services;
 
+use App\Core\AI\AiProviderManager;
 use App\Core\AI\Models\AiConversation;
+use App\Core\AI\Services\PlatformAiService;
 use App\Core\AI\Services\TenantAssistantService;
 use App\Core\Identity\Models\ExternalChatPairing;
 use App\Core\Identity\Models\ExternalChatSession;
@@ -10,6 +12,8 @@ use App\Core\Identity\Models\SystemSetting;
 use App\Core\Identity\Models\User;
 use App\Core\Tenancy\Models\Tenant;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Pekan\Services\TransactionService;
+use App\Shared\Helpers\MoneyHelper;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -17,10 +21,17 @@ use Illuminate\Support\Str;
 class ExternalChatGatewayService
 {
     protected TenantAssistantService $assistantService;
+    protected ?TransactionService $transactionService;
+    protected ?AiProviderManager $providerManager;
 
-    public function __construct(TenantAssistantService $assistantService)
-    {
+    public function __construct(
+        TenantAssistantService $assistantService,
+        ?TransactionService $transactionService = null,
+        ?AiProviderManager $providerManager = null
+    ) {
         $this->assistantService = $assistantService;
+        $this->transactionService = $transactionService ?: app(TransactionService::class);
+        $this->providerManager = $providerManager ?: app(AiProviderManager::class);
     }
 
     /**
@@ -213,7 +224,7 @@ class ExternalChatGatewayService
             // Kirim pesan ke asisten AI
             $responseMessage = $this->assistantService->sendMessage($conversation, $userMessageText);
 
-            return $responseMessage->content;
+            return $this->formatChatAssistantResponse($responseMessage);
         } catch (\Throwable $e) {
             Log::error("[ExternalChatGateway] Gagal memproses pesan AI: " . $e->getMessage(), [
                 'session_id' => $session->id,
@@ -222,6 +233,216 @@ class ExternalChatGatewayService
 
             return "Maaf, terjadi kendala saat memproses permintaan Anda melalui Asisten AI: " . $e->getMessage();
         }
+    }
+
+    /**
+     * Tangani pesan media gambar (kuitansi/struk belanja) dari WhatsApp atau Telegram.
+     */
+    public function handleIncomingMedia(
+        string $channel,
+        string $channelUserId,
+        string $fileBase64,
+        string $mimeType,
+        ?string $caption = null,
+        ?string $senderName = null
+    ): ?string {
+        $channelLabel = $channel === 'whatsapp' ? 'WhatsApp' : 'Telegram';
+
+        // 1. Cari sesi tautan yang sudah aktif
+        $session = ExternalChatSession::with(['user', 'tenant'])
+            ->where('channel', $channel)
+            ->where('channel_user_id', $channelUserId)
+            ->first();
+
+        if (!$session) {
+            return $this->handleUnauthenticatedMessage($channel, $channelUserId, '', $senderName);
+        }
+
+        if (!$session->user || !$session->user->is_active) {
+            $session->delete();
+            return "[RUDIMAH] Akses Ditolak\n\nAkun Anda telah dinonaktifkan oleh administrator.";
+        }
+
+        $session->update(['last_interaction_at' => now()]);
+        auth()->setUser($session->user);
+        TenantContext::set($session->tenant);
+
+        // 2. Ekstraksi OCR Struk melalui AI Vision Provider aktif
+        try {
+            PlatformAiService::applyRuntimeConfig();
+            $platformSettings = PlatformAiService::getSettings();
+            $activePlatformProvider = $platformSettings['active_provider'] ?? config('rudimah.ai.default_provider', 'gemini');
+            $activeDetails = $platformSettings['providers'][$activePlatformProvider] ?? [];
+            $modelName = $activeDetails['model'] ?? '';
+            $endpoint = $activeDetails['api_endpoint'] ?? null;
+
+            $provider = $this->providerManager->resolve($activePlatformProvider);
+            $extracted = $provider->extractReceipt($fileBase64, $mimeType, [
+                'model' => $modelName,
+                'api_endpoint' => $endpoint,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("[ExternalChatGateway] Gagal OCR dari {$channel}: " . $e->getMessage());
+            return "Maaf, pemindaian struk gagal: " . $e->getMessage() . "\n\nPastikan foto struk terlihat jelas, tidak buram, dan teks kuitansi terbaca.";
+        }
+
+        if (!is_array($extracted) || empty($extracted)) {
+            return "Maaf, sistem tidak dapat menemukan rincian transaksi belanja yang valid dari foto struk ini.";
+        }
+
+        // 3. Catat transaksi pengeluaran ke buku kas ruang kerja
+        try {
+            $totalMinor = (int) ($extracted['total_minor'] ?? 0);
+            $merchantName = $extracted['merchant_name'] ?? 'Toko';
+            $date = !empty($extracted['transaction_date']) ? $extracted['transaction_date'] : now()->toDateString();
+            $receiptNo = $extracted['receipt_number'] ?? null;
+
+            $items = [];
+            if (!empty($extracted['items']) && is_array($extracted['items'])) {
+                foreach ($extracted['items'] as $it) {
+                    $items[] = [
+                        'item_name' => $it['item_name'] ?? 'Barang',
+                        'quantity' => $it['quantity'] ?? 1,
+                        'price_minor' => (int) ($it['price_minor'] ?? 0),
+                        'total_minor' => (int) ($it['total_minor'] ?? 0),
+                        'discount_minor' => 0,
+                    ];
+                }
+            }
+
+            $desc = "Belanja di {$merchantName}";
+            if (!empty($caption)) {
+                $desc .= " (" . trim($caption) . ")";
+            }
+
+            $this->transactionService->createTransaction([
+                'type' => 'expense',
+                'amount_minor' => $totalMinor,
+                'merchant_name' => $merchantName,
+                'receipt_number' => $receiptNo,
+                'transaction_date' => $date,
+                'description' => $desc,
+                'notes' => "Dipindai dan dicatat otomatis via {$channelLabel}",
+            ], $items);
+
+            $totalFormatted = MoneyHelper::formatIdr($totalMinor);
+            $itemLines = [];
+            foreach ($items as $it) {
+                $pStr = MoneyHelper::formatIdr((int) $it['price_minor']);
+                $tStr = MoneyHelper::formatIdr((int) $it['total_minor']);
+                $itemLines[] = "• {$it['item_name']} ({$it['quantity']}x @ {$pStr}): {$tStr}";
+            }
+
+            $res = "[RUDIMAH - Hasil Pindai Struk]\n\n"
+                . "Foto struk berhasil dipindai dan dicatat ke pengeluaran ruang kerja {$session->tenant->name}:\n\n"
+                . "Tempat: *{$merchantName}*\n"
+                . "Tanggal: {$date}\n"
+                . "Total Belanja: *{$totalFormatted}*\n";
+
+            if (!empty($receiptNo)) {
+                $res .= "No. Struk: {$receiptNo}\n";
+            }
+
+            if (!empty($itemLines)) {
+                $res .= "\nRincian Barang:\n" . implode("\n", $itemLines) . "\n";
+            }
+
+            $res .= "\nTransaksi telah otomatis tersimpan ke buku kas.";
+            return $res;
+        } catch (\Throwable $e) {
+            Log::error("[ExternalChatGateway] Gagal mencatat transaksi dari OCR {$channel}: " . $e->getMessage());
+            return "Struk berhasil diekstraksi, namun terjadi kendala saat menyimpan transaksi: " . $e->getMessage();
+        }
+    }
+
+    /**
+     * Memformat balasan asisten AI agar mencantumkan rincian aksi (transaksi, tagihan, tabungan)
+     * yang serupa dengan kartu tampilan pada antarmuka web.
+     */
+    protected function formatChatAssistantResponse($responseMessage): string
+    {
+        $content = trim($responseMessage->content);
+        $metadata = $responseMessage->metadata ?? [];
+        $extraBlocks = [];
+
+        // 1. Rincian Transaksi yang Dicatat/Diperbarui/Dihapus
+        if (!empty($metadata['recorded_transactions'])) {
+            $txLines = [];
+            foreach ($metadata['recorded_transactions'] as $tx) {
+                $actLabel = match ($tx['action'] ?? 'created') {
+                    'updated' => '[Diperbarui]',
+                    'deleted' => '[Dihapus]',
+                    default => ($tx['type'] ?? 'expense') === 'income' ? '[Pemasukan]' : '[Pengeluaran]',
+                };
+                $amtStr = MoneyHelper::formatIdr((int) ($tx['amount_minor'] ?? 0));
+                $desc = $tx['description'] ?? 'Transaksi';
+                $dateStr = !empty($tx['date']) ? " ({$tx['date']})" : '';
+                $txLines[] = "• {$actLabel} {$desc}: *{$amtStr}*{$dateStr}";
+            }
+            if (!empty($txLines)) {
+                $extraBlocks[] = "*Rincian Transaksi:*\n" . implode("\n", $txLines);
+            }
+        }
+
+        // 2. Rincian Jadwal Tagihan
+        if (!empty($metadata['recorded_reminders'])) {
+            $remLines = [];
+            foreach ($metadata['recorded_reminders'] as $rem) {
+                $actLabel = match ($rem['action'] ?? 'created') {
+                    'updated' => '[Diperbarui]',
+                    'deleted' => '[Dihapus]',
+                    default => '[Jadwal Baru]',
+                };
+                $amtStr = MoneyHelper::formatIdr((int) ($rem['amount_minor'] ?? 0));
+                $title = $rem['title'] ?? 'Tagihan';
+                $intervalStr = match ($rem['repeat_interval'] ?? 'monthly') {
+                    'monthly' => 'Bulanan',
+                    'weekly' => 'Mingguan',
+                    'yearly' => 'Tahunan',
+                    'daily' => 'Harian',
+                    default => 'Sekali',
+                };
+                $dueStr = !empty($rem['due_date']) ? "Jatuh tempo: {$rem['due_date']}" : '';
+                $remLines[] = "• {$actLabel} {$title}: *{$amtStr}* ({$intervalStr}, {$dueStr})";
+            }
+            if (!empty($remLines)) {
+                $extraBlocks[] = "*Jadwal Tagihan & Pengingat:*\n" . implode("\n", $remLines);
+            }
+        }
+
+        // 3. Rincian Tabungan
+        if (!empty($metadata['recorded_savings'])) {
+            $savLines = [];
+            foreach ($metadata['recorded_savings'] as $sav) {
+                $name = $sav['name'] ?? 'Tabungan';
+                if (($sav['action'] ?? '') === 'deposited') {
+                    $amtStr = MoneyHelper::formatIdr((int) ($sav['amount_minor'] ?? 0));
+                    $currStr = MoneyHelper::formatIdr((int) ($sav['current_amount_minor'] ?? 0));
+                    $targetStr = MoneyHelper::formatIdr((int) ($sav['target_amount_minor'] ?? 0));
+                    $pct = $sav['progress_percent'] ?? 0;
+                    $savLines[] = "• [Setoran] {$name}: *+{$amtStr}* (Terkumpul: {$currStr} / {$targetStr} - {$pct}%)";
+                } elseif (($sav['action'] ?? '') === 'withdrawn') {
+                    $amtStr = MoneyHelper::formatIdr((int) ($sav['amount_minor'] ?? 0));
+                    $currStr = MoneyHelper::formatIdr((int) ($sav['current_amount_minor'] ?? 0));
+                    $savLines[] = "• [Penarikan] {$name}: *-{$amtStr}* (Sisa: {$currStr})";
+                } elseif (($sav['action'] ?? '') === 'deleted') {
+                    $savLines[] = "• [Dihapus] Pos Tabungan: {$name}";
+                } else {
+                    $targetStr = MoneyHelper::formatIdr((int) ($sav['target_amount_minor'] ?? 0));
+                    $targetDate = !empty($sav['target_date']) ? ", Target: {$sav['target_date']}" : '';
+                    $savLines[] = "• [Target Baru] {$name}: Target *{$targetStr}*{$targetDate}";
+                }
+            }
+            if (!empty($savLines)) {
+                $extraBlocks[] = "*Pos Tabungan Impian:*\n" . implode("\n", $savLines);
+            }
+        }
+
+        if (!empty($extraBlocks)) {
+            $content .= "\n\n" . implode("\n\n", $extraBlocks);
+        }
+
+        return $content;
     }
 
     /**
@@ -302,18 +523,19 @@ class ExternalChatGatewayService
      */
     protected function buildHelpMessage(ExternalChatSession $session): string
     {
-        return "[RUDIMAH] Panduan Asisten Chat\n\n"
+        return "[RUDIMAH] Panduan Asisten Chat (WhatsApp & Telegram)\n\n"
             . "Ruang Kerja Saat Ini: {$session->tenant->name}\n\n"
             . "Perintah Sistem:\n"
             . "- /status : Cek info akun & ruang kerja yang sedang aktif\n"
             . "- /tenant : Tampilkan daftar ruang kerja Anda\n"
             . "- /switch <nomor> : Beralih ke ruang kerja lain\n"
             . "- /logout : Putuskan tautan chat ini dari akun Anda\n\n"
-            . "Penggunaan AI Assistant:\n"
-            . "Ketik secara bebas dalam Bahasa Indonesia untuk mencatat pengeluaran, pemasukan, atau mengecek informasi keuangan.\n"
-            . "Contoh:\n"
-            . "'Beli bensin pertalite 2.5 liter total 25 ribu di SPBU Pertamina'\n"
-            . "'Sarapan lontong sayur 15 ribu pakai kas tunai'";
+            . "Fungsi AI Assistant (Sama Persis dengan Web RUDIMAH):\n"
+            . "1. Catat Transaksi: Kirim teks seperti 'Beli bensin pertamax 35rb di SPBU Pertamina' atau 'Makan siang soto 25rb'.\n"
+            . "2. Pindai Struk / Kuitansi: Kirim foto kuitansi/struk belanja untuk dipindai otomatis via OCR.\n"
+            . "3. Jadwal Tagihan: 'tolong masukan ini ke tagihan, Tagihan VPS everera 235rb setiap tanggal 1'.\n"
+            . "4. Pos Tabungan: 'buat target tabungan Beli Laptop 15 juta target 31 Des 2026' atau 'nabung 500rb ke tabungan Beli Laptop'.\n"
+            . "5. Informasi Keuangan: 'berapa saldo kas saat ini?', 'ada tagihan apa saja?', atau 'ringkasan pengeluaran bulan ini'.";
     }
 
     /**

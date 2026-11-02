@@ -11,6 +11,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Models\FinanceTransaction;
 use App\Modules\Pekan\Models\FinanceReminder;
 use App\Modules\Pekan\Models\FinanceCategory;
+use App\Modules\Pekan\Models\FinanceSavings;
 use App\Modules\Pekan\Services\TransactionService;
 use App\Shared\Helpers\MoneyHelper;
 use Illuminate\Database\Schema\Blueprint;
@@ -707,6 +708,234 @@ class TenantAssistantService
             }
         }
 
+        // 6c. Deteksi dan Eksekusi Tindakan Tabungan (Savings Actions)
+        $recordedSavings = [];
+        [$parsedSavingsActions, $cleanedFromSavings] = $this->extractSavingsActions($replyContent, $userMessageText);
+
+        if (!empty($parsedSavingsActions)) {
+            $this->ensureSavingsSchema();
+            foreach ($parsedSavingsActions as $savAction) {
+                try {
+                    $rawSavAction = strtolower($savAction['action'] ?? 'create');
+                    $savName = trim($savAction['name'] ?? '');
+                    if (empty($savName)) {
+                        $savName = 'Tabungan Impian';
+                    }
+
+                    // A. AKSI HAPUS TARGET TABUNGAN
+                    if ($rawSavAction === 'delete') {
+                        $targetSav = null;
+                        if (!empty($savAction['savings_id'])) {
+                            $targetSav = FinanceSavings::where('tenant_id', $tenantId)->find($savAction['savings_id']);
+                        }
+                        if (!$targetSav && !empty($savName)) {
+                            $targetSav = FinanceSavings::where('tenant_id', $tenantId)
+                                ->where('name', 'like', '%' . $savName . '%')
+                                ->orderBy('created_at', 'desc')
+                                ->first();
+                        }
+                        if ($targetSav) {
+                            $deletedName = $targetSav->name;
+                            $deletedTarget = $targetSav->target_amount_minor;
+                            $targetSav->delete();
+                            $recordedSavings[] = [
+                                'id' => $targetSav->id,
+                                'action' => 'deleted',
+                                'name' => $deletedName,
+                                'target_amount_minor' => $deletedTarget,
+                            ];
+                        }
+                        continue;
+                    }
+
+                    // B. AKSI MENABUNG / SETOR DANA KE TABUNGAN (DEPOSIT)
+                    if ($rawSavAction === 'deposit') {
+                        $depAmount = (int) ($savAction['amount_minor'] ?? 0);
+                        if ($depAmount <= 0 && !empty($savAction['amount'])) {
+                            $depAmount = (int) round((float) $savAction['amount']);
+                        }
+                        if ($depAmount <= 0) {
+                            $depAmount = $this->parseIndonesianNominal($userMessageTrimmed);
+                        }
+
+                        if ($depAmount > 0) {
+                            $targetSav = null;
+                            if (!empty($savAction['savings_id'])) {
+                                $targetSav = FinanceSavings::where('tenant_id', $tenantId)->find($savAction['savings_id']);
+                            }
+                            if (!$targetSav && !empty($savName)) {
+                                $targetSav = FinanceSavings::where('tenant_id', $tenantId)
+                                    ->where('name', 'like', '%' . $savName . '%')
+                                    ->orderBy('created_at', 'desc')
+                                    ->first();
+                            }
+                            // Jika belum ada pos tabungan bernama itu, buatkan pos tabungan baru otomatis
+                            if (!$targetSav) {
+                                $targetSav = new FinanceSavings();
+                                $targetSav->id = (string) Str::uuid();
+                                $targetSav->tenant_id = $tenantId;
+                                $targetSav->name = $savName;
+                                $targetSav->target_amount_minor = $depAmount * 10;
+                                $targetSav->current_amount_minor = 0;
+                                $targetSav->currency = 'Rp';
+                                $targetSav->start_date = now()->toDateString();
+                                $targetSav->status = 'active';
+                                $targetSav->created_by = auth()->id();
+                                $targetSav->save();
+                            }
+
+                            $targetSav->current_amount_minor += $depAmount;
+                            if ($targetSav->target_amount_minor > 0 && $targetSav->current_amount_minor >= $targetSav->target_amount_minor) {
+                                $targetSav->status = 'completed';
+                            }
+                            $targetSav->save();
+
+                            // Catat transaksi mutasi kas bertipe savings agar buku kas sinkron
+                            try {
+                                $this->transactionService->createTransaction([
+                                    'type' => 'savings',
+                                    'amount_minor' => $depAmount,
+                                    'description' => "Setoran Tabungan: {$targetSav->name}",
+                                    'transaction_date' => now()->toDateString(),
+                                    'notes' => 'Setoran tabungan via Asisten AI',
+                                ]);
+                            } catch (\Throwable $te) {
+                                Log::warning('[TenantAssistantService] Gagal mencatat transaksi kas tabungan: ' . $te->getMessage());
+                            }
+
+                            $recordedSavings[] = [
+                                'id' => $targetSav->id,
+                                'action' => 'deposited',
+                                'name' => $targetSav->name,
+                                'amount_minor' => $depAmount,
+                                'current_amount_minor' => $targetSav->current_amount_minor,
+                                'target_amount_minor' => $targetSav->target_amount_minor,
+                                'progress_percent' => $targetSav->progress_percent,
+                            ];
+                        }
+                        continue;
+                    }
+
+                    // C. AKSI MENARIK DANA TABUNGAN (WITHDRAW)
+                    if ($rawSavAction === 'withdraw') {
+                        $wthAmount = (int) ($savAction['amount_minor'] ?? 0);
+                        if ($wthAmount <= 0) {
+                            $wthAmount = $this->parseIndonesianNominal($userMessageTrimmed);
+                        }
+
+                        if ($wthAmount > 0) {
+                            $targetSav = FinanceSavings::where('tenant_id', $tenantId)
+                                ->where('name', 'like', '%' . $savName . '%')
+                                ->orderBy('created_at', 'desc')
+                                ->first();
+
+                            if ($targetSav) {
+                                $targetSav->current_amount_minor = max(0, $targetSav->current_amount_minor - $wthAmount);
+                                if ($targetSav->status === 'completed' && $targetSav->current_amount_minor < $targetSav->target_amount_minor) {
+                                    $targetSav->status = 'active';
+                                }
+                                $targetSav->save();
+
+                                try {
+                                    $this->transactionService->createTransaction([
+                                        'type' => 'income',
+                                        'amount_minor' => $wthAmount,
+                                        'description' => "Penarikan Tabungan: {$targetSav->name}",
+                                        'transaction_date' => now()->toDateString(),
+                                        'notes' => 'Penarikan tabungan via Asisten AI',
+                                    ]);
+                                } catch (\Throwable $te) {
+                                    Log::warning('[TenantAssistantService] Gagal mencatat transaksi penarikan tabungan: ' . $te->getMessage());
+                                }
+
+                                $recordedSavings[] = [
+                                    'id' => $targetSav->id,
+                                    'action' => 'withdrawn',
+                                    'name' => $targetSav->name,
+                                    'amount_minor' => $wthAmount,
+                                    'current_amount_minor' => $targetSav->current_amount_minor,
+                                    'target_amount_minor' => $targetSav->target_amount_minor,
+                                    'progress_percent' => $targetSav->progress_percent,
+                                ];
+                            }
+                        }
+                        continue;
+                    }
+
+                    // D. AKSI MEMBUAT TARGET TABUNGAN BARU (CREATE)
+                    $targetAmount = (int) ($savAction['target_amount_minor'] ?? 0);
+                    if ($targetAmount <= 0 && !empty($savAction['amount'])) {
+                        $targetAmount = (int) round((float) $savAction['amount']);
+                    }
+                    if ($targetAmount <= 0) {
+                        $targetAmount = $this->parseIndonesianNominal($userMessageTrimmed);
+                    }
+
+                    if ($targetAmount <= 0) {
+                        continue;
+                    }
+
+                    $initialAmount = (int) ($savAction['current_amount_minor'] ?? 0);
+                    $targetDate = !empty($savAction['target_date']) ? $savAction['target_date'] : null;
+
+                    $savings = new FinanceSavings();
+                    $savings->id = (string) Str::uuid();
+                    $savings->tenant_id = $tenantId;
+                    $savings->name = $savName;
+                    $savings->target_amount_minor = $targetAmount;
+                    $savings->current_amount_minor = $initialAmount;
+                    $savings->currency = 'Rp';
+                    $savings->start_date = now()->toDateString();
+                    $savings->target_date = $targetDate;
+                    $savings->notes = $savAction['notes'] ?? "Target tabungan {$savName}";
+                    $savings->status = ($initialAmount >= $targetAmount && $targetAmount > 0) ? 'completed' : 'active';
+                    $savings->created_by = auth()->id();
+                    $savings->save();
+
+                    $recordedSavings[] = [
+                        'id' => $savings->id,
+                        'action' => 'created',
+                        'name' => $savings->name,
+                        'target_amount_minor' => $savings->target_amount_minor,
+                        'current_amount_minor' => $savings->current_amount_minor,
+                        'target_date' => $savings->target_date ? \Carbon\Carbon::parse($savings->target_date)->format('Y-m-d') : null,
+                        'progress_percent' => $savings->progress_percent,
+                    ];
+                } catch (\Throwable $e) {
+                    Log::error('[TenantAssistantService] Gagal mengeksekusi aksi tabungan: ' . $e->getMessage());
+                }
+            }
+
+            if (!empty($recordedSavings)) {
+                $meta['recorded_savings'] = $recordedSavings;
+                $replyContent = $cleanedFromSavings;
+
+                // Cegah respon halusinasi penolakan
+                if (preg_match('/Fitur\s+(?:tambah|buat)?\s*tabungan\s+via\s+chat\s+belum\s+tersedia/i', $replyContent) ||
+                    preg_match('/Input\s+manual\s+lewat\s+menu\s+Tabungan/i', $replyContent) ||
+                    empty(trim($replyContent))) {
+                    $firstSav = $recordedSavings[0];
+                    if (($firstSav['action'] ?? '') === 'deposited') {
+                        $amtStr = MoneyHelper::formatIdr((int) $firstSav['amount_minor']);
+                        $currStr = MoneyHelper::formatIdr((int) $firstSav['current_amount_minor']);
+                        $targetStr = MoneyHelper::formatIdr((int) $firstSav['target_amount_minor']);
+                        $pct = $firstSav['progress_percent'] ?? 0;
+                        $replyContent = "Baik, setoran sebesar {$amtStr} ke pos tabungan '{$firstSav['name']}' telah berhasil dicatat. Saldo saat ini: {$currStr} dari target {$targetStr} ({$pct}%).";
+                    } elseif (($firstSav['action'] ?? '') === 'withdrawn') {
+                        $amtStr = MoneyHelper::formatIdr((int) $firstSav['amount_minor']);
+                        $currStr = MoneyHelper::formatIdr((int) $firstSav['current_amount_minor']);
+                        $replyContent = "Baik, penarikan sebesar {$amtStr} dari pos tabungan '{$firstSav['name']}' telah berhasil dicatat. Sisa saldo tabungan: {$currStr}.";
+                    } elseif (($firstSav['action'] ?? '') === 'deleted') {
+                        $replyContent = "Pos tabungan '{$firstSav['name']}' telah berhasil dihapus dari sistem.";
+                    } else {
+                        $targetStr = MoneyHelper::formatIdr((int) $firstSav['target_amount_minor']);
+                        $targetDateStr = !empty($firstSav['target_date']) ? ", target pencapaian " . \Carbon\Carbon::parse($firstSav['target_date'])->translatedFormat('d F Y') : '';
+                        $replyContent = "Baik, target tabungan '{$firstSav['name']}' sebesar {$targetStr}{$targetDateStr} telah berhasil dibuat ke dalam daftar Tabungan Impian.";
+                    }
+                }
+            }
+        }
+
         // 7. Bersihkan kalimat penutup klise repetitif (seperti "Ada transaksi lain?", "Transaksi lain?")
         $replyContent = $this->cleanRepetitiveClosingPhrases($replyContent);
 
@@ -747,8 +976,12 @@ class TenantAssistantService
         $isReminderScheduleIntent = (bool) preg_match('/\b(?:masuk(?:in|kan)?|jadwal(?:kan)?|tambah(?:kan)?|catat)\s+(?:ini\s+)?ke\s+tagihan\b/i', $userMessageText)
             || (bool) preg_match('/\b(jadwal(?:kan)?|pengingat)\s+tagihan\b/i', $userMessageText);
 
-        if ($isInformationalQuery || $isNegatedOrQuestion || $isReminderScheduleIntent) {
-            // Bersihkan blok kode JSON action jika model AI keliru menyertakannya saat menjawab pertanyaan informasi atau penjadwalan tagihan
+        $isSavingsIntent = (bool) preg_match('/\b(?:buat(?:kan)?|tambah(?:kan)?|bikin)\s+(?:target\s+)?tabungan\b/i', $userMessageText)
+            || (bool) preg_match('/\b(?:nabung|menabung|setor|setorkan)\s+.*?ke\s+(?:tabungan|pos\s+tabungan)\b/i', $userMessageText)
+            || (bool) preg_match('/\b(?:tarik|ambil)\s+.*?dari\s+tabungan\b/i', $userMessageText);
+
+        if ($isInformationalQuery || $isNegatedOrQuestion || $isReminderScheduleIntent || $isSavingsIntent) {
+            // Bersihkan blok kode JSON action jika model AI keliru menyertakannya saat menjawab pertanyaan informasi atau penjadwalan tagihan/tabungan
             $cleaned = preg_replace('/```(?:json:transaction_action|json)?\s*(\[\s*\{.*?\}\s*\]|\{\s*"type"\s*:.*?\}\s*)\s*```/is', '', $replyContent);
             return [[], trim($cleaned ?: $replyContent)];
         }
@@ -1392,6 +1625,150 @@ class TenantAssistantService
             'daily' => $today->copy()->addDay()->toDateString(),
             default => $today->copy()->addMonthNoOverflow()->toDateString(),
         };
+    }
+
+    /**
+     * Memastikan skema tabel finance_savings lengkap (images).
+     */
+    protected function ensureSavingsSchema(): void
+    {
+        try {
+            $schema = Schema::connection('pekan');
+            if ($schema->hasTable('finance_savings')) {
+                if (!$schema->hasColumn('finance_savings', 'images')) {
+                    $schema->table('finance_savings', function (Blueprint $table) {
+                        $table->json('images')->nullable()->after('notes');
+                    });
+                }
+            }
+        } catch (\Throwable) {
+            // Abaikan jika migrasi sudah berjalan atau permission terbatas
+        }
+    }
+
+    /**
+     * Mengekstrak instruksi pengelolaan tabungan baik dari blok JSON (json:savings_action)
+     * maupun dari pola teks pesan pengguna secara heuristik.
+     */
+    protected function extractSavingsActions(string $replyContent, string $userMessageText): array
+    {
+        // 1. Ekstraksi Primer: Blok ```json:savings_action ... ```
+        if (preg_match('/```(?:json:savings_action|savings_action)?\s*(\[\s*\{.*?\}\s*\])\s*```/is', $replyContent, $matches)) {
+            $parsed = json_decode($matches[1], true);
+            if (is_array($parsed) && !empty($parsed)) {
+                $cleaned = trim(str_replace($matches[0], '', $replyContent));
+                return [$parsed, $cleaned];
+            }
+        }
+
+        // 2. Ekstraksi Sekunder: Blok objek tunggal ```json:savings_action { ... } ```
+        if (preg_match('/```(?:json:savings_action|savings_action)?\s*(\{\s*"name"\s*:.*?\}\s*)\s*```/is', $replyContent, $matches)) {
+            $parsed = json_decode($matches[1], true);
+            if (is_array($parsed) && !empty($parsed)) {
+                $cleaned = trim(str_replace($matches[0], '', $replyContent));
+                return [[$parsed], $cleaned];
+            }
+        }
+
+        // 3. Ekstraksi Heuristik jika pengguna berniat membuat/menabung/menarik tabungan
+        $isSavingsIntent = (bool) preg_match('/\b(?:buat(?:kan)?|tambah(?:kan)?|bikin)\s+(?:target\s+)?tabungan\b/i', $userMessageText)
+            || (bool) preg_match('/\b(?:nabung|menabung|setor|setorkan)\s+.*?ke\s+(?:tabungan|pos\s+tabungan)\b/i', $userMessageText)
+            || (bool) preg_match('/\b(?:tarik|ambil)\s+.*?dari\s+tabungan\b/i', $userMessageText)
+            || (bool) preg_match('/\b(?:hapus|batalkan)\s+(?:target\s+)?tabungan\b/i', $userMessageText);
+
+        if ($isSavingsIntent) {
+            $extracted = $this->extractSavingsFromUserText($userMessageText);
+            if ($extracted) {
+                $cleaned = preg_replace('/```(?:json:savings_action|savings_action|json)?\s*[\s\S]*?```/i', '', $replyContent);
+                return [[$extracted], trim($cleaned ?: $replyContent)];
+            }
+        }
+
+        return [[], $replyContent];
+    }
+
+    /**
+     * Mengekstrak rincian aksi tabungan secara heuristik dari teks pengguna.
+     */
+    protected function extractSavingsFromUserText(string $userText): ?array
+    {
+        $amountMinor = 0;
+        if (preg_match('/(?:rp\.?\s*)?([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i', $userText, $am)) {
+            $amountMinor = $this->parseIndonesianNominal($am[0]);
+        }
+
+        // Deteksi Aksi
+        $action = 'create';
+        if (preg_match('/\b(?:nabung|menabung|setor|setorkan|masuk(?:in|kan)?)\b/i', $userText)) {
+            $action = 'deposit';
+        } elseif (preg_match('/\b(?:tarik|ambil)\b/i', $userText)) {
+            $action = 'withdraw';
+        } elseif (preg_match('/\b(?:hapus|batalkan)\b/i', $userText)) {
+            $action = 'delete';
+        }
+
+        // Resolusi Nama Tabungan
+        $name = '';
+        if (preg_match('/(?:ke\s+tabungan|dari\s+tabungan|target\s+tabungan|pos\s+tabungan|tabungan)\s+([A-Za-z0-9\s\-_]{3,40}?)(?:\s+\d|\s+sebesar|\s+seharga|\s+target|\s*$)/i', $userText, $nm)) {
+            $candidate = trim($nm[1]);
+            if (!empty($candidate)) {
+                $name = ucwords($candidate);
+            }
+        }
+
+        if (empty($name)) {
+            if (preg_match('/(?:buat|target|pos)\s+tabungan\s+([A-Za-z0-9\s\-_]{3,35})/i', $userText, $nm2)) {
+                $name = ucwords(trim($nm2[1]));
+            }
+        }
+
+        if (empty($name)) {
+            $name = 'Tabungan Impian';
+        }
+
+        // Deteksi target date jika ada (misal "target 31 Desember 2026", "target tanggal 2026-12-31")
+        $targetDate = null;
+        if (preg_match('/target\s+(?:tanggal\s+)?(\d{4}-\d{2}-\d{2})/i', $userText, $dm)) {
+            $targetDate = $dm[1];
+        } elseif (preg_match('/target\s+(?:tanggal\s+)?(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i', $userText, $dm2)) {
+            try {
+                $targetDate = \Carbon\Carbon::parse($dm2[1])->toDateString();
+            } catch (\Throwable) {}
+        }
+
+        if ($action === 'create') {
+            return [
+                'action' => 'create',
+                'name' => $name,
+                'target_amount_minor' => $amountMinor,
+                'current_amount_minor' => 0,
+                'target_date' => $targetDate,
+                'notes' => trim($userText),
+            ];
+        }
+
+        if ($action === 'deposit') {
+            return [
+                'action' => 'deposit',
+                'name' => $name,
+                'amount_minor' => $amountMinor,
+                'notes' => trim($userText),
+            ];
+        }
+
+        if ($action === 'withdraw') {
+            return [
+                'action' => 'withdraw',
+                'name' => $name,
+                'amount_minor' => $amountMinor,
+                'notes' => trim($userText),
+            ];
+        }
+
+        return [
+            'action' => 'delete',
+            'name' => $name,
+        ];
     }
 }
 

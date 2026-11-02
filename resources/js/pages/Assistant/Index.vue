@@ -748,6 +748,85 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
+
+              <!-- Kartu Status Tabungan Berhasil Dibuat / Disetor / Diperbarui (Jika Ada) -->
+              <div
+                v-if="msg.metadata && msg.metadata.recorded_savings && msg.metadata.recorded_savings.length > 0"
+                class="mt-2 p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 w-full text-xs shadow-sm"
+              >
+                <div class="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <div class="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                    <svg class="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>
+                      {{
+                        msg.metadata.recorded_savings.some((s: any) => s.action === 'deposited')
+                          ? `${msg.metadata.recorded_savings.length} Setoran Tabungan Berhasil Dicatat`
+                          : msg.metadata.recorded_savings.some((s: any) => s.action === 'withdrawn')
+                          ? `${msg.metadata.recorded_savings.length} Penarikan Tabungan Berhasil Dicatat`
+                          : msg.metadata.recorded_savings.some((s: any) => s.action === 'deleted')
+                          ? `${msg.metadata.recorded_savings.length} Target Tabungan Berhasil Dihapus`
+                          : `${msg.metadata.recorded_savings.length} Target Tabungan Berhasil Dibuat`
+                      }}
+                    </span>
+                  </div>
+                  <a
+                    :href="`/t/${tenant.slug}/apps/pekan/savings`"
+                    class="text-teal-700 dark:text-teal-400 hover:underline font-medium flex items-center gap-1 text-[11px] shrink-0"
+                  >
+                    <span>Buka Menu Tabungan</span>
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                </div>
+
+                <div class="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  <div
+                    v-for="(sav, idx) in msg.metadata.recorded_savings"
+                    :key="sav.id || idx"
+                    class="py-1.5 flex items-center justify-between text-[11px]"
+                  >
+                    <div class="flex items-center gap-2 truncate pr-2">
+                      <span
+                        v-if="sav.action === 'deposited'"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300"
+                      >
+                        Setoran
+                      </span>
+                      <span
+                        v-else-if="sav.action === 'withdrawn'"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
+                      >
+                        Penarikan
+                      </span>
+                      <span
+                        v-else-if="sav.action === 'deleted'"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300"
+                      >
+                        Dihapus
+                      </span>
+                      <span
+                        v-else
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                      >
+                        Target Baru
+                      </span>
+                      <span class="text-slate-800 dark:text-slate-200 font-medium truncate">{{ sav.name }}</span>
+                      <span v-if="sav.progress_percent !== undefined" class="text-[10px] text-slate-500 font-mono">({{ sav.progress_percent }}%)</span>
+                      <span v-if="sav.target_date" class="text-[10px] text-slate-400 shrink-0 font-mono">(Target: {{ sav.target_date }})</span>
+                    </div>
+                    <div class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">
+                      {{
+                        sav.action === 'deposited' || sav.action === 'withdrawn'
+                          ? `Rp ${Number(sav.amount_minor || 0).toLocaleString('id-ID')}`
+                          : `Target: Rp ${Number(sav.target_amount_minor || 0).toLocaleString('id-ID')}`
+                      }}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Typing indicator saat loading -->
