@@ -9,9 +9,13 @@ use App\Core\AI\Models\TenantAiSetting;
 use App\Core\Audit\AuditLogger;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Models\FinanceTransaction;
+use App\Modules\Pekan\Models\FinanceReminder;
+use App\Modules\Pekan\Models\FinanceCategory;
 use App\Modules\Pekan\Services\TransactionService;
 use App\Shared\Helpers\MoneyHelper;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class TenantAssistantService
@@ -575,6 +579,134 @@ class TenantAssistantService
             }
         }
 
+        // 6b. Deteksi dan Eksekusi Tindakan Tagihan & Pengingat (Reminder Actions)
+        $recordedReminders = [];
+        [$parsedReminderActions, $cleanedFromReminder] = $this->extractReminderActions($replyContent, $userMessageText);
+
+        if (!empty($parsedReminderActions)) {
+            $this->ensureReminderSchema();
+            foreach ($parsedReminderActions as $remAction) {
+                try {
+                    $rawRemAction = strtolower($remAction['action'] ?? 'create');
+                    $remTitle = trim($remAction['title'] ?? '');
+                    if (empty($remTitle)) {
+                        $remTitle = 'Tagihan Rutin';
+                    }
+
+                    $remAmount = (int) ($remAction['amount_minor'] ?? 0);
+                    if ($remAmount <= 0 && !empty($remAction['amount'])) {
+                        $remAmount = (int) round((float) $remAction['amount']);
+                    }
+                    if ($remAmount <= 0) {
+                        $remAmount = $this->parseIndonesianNominal($userMessageTrimmed);
+                    }
+
+                    $remInterval = strtolower($remAction['repeat_interval'] ?? 'monthly');
+                    if (!in_array($remInterval, ['once', 'daily', 'weekly', 'monthly', 'yearly'])) {
+                        $remInterval = 'monthly';
+                    }
+
+                    $remDueDate = $this->calculateNextDueDate($remAction['due_date'] ?? null, $remInterval, $userMessageTrimmed);
+
+                    // A. AKSI HAPUS TAGIHAN
+                    if ($rawRemAction === 'delete') {
+                        $targetRem = null;
+                        if (!empty($remAction['reminder_id'])) {
+                            $targetRem = FinanceReminder::where('tenant_id', $tenantId)->find($remAction['reminder_id']);
+                        }
+                        if (!$targetRem && !empty($remTitle)) {
+                            $targetRem = FinanceReminder::where('tenant_id', $tenantId)
+                                ->where('title', 'like', '%' . $remTitle . '%')
+                                ->orderBy('created_at', 'desc')
+                                ->first();
+                        }
+                        if ($targetRem) {
+                            $deletedTitle = $targetRem->title;
+                            $deletedAmount = $targetRem->amount_minor;
+                            $targetRem->delete();
+                            $recordedReminders[] = [
+                                'id' => $targetRem->id,
+                                'action' => 'deleted',
+                                'title' => $deletedTitle,
+                                'amount_minor' => $deletedAmount,
+                                'due_date' => $targetRem->due_date ? \Carbon\Carbon::parse($targetRem->due_date)->format('Y-m-d') : null,
+                                'repeat_interval' => $targetRem->repeat_interval,
+                            ];
+                        }
+                        continue;
+                    }
+
+                    // B. AKSI JADWALKAN TAGIHAN BARU / UPDATE
+                    if ($remAmount <= 0) {
+                        continue;
+                    }
+
+                    $reminder = new FinanceReminder();
+                    $reminder->id = (string) Str::uuid();
+                    $reminder->tenant_id = $tenantId;
+                    $reminder->title = $remTitle;
+                    $reminder->amount_minor = $remAmount;
+                    $reminder->currency = 'Rp';
+                    $reminder->due_date = $remDueDate;
+                    $reminder->repeat_interval = $remInterval;
+                    $reminder->description = $remAction['description'] ?? "Jadwal {$remTitle} {$remInterval}";
+                    $reminder->status = 'pending';
+                    $reminder->created_by = auth()->id();
+
+                    // Cari kategori tagihan/utilitas yang cocok
+                    $category = FinanceCategory::where('tenant_id', $tenantId)
+                        ->where('is_active', true)
+                        ->where('category_type', 'expense')
+                        ->where(function ($q) use ($remTitle) {
+                            $q->where('name', 'like', '%Tagihan%')
+                              ->orWhere('name', 'like', '%Utilitas%')
+                              ->orWhere('name', 'like', '%Server%')
+                              ->orWhere('name', 'like', '%Langganan%')
+                              ->orWhere('name', 'like', '%Operasional%');
+                        })->first();
+
+                    if ($category) {
+                        $reminder->category_id = $category->id;
+                    }
+
+                    $reminder->save();
+
+                    $recordedReminders[] = [
+                        'id' => $reminder->id,
+                        'action' => 'created',
+                        'title' => $reminder->title,
+                        'amount_minor' => $reminder->amount_minor,
+                        'due_date' => $reminder->due_date ? \Carbon\Carbon::parse($reminder->due_date)->format('Y-m-d') : null,
+                        'repeat_interval' => $reminder->repeat_interval,
+                    ];
+                } catch (\Throwable $e) {
+                    Log::error('[TenantAssistantService] Gagal mengeksekusi aksi tagihan/pengingat: ' . $e->getMessage());
+                }
+            }
+
+            if (!empty($recordedReminders)) {
+                $meta['recorded_reminders'] = $recordedReminders;
+                $replyContent = $cleanedFromReminder;
+
+                // Cegah respon halusinasi "Fitur tambah jadwal tagihan via chat belum tersedia"
+                if (preg_match('/Fitur\s+tambah\s+jadwal\s+tagihan\s+via\s+chat\s+belum\s+tersedia/i', $replyContent) ||
+                    preg_match('/Input\s+manual\s+lewat\s+menu\s+Tagihan/i', $replyContent) ||
+                    empty(trim($replyContent))) {
+                    $firstRem = $recordedReminders[0];
+                    $nominalFormatted = MoneyHelper::formatIdr((int) $firstRem['amount_minor']);
+                    $dueDateFormatted = $firstRem['due_date'] ? \Carbon\Carbon::parse($firstRem['due_date'])->translatedFormat('d F Y') : 'sesuai jadwal';
+                    $intervalLabel = match ($firstRem['repeat_interval'] ?? 'monthly') {
+                        'monthly' => 'setiap bulan',
+                        'weekly' => 'setiap minggu',
+                        'yearly' => 'setiap tahun',
+                        'daily' => 'setiap hari',
+                        default => 'sekali',
+                    };
+                    $replyContent = "Baik, jadwal tagihan {$firstRem['title']} sebesar {$nominalFormatted} (jatuh tempo {$dueDateFormatted}, {$intervalLabel}) telah berhasil dimasukkan ke dalam daftar Tagihan & Pengingat.";
+                }
+            }
+        }
+
         // 7. Bersihkan kalimat penutup klise repetitif (seperti "Ada transaksi lain?", "Transaksi lain?")
         $replyContent = $this->cleanRepetitiveClosingPhrases($replyContent);
 
@@ -612,8 +744,11 @@ class TenantAssistantService
         $isNegatedOrQuestion = (bool) preg_match('/\b(belum|jangan|tidak|bukan|kok|kenapa|mengapa)\s+(?:pernah\s+)?(?:di)?(?:catat|simpan|masuk|input|perbarui|update)\b/i', $userMessageText)
             && !preg_match('/\b(tolong\s+catat|sekarang\s+catat|catat\s+ulang|masukkan\s+ulang|buatkan\s+baru)\b/i', $userMessageText);
 
-        if ($isInformationalQuery || $isNegatedOrQuestion) {
-            // Bersihkan blok kode JSON action jika model AI keliru menyertakannya saat menjawab pertanyaan informasi atau klarifikasi
+        $isReminderScheduleIntent = (bool) preg_match('/\b(?:masuk(?:in|kan)?|jadwal(?:kan)?|tambah(?:kan)?|catat)\s+(?:ini\s+)?ke\s+tagihan\b/i', $userMessageText)
+            || (bool) preg_match('/\b(jadwal(?:kan)?|pengingat)\s+tagihan\b/i', $userMessageText);
+
+        if ($isInformationalQuery || $isNegatedOrQuestion || $isReminderScheduleIntent) {
+            // Bersihkan blok kode JSON action jika model AI keliru menyertakannya saat menjawab pertanyaan informasi atau penjadwalan tagihan
             $cleaned = preg_replace('/```(?:json:transaction_action|json)?\s*(\[\s*\{.*?\}\s*\]|\{\s*"type"\s*:.*?\}\s*)\s*```/is', '', $replyContent);
             return [[], trim($cleaned ?: $replyContent)];
         }
@@ -1079,6 +1214,184 @@ class TenantAssistantService
         }
 
         return $content;
+    }
+
+    /**
+     * Memastikan skema tabel finance_reminders lengkap (category_id, images).
+     */
+    protected function ensureReminderSchema(): void
+    {
+        try {
+            $schema = Schema::connection('pekan');
+            if ($schema->hasTable('finance_reminders')) {
+                if (!$schema->hasColumn('finance_reminders', 'category_id')) {
+                    $schema->table('finance_reminders', function (Blueprint $table) {
+                        $table->uuid('category_id')->nullable()->after('tenant_id')->index();
+                    });
+                }
+                if (!$schema->hasColumn('finance_reminders', 'images')) {
+                    $schema->table('finance_reminders', function (Blueprint $table) {
+                        $table->json('images')->nullable()->after('description');
+                    });
+                }
+            }
+        } catch (\Throwable) {
+            // Abaikan jika migrasi sudah berjalan atau permission terbatas
+        }
+    }
+
+    /**
+     * Mengekstrak instruksi penjadwalan tagihan / pengingat baik dari blok JSON
+     * (json:reminder_action) maupun dari pola teks pesan pengguna secara heuristik.
+     */
+    protected function extractReminderActions(string $replyContent, string $userMessageText): array
+    {
+        // 1. Ekstraksi Primer: Blok ```json:reminder_action ... ```
+        if (preg_match('/```(?:json:reminder_action|reminder_action)?\s*(\[\s*\{.*?\}\s*\])\s*```/is', $replyContent, $matches)) {
+            $parsed = json_decode($matches[1], true);
+            if (is_array($parsed) && !empty($parsed)) {
+                $cleaned = trim(str_replace($matches[0], '', $replyContent));
+                return [$parsed, $cleaned];
+            }
+        }
+
+        // 2. Ekstraksi Sekunder: Blok objek tunggal ```json:reminder_action { ... } ```
+        if (preg_match('/```(?:json:reminder_action|reminder_action)?\s*(\{\s*"title"\s*:.*?\}\s*)\s*```/is', $replyContent, $matches)) {
+            $parsed = json_decode($matches[1], true);
+            if (is_array($parsed) && !empty($parsed)) {
+                $cleaned = trim(str_replace($matches[0], '', $replyContent));
+                return [[$parsed], $cleaned];
+            }
+        }
+
+        // 3. Ekstraksi Heuristik jika pengguna berniat menjadwalkan/memasukkan tagihan
+        // (contoh: "tolong masukan ini ke tagihan, Tagihan VPS everera 235rb setiap tanggal 1")
+        $isReminderScheduleIntent = (bool) preg_match('/\b(?:masuk(?:in|kan)?|jadwal(?:kan)?|tambah(?:kan)?|catat)\s+(?:ini\s+)?ke\s+tagihan\b/i', $userMessageText)
+            || (bool) preg_match('/\b(jadwal(?:kan)?|pengingat)\s+tagihan\b/i', $userMessageText)
+            || (bool) preg_match('/\btagihan\b.*?\b(?:setiap|tiap|jatuh\s+tempo|bulanan)\b/i', $userMessageText);
+
+        if ($isReminderScheduleIntent) {
+            $extracted = $this->extractReminderFromUserText($userMessageText);
+            if ($extracted) {
+                // Bersihkan blok tindakan yang mungkin salah
+                $cleaned = preg_replace('/```(?:json:reminder_action|reminder_action|json)?\s*[\s\S]*?```/i', '', $replyContent);
+                return [[$extracted], trim($cleaned ?: $replyContent)];
+            }
+        }
+
+        return [[], $replyContent];
+    }
+
+    /**
+     * Mengekstrak rincian jadwal tagihan secara heuristik dari kalimat pengguna.
+     */
+    protected function extractReminderFromUserText(string $userText): ?array
+    {
+        $amountMinor = 0;
+        // Cari nominal uang: 235rb, Rp 235.000, 235000, 235 ribu
+        if (preg_match('/(?:rp\.?\s*)?([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i', $userText, $am)) {
+            $amountMinor = $this->parseIndonesianNominal($am[0]);
+        }
+
+        if ($amountMinor <= 0) {
+            return null;
+        }
+
+        // Interval perulangan
+        $interval = 'monthly';
+        if (preg_match('/\b(sekali|hanya\s+sekali|satu\s+kali)\b/i', $userText)) {
+            $interval = 'once';
+        } elseif (preg_match('/\b(?:setiap|tiap)\s+minggu\b/i', $userText)) {
+            $interval = 'weekly';
+        } elseif (preg_match('/\b(?:setiap|tiap)\s+tahun\b/i', $userText)) {
+            $interval = 'yearly';
+        } elseif (preg_match('/\b(?:setiap|tiap)\s+hari\b/i', $userText)) {
+            $interval = 'daily';
+        }
+
+        $dueDate = $this->calculateNextDueDate(null, $interval, $userText);
+
+        // Resolusi Nama / Judul Tagihan
+        $title = '';
+        if (preg_match('/(?:ke\s+tagihan\s*,?\s*|\btagihan\s+:?\s*)([A-Za-z0-9\s\-_]{3,40}?)(?:\s+\d|\s+sebesar|\s+seharga|\s+setiap|\s+tiap|\s+tgl|\s+tanggal|\s+jatuh|\s*$)/i', $userText, $tm)) {
+            $candidate = trim($tm[1]);
+            if (!empty($candidate)) {
+                $title = stripos($candidate, 'tagihan') === false ? 'Tagihan ' . ucwords($candidate) : ucwords($candidate);
+            }
+        }
+
+        if (empty($title)) {
+            if (preg_match('/(?:untuk|buat|jadwal)\s+([A-Za-z0-9\s\-_]{3,35}?)(?:\s+\d|\s+sebesar|\s+seharga|\s+setiap|\s+tiap|\s+tgl|\s+tanggal|\s+jatuh|\s*$)/i', $userText, $tm2)) {
+                $candidate = trim($tm2[1]);
+                if (!empty($candidate)) {
+                    $title = 'Tagihan ' . ucwords($candidate);
+                }
+            }
+        }
+
+        if (empty($title)) {
+            $title = 'Tagihan Rutin';
+        }
+
+        return [
+            'action' => 'create',
+            'title' => $title,
+            'amount_minor' => $amountMinor,
+            'due_date' => $dueDate,
+            'repeat_interval' => $interval,
+            'description' => trim($userText),
+        ];
+    }
+
+    /**
+     * Menghitung tanggal jatuh tempo terdekat berikutnya dari hari ini berdasarkan interval dan teks pengguna.
+     */
+    protected function calculateNextDueDate(?string $dueDateStr, string $interval, string $userText): string
+    {
+        if (!empty($dueDateStr) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDateStr)) {
+            return $dueDateStr;
+        }
+
+        $today = now();
+
+        // Pola "setiap tanggal X" atau "tiap tanggal X" atau "tgl X"
+        if (preg_match('/(?:tanggal|tgl)\s*(\d{1,2})/i', $userText, $m)) {
+            $day = (int) $m[1];
+            if ($day >= 1 && $day <= 31) {
+                if ($day >= $today->day) {
+                    try {
+                        return $today->copy()->day($day)->toDateString();
+                    } catch (\Throwable) {
+                        return $today->copy()->endOfMonth()->toDateString();
+                    }
+                } else {
+                    try {
+                        return $today->copy()->addMonthNoOverflow()->day($day)->toDateString();
+                    } catch (\Throwable) {
+                        return $today->copy()->addMonthNoOverflow()->endOfMonth()->toDateString();
+                    }
+                }
+            }
+        }
+
+        if (preg_match('/\bbesok\b/i', $userText)) {
+            return $today->copy()->addDay()->toDateString();
+        }
+
+        if (preg_match('/\bminggu\s+depan\b/i', $userText)) {
+            return $today->copy()->addWeek()->toDateString();
+        }
+
+        if (preg_match('/\bbulan\s+depan\b/i', $userText)) {
+            return $today->copy()->addMonthNoOverflow()->toDateString();
+        }
+
+        return match ($interval) {
+            'weekly' => $today->copy()->addWeek()->toDateString(),
+            'yearly' => $today->copy()->addYear()->toDateString(),
+            'daily' => $today->copy()->addDay()->toDateString(),
+            default => $today->copy()->addMonthNoOverflow()->toDateString(),
+        };
     }
 }
 

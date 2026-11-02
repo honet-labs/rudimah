@@ -677,6 +677,77 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
+
+              <!-- Kartu Status Tagihan / Pengingat Berhasil Dijadwalkan / Diperbarui (Jika Ada) -->
+              <div
+                v-if="msg.metadata && msg.metadata.recorded_reminders && msg.metadata.recorded_reminders.length > 0"
+                class="mt-2 p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 w-full text-xs shadow-sm"
+              >
+                <div class="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <div class="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                    <svg class="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>
+                      {{
+                        msg.metadata.recorded_reminders.some((r: any) => r.action === 'updated')
+                          ? `${msg.metadata.recorded_reminders.length} Tagihan Berhasil Diperbarui di Sistem`
+                          : msg.metadata.recorded_reminders.some((r: any) => r.action === 'deleted')
+                          ? `${msg.metadata.recorded_reminders.length} Tagihan Berhasil Dihapus dari Sistem`
+                          : `${msg.metadata.recorded_reminders.length} Tagihan Berhasil Dijadwalkan ke Sistem`
+                      }}
+                    </span>
+                  </div>
+                  <a
+                    :href="`/t/${tenant.slug}/apps/pekan/reminders`"
+                    class="text-teal-700 dark:text-teal-400 hover:underline font-medium flex items-center gap-1 text-[11px] shrink-0"
+                  >
+                    <span>Buka Menu Tagihan</span>
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                </div>
+
+                <div class="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  <div
+                    v-for="(rem, idx) in msg.metadata.recorded_reminders"
+                    :key="rem.id || idx"
+                    class="py-1.5 flex items-center justify-between text-[11px]"
+                  >
+                    <div class="flex items-center gap-2 truncate pr-2">
+                      <span
+                        v-if="rem.action === 'updated'"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
+                      >
+                        Diperbarui
+                      </span>
+                      <span
+                        v-else-if="rem.action === 'deleted'"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300"
+                      >
+                        Dihapus
+                      </span>
+                      <span
+                        v-else
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                      >
+                        {{
+                          rem.repeat_interval === 'monthly' ? 'Bulanan' :
+                          rem.repeat_interval === 'weekly' ? 'Mingguan' :
+                          rem.repeat_interval === 'yearly' ? 'Tahunan' :
+                          rem.repeat_interval === 'daily' ? 'Harian' : 'Sekali'
+                        }}
+                      </span>
+                      <span class="text-slate-800 dark:text-slate-200 font-medium truncate">{{ rem.title }}</span>
+                      <span v-if="rem.due_date" class="text-[10px] text-slate-400 shrink-0 font-mono">(Jatuh Tempo: {{ rem.due_date }})</span>
+                    </div>
+                    <div class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">
+                      Rp {{ Number(rem.amount_minor || 0).toLocaleString('id-ID') }}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Typing indicator saat loading -->
