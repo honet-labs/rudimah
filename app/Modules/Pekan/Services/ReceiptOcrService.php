@@ -151,6 +151,11 @@ class ReceiptOcrService
             return [base64_encode($file->getContent()), $mimeType];
         }
 
+        // Jika berkas sudah berupa JPEG dengan ukuran ringan (hasil pra-kompresi browser <= 500KB), langsung gunakan tanpa proses GD ulang
+        if ($file->getSize() <= 500 * 1024 && in_array(strtolower($mimeType), ['image/jpeg', 'image/jpg'], true)) {
+            return [base64_encode($file->getContent()), 'image/jpeg'];
+        }
+
         try {
             $path = $file->getRealPath();
             if (!$path || !file_exists($path)) {

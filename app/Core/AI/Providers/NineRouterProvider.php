@@ -230,7 +230,7 @@ class NineRouterProvider implements AiProviderInterface
     }
   ]
 }
-Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pastikan total_minor = subtotal_minor + tax_minor + service_charge_minor - discount_minor.';
+Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pastikan total_minor = subtotal_minor + tax_minor + service_charge_minor - discount_minor. Kembalikan HANYA format JSON valid di atas tanpa teks pengantar, tanpa pemikiran/reasoning, dan tanpa markdown wrapper.';
 
         $normalizedMime = strtolower(trim($mimeType));
         if ($normalizedMime === 'image/jpg' || $normalizedMime === 'image/pjpeg') {
@@ -250,25 +250,24 @@ Catatan: Semua nilai nominal berupa integer dalam satuan Rupiah (tanpa sen). Pas
                             'type' => 'image_url',
                             'image_url' => [
                                 'url' => $dataUrl,
-                                'detail' => 'auto',
                             ],
                         ],
                     ],
                 ],
             ],
             'temperature' => 0.1,
-            'max_tokens' => 2048,
+            'max_tokens' => 1200,
             'stream' => false,
         ];
 
         try {
             $response = Http::withToken($apiKey)
-                ->timeout(45)
+                ->timeout(80)
                 ->post($url, $payload);
         } catch (\Throwable $e) {
             Log::error('9Router OCR API connection exception', ['model' => $model, 'error' => $e->getMessage()]);
             if (str_contains(strtolower($e->getMessage()), 'timed out') || str_contains(strtolower($e->getMessage()), 'timeout') || str_contains(strtolower($e->getMessage()), '28')) {
-                throw new \RuntimeException("Pemindaian struk melebihi batas waktu (45 detik). Model '{$model}' di 9Router kemungkinan tidak mendukung vision atau sedang mengalami latensi tinggi. Silakan pilih model vision (seperti gpt-4o-mini atau gemini-1.5-flash) di Administrasi Sistem.");
+                throw new \RuntimeException("Pemindaian struk melebihi batas waktu (80 detik). Model '{$model}' di 9Router kemungkinan tidak mendukung vision atau gateway sedang mengalami antrian/latensi tinggi. Silakan pilih model vision (seperti gpt-4o-mini atau gemini-1.5-flash) di Administrasi Sistem.");
             }
             throw new \RuntimeException("Gagal menghubungi layanan OCR 9Router ({$url}): " . $e->getMessage());
         }

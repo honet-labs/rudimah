@@ -165,7 +165,7 @@ Format JSON wajib:
 
         $payload = [
             'model' => $model,
-            'max_tokens' => 2048,
+            'max_tokens' => 1200,
             'messages' => [
                 [
                     'role' => 'user',
@@ -192,11 +192,11 @@ Format JSON wajib:
                 'x-api-key' => $apiKey,
                 'anthropic-version' => '2023-06-01',
                 'content-type' => 'application/json',
-            ])->timeout(45)->post($url, $payload);
+            ])->timeout(80)->post($url, $payload);
         } catch (\Throwable $e) {
             Log::error('Claude Vision exception', ['error' => $e->getMessage()]);
             if (str_contains(strtolower($e->getMessage()), 'timed out') || str_contains(strtolower($e->getMessage()), 'timeout') || str_contains(strtolower($e->getMessage()), '28')) {
-                throw new \RuntimeException("Pemindaian struk melebihi batas waktu (45 detik). Model '{$model}' pada Anthropic Claude kemungkinan sedang mengalami antrian tinggi atau tidak mendukung vision.");
+                throw new \RuntimeException("Pemindaian struk melebihi batas waktu (80 detik). Model '{$model}' pada Anthropic Claude kemungkinan sedang mengalami antrian tinggi atau tidak mendukung vision.");
             }
             throw new \RuntimeException("Gagal menghubungi model Vision Anthropic Claude: " . $e->getMessage());
         }

@@ -185,7 +185,7 @@ async function handleFileSelected(file: File) {
   formData.append('receipt_file', fileToUpload);
 
   const abortCtrl = new AbortController();
-  const timeoutId = setTimeout(() => abortCtrl.abort(), 50000);
+  const timeoutId = setTimeout(() => abortCtrl.abort(), 90000);
 
   try {
     const res = await secureFetch(`/t/${props.tenant.slug}/apps/pekan/receipt-scan/upload`, {
@@ -244,7 +244,7 @@ async function handleFileSelected(file: File) {
     }
   } catch (err: any) {
     if (err?.name === 'AbortError') {
-      errorMessage.value = 'Waktu proses pemindaian struk melebihi batas (timeout 50 detik). Silakan coba unggah kembali dengan foto struk yang lebih fokus atau periksa model vision di Administrasi Sistem.';
+      errorMessage.value = 'Waktu proses pemindaian struk melebihi batas (timeout 90 detik). Silakan coba unggah kembali dengan foto struk yang lebih fokus atau periksa koneksi dan model vision di Administrasi Sistem.';
     } else {
       errorMessage.value = 'Terjadi gangguan jaringan saat mengunggah struk: ' + (err.message || 'Koneksi gagal');
     }
