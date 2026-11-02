@@ -66,6 +66,7 @@ class PekanParityTest extends TestCase
         $this->assertNotNull($routes->getByName('pekan.transactions.update'));
         $this->assertNotNull($routes->getByName('pekan.budgets.edit'));
         $this->assertNotNull($routes->getByName('pekan.budgets.update'));
+        $this->assertNotNull($routes->getByName('pekan.budgets.transactions'));
         $this->assertNotNull($routes->getByName('pekan.savings.edit'));
         $this->assertNotNull($routes->getByName('pekan.savings.update'));
         $this->assertNotNull($routes->getByName('pekan.reminders.edit'));

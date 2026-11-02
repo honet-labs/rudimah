@@ -6,6 +6,7 @@ use App\Core\Applications\AppRegistry;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Models\FinanceBudget;
 use App\Modules\Pekan\Models\FinanceCategory;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -39,6 +40,38 @@ class BudgetController
             'tenants' => $tenants,
             'apps' => AppRegistry::all(),
             'budgets' => $budgets,
+        ]);
+    }
+
+    public function transactions(Request $request, string $tenantSlug, string $id): JsonResponse
+    {
+        $budgetId = $request->route('id') ?: $id;
+        $budget = FinanceBudget::with('category')->findOrFail($budgetId);
+
+        $transactions = $budget->getTransactionsQuery()
+            ->with(['category', 'account', 'items'])
+            ->orderByDesc('transaction_date')
+            ->orderByDesc('created_at')
+            ->get();
+
+        [$startDate, $endDate] = $budget->getDateRange();
+
+        return response()->json([
+            'success' => true,
+            'budget' => [
+                'id' => $budget->id,
+                'name' => $budget->name,
+                'category_name' => $budget->category_name,
+                'amount_limit_minor' => (int) $budget->amount_limit_minor,
+                'spent_amount_minor' => (int) $budget->spent_amount_minor,
+                'progress_percent' => (float) $budget->progress_percent,
+                'period_label' => $budget->period_label,
+                'start_date' => $startDate->toDateString(),
+                'end_date' => $endDate->toDateString(),
+            ],
+            'transactions' => $transactions,
+            'total_count' => $transactions->count(),
+            'total_spent_minor' => (int) $transactions->sum('amount_minor'),
         ]);
     }
 

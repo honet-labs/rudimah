@@ -109,13 +109,8 @@ class FinanceBudget extends Model
         return [$startDate, $endDate];
     }
 
-    public function recalculateSpentAmount(bool $force = false): int
+    public function getTransactionsQuery()
     {
-        // Kunci nominal anggaran jika periodenya sudah berakhir (masuk histori) agar tidak terus bertambah
-        if (!$force && ($this->is_past || $this->status === 'archived')) {
-            return (int) $this->spent_amount_minor;
-        }
-
         [$startDate, $endDate] = $this->getDateRange();
 
         $categoryIds = [];
@@ -151,6 +146,12 @@ class FinanceBudget extends Model
                     ->all();
                 $categoryIds = array_merge($categoryIds, $similarCats);
             }
+        } else {
+            $words = array_filter(
+                explode(' ', strtolower(preg_replace('/[^a-zA-Z0-9\s]/', ' ', $this->name))),
+                fn($w) => strlen($w) >= 3 && !in_array($w, ['dan', 'yang', 'atau', 'pos', 'anggaran'])
+            );
+            $catWords = array_values($words);
         }
 
         $query = FinanceTransaction::where('tenant_id', $this->tenant_id)
@@ -168,9 +169,25 @@ class FinanceBudget extends Model
                     }
                 }
             });
+        } elseif (!empty($catWords)) {
+            $query->where(function ($q) use ($catWords) {
+                foreach ($catWords as $word) {
+                    $q->orWhere('description', 'like', "%{$word}%");
+                }
+            });
         }
 
-        $spent = (int) $query->sum('amount_minor');
+        return $query;
+    }
+
+    public function recalculateSpentAmount(bool $force = false): int
+    {
+        // Kunci nominal anggaran jika periodenya sudah berakhir (masuk histori) agar tidak terus bertambah
+        if (!$force && ($this->is_past || $this->status === 'archived')) {
+            return (int) $this->spent_amount_minor;
+        }
+
+        $spent = (int) $this->getTransactionsQuery()->sum('amount_minor');
 
         if ($this->spent_amount_minor !== $spent) {
             $this->spent_amount_minor = $spent;

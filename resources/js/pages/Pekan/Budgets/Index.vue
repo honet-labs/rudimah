@@ -5,12 +5,16 @@ import RudimahAppShell from '../../../layouts/RudimahAppShell.vue';
 import RdPageHeader from '../../../design-system/RdPageHeader.vue';
 import RdCard from '../../../design-system/RdCard.vue';
 import RdButton from '../../../design-system/RdButton.vue';
+import RdInput from '../../../design-system/RdInput.vue';
+import RdTable from '../../../design-system/RdTable.vue';
+import RdDateTime from '../../../design-system/RdDateTime.vue';
 import RdMoney from '../../../design-system/RdMoney.vue';
 import RdBadge from '../../../design-system/RdBadge.vue';
+import RdModal from '../../../design-system/RdModal.vue';
 import RdEmptyState from '../../../design-system/RdEmptyState.vue';
 import RdConfirmDialog from '../../../design-system/RdConfirmDialog.vue';
 import type { User, Tenant } from '../../../types/core';
-import type { FinanceBudget } from '../../../types/pekan';
+import type { FinanceBudget, Transaction } from '../../../types/pekan';
 
 const props = withDefaults(
   defineProps<{
@@ -61,6 +65,80 @@ function handleDelete() {
     },
   });
 }
+
+// Modal Rincian Daftar Transaksi Anggaran
+const isTransactionsModalOpen = ref(false);
+const isLoadingTransactions = ref(false);
+const selectedBudgetForTransactions = ref<FinanceBudget | null>(null);
+const budgetTransactions = ref<Transaction[]>([]);
+const transactionsSearch = ref('');
+
+// Lightbox Pratinjau Foto Struk Transaksi
+const previewModalOpen = ref(false);
+const previewImage = ref<{ url: string; title: string; images?: any[] }>({ url: '', title: '', images: [] });
+
+function openPreview(url: string, title: string, images?: any[]) {
+  previewImage.value = { url, title, images: images || [] };
+  previewModalOpen.value = true;
+}
+
+async function viewBudgetTransactions(budget: FinanceBudget) {
+  selectedBudgetForTransactions.value = budget;
+  isTransactionsModalOpen.value = true;
+  isLoadingTransactions.value = true;
+  transactionsSearch.value = '';
+  budgetTransactions.value = [];
+
+  try {
+    const res = await fetch(`/t/${props.tenant.slug}/apps/pekan/budgets/${budget.id}/transactions`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.transactions)) {
+        budgetTransactions.value = data.transactions;
+        if (data.budget && data.budget.spent_amount_minor !== undefined) {
+          budget.spent_amount_minor = data.budget.spent_amount_minor;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Gagal mengambil daftar transaksi anggaran:', err);
+  } finally {
+    isLoadingTransactions.value = false;
+  }
+}
+
+const filteredBudgetTransactions = computed(() => {
+  if (!transactionsSearch.value.trim()) {
+    return budgetTransactions.value;
+  }
+  const q = transactionsSearch.value.trim().toLowerCase();
+  return budgetTransactions.value.filter((tx) => {
+    return (
+      (tx.description && tx.description.toLowerCase().includes(q)) ||
+      (tx.merchant_name && tx.merchant_name.toLowerCase().includes(q)) ||
+      (tx.category_name && tx.category_name.toLowerCase().includes(q)) ||
+      (tx.account_name && tx.account_name.toLowerCase().includes(q)) ||
+      (tx.payment_method && tx.payment_method.toLowerCase().includes(q)) ||
+      (tx.id && tx.id.toLowerCase().includes(q))
+    );
+  });
+});
+
+const totalFilteredSpentMinor = computed(() => {
+  return filteredBudgetTransactions.value.reduce((acc, tx) => acc + (tx.amount_minor || 0), 0);
+});
+
+const transactionColumns = [
+  { key: 'id', label: 'ID', width: '90px' },
+  { key: 'transaction_date', label: 'Tanggal', width: '115px' },
+  { key: 'merchant_name', label: 'Merchant', width: '130px' },
+  { key: 'description', label: 'Keterangan' },
+  { key: 'category_name', label: 'Kategori', width: '110px' },
+  { key: 'payment_method', label: 'Akun / Metode', width: '120px' },
+  { key: 'amount_minor', label: 'Nominal', width: '120px', align: 'right' as const },
+  { key: 'images', label: 'Struk', width: '75px', align: 'center' as const },
+  { key: 'actions', label: 'Aksi', width: '65px', align: 'center' as const },
+];
 </script>
 
 <template>
@@ -163,15 +241,47 @@ function handleDelete() {
           ></div>
         </div>
 
-        <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 mb-4">
-          <div>
-            <span class="block text-slate-400 text-[11px]">Realisasi</span>
-            <span class="font-semibold"><RdMoney :amount-minor="b.spent_amount_minor" /></span>
-          </div>
+        <!-- Realisasi & Batas Plafon (Dapat diklik untuk melihat rincian transaksi) -->
+        <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 mb-3">
+          <button
+            type="button"
+            @click="viewBudgetTransactions(b)"
+            class="text-left group cursor-pointer focus:outline-none"
+            title="Klik untuk melihat rincian transaksi"
+          >
+            <span class="block text-slate-400 group-hover:text-teal-600 dark:group-hover:text-teal-400 text-[11px] transition-colors flex items-center gap-1">
+              <span>Realisasi</span>
+              <svg class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </span>
+            <span class="font-semibold text-slate-900 dark:text-white group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors">
+              <RdMoney :amount-minor="b.spent_amount_minor" />
+            </span>
+          </button>
           <div class="text-right">
             <span class="block text-slate-400 text-[11px]">Batas Plafon</span>
             <span class="font-semibold"><RdMoney :amount-minor="b.amount_limit_minor" /></span>
           </div>
+        </div>
+
+        <!-- Tombol Aksi Lihat Transaksi Cepat -->
+        <div class="mb-3">
+          <button
+            type="button"
+            @click="viewBudgetTransactions(b)"
+            class="w-full py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-teal-700 dark:hover:text-teal-400 flex items-center justify-between transition-colors cursor-pointer group"
+          >
+            <div class="flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-slate-500 group-hover:text-teal-600 dark:text-slate-400 dark:group-hover:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+              <span>Lihat Rincian Transaksi</span>
+            </div>
+            <svg class="w-3 h-3 text-slate-400 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
 
         <div class="border-t border-slate-100 dark:border-slate-800 pt-3 flex items-center justify-between text-[11px] text-slate-400">
@@ -232,6 +342,230 @@ function handleDelete() {
       description="Anggaran belanja yang telah diarsipkan atau telah melewati batas akhir berlaku akan tersimpan di sini untuk dievaluasi."
     />
 
+    <!-- Modal Rincian Daftar Transaksi Anggaran -->
+    <RdModal
+      v-model="isTransactionsModalOpen"
+      :title="selectedBudgetForTransactions ? `Daftar Transaksi: ${selectedBudgetForTransactions.name}` : 'Daftar Transaksi Anggaran'"
+      max-width="4xl"
+    >
+      <div v-if="selectedBudgetForTransactions" class="space-y-4">
+        <!-- Panel Ringkasan Anggaran -->
+        <div class="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+            <div>
+              <span class="block text-slate-400 text-[11px] mb-0.5">Kategori Anggaran</span>
+              <span class="font-semibold text-slate-800 dark:text-slate-100">
+                {{ selectedBudgetForTransactions.category_name || 'Semua Kategori' }}
+              </span>
+            </div>
+            <div>
+              <span class="block text-slate-400 text-[11px] mb-0.5">Periode Evaluasi</span>
+              <span class="font-semibold text-slate-800 dark:text-slate-100">
+                {{ selectedBudgetForTransactions.period_label || 'Bulanan' }}
+              </span>
+            </div>
+            <div>
+              <span class="block text-slate-400 text-[11px] mb-0.5">Batas Plafon</span>
+              <span class="font-semibold text-slate-800 dark:text-slate-100">
+                <RdMoney :amount-minor="selectedBudgetForTransactions.amount_limit_minor" />
+              </span>
+            </div>
+            <div>
+              <span class="block text-slate-400 text-[11px] mb-0.5">Total Realisasi</span>
+              <span class="font-bold text-teal-800 dark:text-teal-300">
+                <RdMoney :amount-minor="selectedBudgetForTransactions.spent_amount_minor" />
+              </span>
+            </div>
+          </div>
+
+          <!-- Progress Bar & Sisa Plafon -->
+          <div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="text-slate-500">Penggunaan:</span>
+              <RdBadge :variant="selectedBudgetForTransactions.progress_percent >= 100 ? 'danger' : (selectedBudgetForTransactions.progress_percent >= 80 ? 'warning' : 'neutral')">
+                {{ Math.round(selectedBudgetForTransactions.progress_percent) }}%
+              </RdBadge>
+            </div>
+            <div class="text-slate-600 dark:text-slate-300 text-xs">
+              <span class="text-slate-400">Sisa Plafon: </span>
+              <span
+                class="font-semibold"
+                :class="selectedBudgetForTransactions.spent_amount_minor > selectedBudgetForTransactions.amount_limit_minor ? 'text-red-700 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'"
+              >
+                <RdMoney :amount-minor="Math.max(0, selectedBudgetForTransactions.amount_limit_minor - selectedBudgetForTransactions.spent_amount_minor)" />
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Pencarian Transaksi di Modal jika ada lebih dari 3 transaksi -->
+        <div v-if="budgetTransactions.length > 3" class="flex items-center gap-2">
+          <RdInput
+            v-model="transactionsSearch"
+            placeholder="Cari transaksi berdasarkan catatan, merchant, atau metode..."
+            class="w-full text-xs"
+          />
+        </div>
+
+        <!-- Tabel Transaksi -->
+        <div class="overflow-hidden">
+          <RdTable
+            :columns="transactionColumns"
+            :items="filteredBudgetTransactions"
+            :loading="isLoadingTransactions"
+            empty-text="Belum ada transaksi pengeluaran yang terhubung pada periode anggaran ini."
+          >
+            <template #id="{ value }">
+              <code
+                class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-nowrap select-all cursor-default"
+                :title="value"
+              >
+                #{{ value && value.length > 8 ? value.substring(0, 8) : value }}
+              </code>
+            </template>
+
+            <template #transaction_date="{ value }">
+              <RdDateTime :value="value" format="date" />
+            </template>
+
+            <template #merchant_name="{ item }">
+              <span class="text-slate-700 dark:text-slate-300 text-xs block truncate max-w-[130px]" :title="item.merchant_name || '-'">
+                {{ item.merchant_name || '-' }}
+              </span>
+            </template>
+
+            <template #description="{ item }">
+              <span class="font-medium text-slate-800 dark:text-slate-100 text-xs block truncate max-w-[180px]" :title="item.description || '-'">
+                {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : '-' }}
+              </span>
+            </template>
+
+            <template #category_name="{ value }">
+              <span class="text-xs text-slate-700 dark:text-slate-300">
+                {{ value || 'Tanpa Kategori' }}
+              </span>
+            </template>
+
+            <template #payment_method="{ item }">
+              <span class="text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                {{ item.account?.name || item.payment_method || 'Kas Utama' }}
+              </span>
+            </template>
+
+            <template #amount_minor="{ item }">
+              <span class="font-semibold text-slate-800 dark:text-slate-100 text-xs">
+                <RdMoney :amount-minor="item.amount_minor" />
+              </span>
+            </template>
+
+            <template #images="{ item }">
+              <div v-if="item.images && item.images.length > 0" class="flex items-center justify-center">
+                <button
+                  type="button"
+                  @click.stop="openPreview(item.images[0].url, `${item.merchant_name || item.description || 'Transaksi'} - Lampiran Struk`, item.images)"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  title="Lihat berkas lampiran struk"
+                >
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span>{{ item.images.length }}</span>
+                </button>
+              </div>
+              <span v-else class="text-xs text-slate-400">-</span>
+            </template>
+
+            <template #actions="{ item }">
+              <div class="flex items-center justify-center">
+                <a
+                  :href="`/t/${tenant.slug}/apps/pekan/transactions/${item.id}`"
+                  target="_blank"
+                  title="Buka detail transaksi di tab baru"
+                  class="p-1 text-slate-500 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors inline-flex items-center justify-center cursor-pointer"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              </div>
+            </template>
+          </RdTable>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="w-full flex items-center justify-between">
+          <div class="text-xs text-slate-500">
+            <span v-if="filteredBudgetTransactions.length > 0">
+              Total: <span class="font-semibold text-slate-800 dark:text-slate-200">{{ filteredBudgetTransactions.length }} transaksi</span> (<RdMoney :amount-minor="totalFilteredSpentMinor" />)
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <a
+              v-if="selectedBudgetForTransactions"
+              :href="`/t/${tenant.slug}/apps/pekan/transactions?search=${encodeURIComponent(selectedBudgetForTransactions.category_name || selectedBudgetForTransactions.name)}`"
+              class="inline-flex"
+            >
+              <RdButton variant="outline" size="sm">
+                Buka di Menu Transaksi
+              </RdButton>
+            </a>
+            <RdButton variant="secondary" size="sm" @click="isTransactionsModalOpen = false">
+              Tutup
+            </RdButton>
+          </div>
+        </div>
+      </template>
+    </RdModal>
+
+    <!-- Modal Lightbox Pratinjau Foto Struk Transaksi -->
+    <RdModal
+      v-model="previewModalOpen"
+      :title="previewImage.title"
+      max-width="lg"
+    >
+      <div class="space-y-4">
+        <div class="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-black/5 dark:bg-black/30 flex items-center justify-center min-h-[260px]">
+          <img
+            :src="previewImage.url"
+            :alt="previewImage.title"
+            class="max-h-[70vh] w-auto max-w-full object-contain mx-auto rounded"
+          />
+        </div>
+        <!-- Thumbnail galeri jika terdapat lebih dari 1 lampiran gambar -->
+        <div v-if="previewImage.images && previewImage.images.length > 1" class="flex items-center gap-2 overflow-x-auto pb-1">
+          <button
+            v-for="(subImg, sIdx) in previewImage.images"
+            :key="sIdx"
+            type="button"
+            @click="previewImage.url = subImg.url"
+            :class="[
+              'w-14 h-14 rounded border-2 overflow-hidden shrink-0 transition-all cursor-pointer',
+              previewImage.url === subImg.url ? 'border-teal-600 scale-105' : 'border-slate-200 dark:border-slate-700 opacity-60 hover:opacity-100'
+            ]"
+            :title="subImg.name || `Lampiran ${sIdx + 1}`"
+          >
+            <img :src="subImg.url" :alt="subImg.name || `Gambar ${sIdx + 1}`" class="w-full h-full object-cover" />
+          </button>
+        </div>
+        <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <span>Bukti Foto Struk</span>
+          <a
+            :href="previewImage.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 dark:text-teal-400 font-medium hover:underline"
+          >
+            <span>Buka Gambar Penuh</span>
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </RdModal>
+
     <!-- Dialog Konfirmasi Hapus Anggaran -->
     <RdConfirmDialog
       v-model="isDeleteDialogOpen"
@@ -244,3 +578,4 @@ function handleDelete() {
     />
   </RudimahAppShell>
 </template>
+
