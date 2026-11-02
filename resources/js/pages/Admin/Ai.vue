@@ -87,7 +87,7 @@ const aiForm = ref({
   '9router': {
     api_endpoint: props.aiSettings?.providers?.['9router']?.api_endpoint || 'https://api.9router.com/v1',
     api_key: '',
-    model: props.aiSettings?.providers?.['9router']?.model || 'high-models-agent',
+    model: props.aiSettings?.providers?.['9router']?.model || 'gpt-4o-mini',
   },
 });
 

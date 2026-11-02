@@ -27,8 +27,14 @@ class OpenAiProvider implements AiProviderInterface
     public function chat(array $messages, array $options = []): array
     {
         $model = $options['model'] ?? $this->defaultModel;
+        $endpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : $this->apiBaseUrl;
+        if (empty($endpoint)) {
+            $endpoint = rtrim(config('rudimah.ai.openai_endpoint', 'https://api.openai.com/v1'), '/');
+        }
 
-        if (empty($this->apiKey)) {
+        $apiKey = !empty($this->apiKey) ? $this->apiKey : (string) config('rudimah.ai.openai_key', '');
+
+        if (empty($apiKey)) {
             throw new \RuntimeException('Kunci API OpenAI belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
         }
 
@@ -49,12 +55,12 @@ class OpenAiProvider implements AiProviderInterface
         ];
 
         try {
-            $response = Http::withToken($this->apiKey)
+            $response = Http::withToken($apiKey)
                 ->timeout(60)
-                ->post("{$this->apiBaseUrl}/chat/completions", $payload);
+                ->post("{$endpoint}/chat/completions", $payload);
         } catch (\Throwable $e) {
             Log::error('OpenAI API exception', ['error' => $e->getMessage()]);
-            throw new \RuntimeException("Gagal menghubungi layanan OpenAI ({$this->apiBaseUrl}): " . $e->getMessage());
+            throw new \RuntimeException("Gagal menghubungi layanan OpenAI ({$endpoint}): " . $e->getMessage());
         }
 
         if ($response->successful()) {

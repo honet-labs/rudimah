@@ -358,7 +358,7 @@ const categoryOptions = computed(() => {
       ]"
     >
       <template #actions>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-2">
           <RdBadge
             :variant="isAiConnected ? 'success' : 'danger'"
             size="sm"
@@ -366,18 +366,7 @@ const categoryOptions = computed(() => {
             :title="isAiConnected ? 'Layanan AI terhubung dan siap digunakan' : 'Layanan AI belum terhubung atau kunci API belum dikonfigurasi'"
           >
             <span :class="['w-1.5 h-1.5 rounded-full inline-block shrink-0', isAiConnected ? 'bg-teal-600 dark:bg-teal-400' : 'bg-red-500']"></span>
-            <span>Status: {{ isAiConnected ? 'Terhubung' : 'Terputus' }}</span>
-          </RdBadge>
-
-          <RdBadge
-            v-if="props.ai_engine?.model"
-            variant="neutral"
-            size="sm"
-            class="items-center gap-1 font-mono text-[11px]"
-            :title="'Penyedia & Model aktif dari Administrasi Sistem: ' + (props.ai_engine?.provider_name || '') + ' (' + props.ai_engine?.model + ')'"
-          >
-            <span class="text-slate-500">{{ props.ai_engine?.provider_name }}:</span>
-            <span class="font-semibold text-slate-800 dark:text-slate-200">{{ props.ai_engine?.model }}</span>
+            <span>Status AI: {{ isAiConnected ? 'Terhubung' : 'Terputus' }}</span>
           </RdBadge>
         </div>
       </template>

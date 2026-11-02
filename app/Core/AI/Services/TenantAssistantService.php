@@ -168,8 +168,8 @@ class TenantAssistantService
             ? $setting->api_endpoint
             : ($activeDetails['api_endpoint'] ?? config("rudimah.ai.{$normalizedProvider}_endpoint"));
 
-        // Jika percakapan lama memiliki provider yang berbeda atau belum terset, sinkronkan ke provider aktif
-        if ($conversation->provider !== $activeProvider || empty($conversation->model)) {
+        // Jika percakapan lama memiliki provider atau model yang berbeda dari konfigurasi aktif, sinkronkan ke konfigurasi aktif
+        if ($conversation->provider !== $activeProvider || $conversation->model !== $activeModel) {
             $conversation->update([
                 'provider' => $activeProvider,
                 'model' => $activeModel,

@@ -33,7 +33,9 @@ class ClaudeProvider implements AiProviderInterface
             $endpoint = rtrim(config('rudimah.ai.claude_endpoint', 'https://api.anthropic.com/v1'), '/');
         }
 
-        if (empty($this->apiKey)) {
+        $apiKey = !empty($this->apiKey) ? $this->apiKey : (string) config('rudimah.ai.claude_key', '');
+
+        if (empty($apiKey)) {
             throw new \RuntimeException('Kunci API Anthropic Claude belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
         }
 
@@ -69,7 +71,7 @@ class ClaudeProvider implements AiProviderInterface
 
         try {
             $response = Http::withHeaders([
-                'x-api-key' => $this->apiKey,
+                'x-api-key' => $apiKey,
                 'anthropic-version' => '2023-06-01',
                 'content-type' => 'application/json',
             ])->timeout(45)->post($url, $payload);

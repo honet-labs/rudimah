@@ -26,47 +26,29 @@ class PlatformAiService
         $isEnabled = filter_var($dbSettings->get('ai_enabled', '1'), FILTER_VALIDATE_BOOLEAN);
 
         // 1. Google Gemini
-        $geminiRawKey = $dbSettings->get('ai_gemini_key', env('GEMINI_API_KEY', ''));
-        $geminiEndpoint = $dbSettings->get('ai_gemini_endpoint', 'https://generativelanguage.googleapis.com');
-        $geminiModel = $dbSettings->get('ai_gemini_model', 'gemini-1.5-flash');
+        $geminiRawKey = $dbSettings->get('ai_gemini_key', config('rudimah.ai.gemini_key', env('GEMINI_API_KEY', '')));
+        $geminiEndpoint = $dbSettings->get('ai_gemini_endpoint', config('rudimah.ai.gemini_endpoint', 'https://generativelanguage.googleapis.com'));
+        $geminiModel = $dbSettings->get('ai_gemini_model', config('rudimah.ai.gemini_model', 'gemini-1.5-flash'));
 
         // 2. OpenAI
-        $openaiRawKey = $dbSettings->get('ai_openai_key', env('OPENAI_API_KEY', ''));
-        $openaiEndpoint = $dbSettings->get('ai_openai_endpoint', 'https://api.openai.com/v1');
-        $openaiModel = $dbSettings->get('ai_openai_model', 'gpt-4o-mini');
+        $openaiRawKey = $dbSettings->get('ai_openai_key', config('rudimah.ai.openai_key', env('OPENAI_API_KEY', '')));
+        $openaiEndpoint = $dbSettings->get('ai_openai_endpoint', config('rudimah.ai.openai_endpoint', 'https://api.openai.com/v1'));
+        $openaiModel = $dbSettings->get('ai_openai_model', config('rudimah.ai.openai_model', 'gpt-4o-mini'));
 
         // 3. Anthropic Claude
-        $claudeRawKey = $dbSettings->get('ai_claude_key', env('CLAUDE_API_KEY', ''));
-        $claudeEndpoint = $dbSettings->get('ai_claude_endpoint', 'https://api.anthropic.com/v1');
-        $claudeModel = $dbSettings->get('ai_claude_model', 'claude-3-5-sonnet-20241022');
+        $claudeRawKey = $dbSettings->get('ai_claude_key', config('rudimah.ai.claude_key', env('CLAUDE_API_KEY', '')));
+        $claudeEndpoint = $dbSettings->get('ai_claude_endpoint', config('rudimah.ai.claude_endpoint', 'https://api.anthropic.com/v1'));
+        $claudeModel = $dbSettings->get('ai_claude_model', config('rudimah.ai.claude_model', 'claude-3-5-sonnet-20241022'));
 
         // 4. 9Router AI Gateway
-        $routerRawKey = $dbSettings->get('ai_9router_key', $dbSettings->get('ai_ninerouter_key', env('NINEROUTER_API_KEY', '')));
-        $routerEndpoint = $dbSettings->get('ai_9router_endpoint', $dbSettings->get('ai_ninerouter_endpoint', 'https://api.9router.com/v1'));
-        $routerModel = $dbSettings->get('ai_9router_model', $dbSettings->get('ai_ninerouter_model', 'high-models-agent'));
-
-        $providerKeyStatus = [
-            'openai' => !empty($openaiRawKey),
-            'gemini' => !empty($geminiRawKey),
-            'claude' => !empty($claudeRawKey),
-            '9router' => !empty($routerRawKey),
-        ];
-
-        // Jika active_provider yang tersimpan tidak memiliki kredensial API tetapi penyedia lain memilikinya,
-        // alihkan default aktif ke penyedia yang telah dikonfigurasi (misal OpenAI) agar tidak gagal panggil
-        if (empty($providerKeyStatus[$activeProvider])) {
-            foreach (['openai', 'gemini', 'claude', '9router'] as $pCode) {
-                if (!empty($providerKeyStatus[$pCode])) {
-                    $activeProvider = $pCode;
-                    break;
-                }
-            }
-        }
+        $routerRawKey = $dbSettings->get('ai_9router_key', $dbSettings->get('ai_ninerouter_key', config('rudimah.ai.9router_key', config('rudimah.ai.ninerouter_key', env('NINEROUTER_API_KEY', '')))));
+        $routerEndpoint = $dbSettings->get('ai_9router_endpoint', $dbSettings->get('ai_ninerouter_endpoint', config('rudimah.ai.9router_endpoint', config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1'))));
+        $routerModel = $dbSettings->get('ai_9router_model', $dbSettings->get('ai_ninerouter_model', config('rudimah.ai.9router_model', config('rudimah.ai.ninerouter_model', 'gpt-4o-mini'))));
 
         $activeModel = match ($activeProvider) {
             'openai' => $openaiModel ?: 'gpt-4o-mini',
             'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
-            '9router' => $routerModel ?: 'high-models-agent',
+            '9router' => $routerModel ?: 'gpt-4o-mini',
             default => $geminiModel ?: 'gemini-1.5-flash',
         };
 
@@ -114,7 +96,7 @@ class PlatformAiService
                     'api_key' => '',
                     'has_api_key' => !empty($routerRawKey),
                     'api_endpoint' => $routerEndpoint ?: 'https://api.9router.com/v1',
-                    'model' => $routerModel ?: 'high-models-agent',
+                    'model' => $routerModel ?: 'gpt-4o-mini',
                     'is_configured' => !empty($routerRawKey),
                 ],
             ],
@@ -127,7 +109,8 @@ class PlatformAiService
     public static function saveSettings(array $data): void
     {
         if (isset($data['active_provider'])) {
-            SystemSetting::set('ai_default_provider', trim($data['active_provider']), 'ai');
+            $norm = (strtolower($data['active_provider']) === 'ninerouter') ? '9router' : strtolower($data['active_provider']);
+            SystemSetting::set('ai_default_provider', trim($norm), 'ai');
         }
 
         if (isset($data['is_enabled'])) {
@@ -146,15 +129,27 @@ class PlatformAiService
                 $cfg = $data[$p];
 
                 if (isset($cfg['api_endpoint'])) {
-                    SystemSetting::set("ai_{$p}_endpoint", rtrim(trim($cfg['api_endpoint']), '/'), 'ai');
+                    $ep = rtrim(trim($cfg['api_endpoint']), '/');
+                    SystemSetting::set("ai_{$p}_endpoint", $ep, 'ai');
+                    if ($p === '9router') {
+                        SystemSetting::set("ai_ninerouter_endpoint", $ep, 'ai');
+                    }
                 }
 
                 if (isset($cfg['model']) && !empty($cfg['model'])) {
-                    SystemSetting::set("ai_{$p}_model", trim($cfg['model']), 'ai');
+                    $m = trim($cfg['model']);
+                    SystemSetting::set("ai_{$p}_model", $m, 'ai');
+                    if ($p === '9router') {
+                        SystemSetting::set("ai_ninerouter_model", $m, 'ai');
+                    }
                 }
 
                 if (!empty($cfg['api_key']) && $cfg['api_key'] !== '******') {
-                    SystemSetting::set("ai_{$p}_key", trim($cfg['api_key']), 'ai', true);
+                    $k = trim($cfg['api_key']);
+                    SystemSetting::set("ai_{$p}_key", $k, 'ai', true);
+                    if ($p === '9router') {
+                        SystemSetting::set("ai_ninerouter_key", $k, 'ai', true);
+                    }
                 }
             }
         }
@@ -173,42 +168,26 @@ class PlatformAiService
             $rawActive = $settings->get('ai_default_provider', config('rudimah.ai.default_provider', env('AI_DEFAULT_PROVIDER', 'gemini')));
             $activeProvider = (strtolower($rawActive) === 'ninerouter') ? '9router' : strtolower($rawActive);
             
-            $geminiKey = $settings->get('ai_gemini_key', env('GEMINI_API_KEY', ''));
-            $geminiEndpoint = $settings->get('ai_gemini_endpoint', 'https://generativelanguage.googleapis.com');
-            $geminiModel = $settings->get('ai_gemini_model', 'gemini-1.5-flash');
+            $geminiKey = $settings->get('ai_gemini_key', config('rudimah.ai.gemini_key', env('GEMINI_API_KEY', '')));
+            $geminiEndpoint = $settings->get('ai_gemini_endpoint', config('rudimah.ai.gemini_endpoint', 'https://generativelanguage.googleapis.com'));
+            $geminiModel = $settings->get('ai_gemini_model', config('rudimah.ai.gemini_model', 'gemini-1.5-flash'));
 
-            $openaiKey = $settings->get('ai_openai_key', env('OPENAI_API_KEY', ''));
-            $openaiEndpoint = $settings->get('ai_openai_endpoint', 'https://api.openai.com/v1');
-            $openaiModel = $settings->get('ai_openai_model', 'gpt-4o-mini');
+            $openaiKey = $settings->get('ai_openai_key', config('rudimah.ai.openai_key', env('OPENAI_API_KEY', '')));
+            $openaiEndpoint = $settings->get('ai_openai_endpoint', config('rudimah.ai.openai_endpoint', 'https://api.openai.com/v1'));
+            $openaiModel = $settings->get('ai_openai_model', config('rudimah.ai.openai_model', 'gpt-4o-mini'));
 
-            $claudeKey = $settings->get('ai_claude_key', env('CLAUDE_API_KEY', ''));
-            $claudeEndpoint = $settings->get('ai_claude_endpoint', 'https://api.anthropic.com/v1');
-            $claudeModel = $settings->get('ai_claude_model', 'claude-3-5-sonnet-20241022');
+            $claudeKey = $settings->get('ai_claude_key', config('rudimah.ai.claude_key', env('CLAUDE_API_KEY', '')));
+            $claudeEndpoint = $settings->get('ai_claude_endpoint', config('rudimah.ai.claude_endpoint', 'https://api.anthropic.com/v1'));
+            $claudeModel = $settings->get('ai_claude_model', config('rudimah.ai.claude_model', 'claude-3-5-sonnet-20241022'));
 
-            $routerKey = $settings->get('ai_9router_key', $settings->get('ai_ninerouter_key', env('NINEROUTER_API_KEY', '')));
-            $routerEndpoint = $settings->get('ai_9router_endpoint', $settings->get('ai_ninerouter_endpoint', 'https://api.9router.com/v1'));
-            $routerModel = $settings->get('ai_9router_model', $settings->get('ai_ninerouter_model', 'high-models-agent'));
-
-            $providerKeyStatus = [
-                'openai' => !empty($openaiKey),
-                'gemini' => !empty($geminiKey),
-                'claude' => !empty($claudeKey),
-                '9router' => !empty($routerKey),
-            ];
-
-            if (empty($providerKeyStatus[$activeProvider])) {
-                foreach (['openai', 'gemini', 'claude', '9router'] as $pCode) {
-                    if (!empty($providerKeyStatus[$pCode])) {
-                        $activeProvider = $pCode;
-                        break;
-                    }
-                }
-            }
+            $routerKey = $settings->get('ai_9router_key', $settings->get('ai_ninerouter_key', config('rudimah.ai.9router_key', config('rudimah.ai.ninerouter_key', env('NINEROUTER_API_KEY', '')))));
+            $routerEndpoint = $settings->get('ai_9router_endpoint', $settings->get('ai_ninerouter_endpoint', config('rudimah.ai.9router_endpoint', config('rudimah.ai.ninerouter_endpoint', 'https://api.9router.com/v1'))));
+            $routerModel = $settings->get('ai_9router_model', $settings->get('ai_ninerouter_model', config('rudimah.ai.9router_model', config('rudimah.ai.ninerouter_model', 'gpt-4o-mini'))));
 
             $activeModel = match ($activeProvider) {
                 'openai' => $openaiModel ?: 'gpt-4o-mini',
                 'claude' => $claudeModel ?: 'claude-3-5-sonnet-20241022',
-                '9router' => $routerModel ?: 'high-models-agent',
+                '9router' => $routerModel ?: 'gpt-4o-mini',
                 default => $geminiModel ?: 'gemini-1.5-flash',
             };
 

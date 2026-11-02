@@ -14,9 +14,9 @@ class NineRouterProvider implements AiProviderInterface
 
     public function __construct(?string $apiKey = null, ?string $defaultModel = null, ?string $apiBaseUrl = null)
     {
-        $this->apiKey = $apiKey ?: (string) config('rudimah.ai.ninerouter_key', env('NINEROUTER_API_KEY', ''));
-        $this->defaultModel = $defaultModel ?: config('rudimah.ai.ninerouter_model', 'high-models-agent');
-        $this->apiBaseUrl = rtrim($apiBaseUrl ?: config('rudimah.ai.ninerouter_endpoint', env('NINEROUTER_API_ENDPOINT', 'https://api.9router.com/v1')), '/');
+        $this->apiKey = $apiKey ?: (string) config('rudimah.ai.9router_key', config('rudimah.ai.ninerouter_key', env('NINEROUTER_API_KEY', '')));
+        $this->defaultModel = $defaultModel ?: config('rudimah.ai.9router_model', config('rudimah.ai.ninerouter_model', 'gpt-4o-mini'));
+        $this->apiBaseUrl = rtrim($apiBaseUrl ?: config('rudimah.ai.9router_endpoint', config('rudimah.ai.ninerouter_endpoint', env('NINEROUTER_API_ENDPOINT', 'https://api.9router.com/v1'))), '/');
     }
 
     public function getName(): string
@@ -58,7 +58,7 @@ class NineRouterProvider implements AiProviderInterface
         ];
 
         try {
-            $response = Http::withToken($this->apiKey)
+            $response = Http::withToken($apiKey)
                 ->timeout(60)
                 ->post($url, $payload);
         } catch (\Throwable $e) {

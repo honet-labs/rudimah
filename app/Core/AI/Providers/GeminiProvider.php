@@ -26,7 +26,9 @@ class GeminiProvider implements AiProviderInterface
     {
         $model = $options['model'] ?? $this->defaultModel;
 
-        if (empty($this->apiKey)) {
+        $apiKey = !empty($this->apiKey) ? $this->apiKey : (string) config('rudimah.ai.gemini_key', '');
+
+        if (empty($apiKey)) {
             throw new \RuntimeException('Kunci API Google Gemini belum dikonfigurasi di Pusat Konfigurasi AI Platform.');
         }
 
@@ -56,7 +58,8 @@ class GeminiProvider implements AiProviderInterface
             $payload['systemInstruction'] = $systemInstruction;
         }
 
-        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$this->apiKey}";
+        $baseEndpoint = !empty($options['api_endpoint']) ? rtrim($options['api_endpoint'], '/') : rtrim(config('rudimah.ai.gemini_endpoint', 'https://generativelanguage.googleapis.com'), '/');
+        $endpoint = "{$baseEndpoint}/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
         try {
             $response = Http::timeout(45)->post($endpoint, $payload);

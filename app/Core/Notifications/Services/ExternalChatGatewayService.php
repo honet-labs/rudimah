@@ -4,6 +4,7 @@ namespace App\Core\Notifications\Services;
 
 use App\Core\AI\AiProviderManager;
 use App\Core\AI\Models\AiConversation;
+use App\Core\AI\Models\TenantAiSetting;
 use App\Core\AI\Services\PlatformAiService;
 use App\Core\AI\Services\TenantAssistantService;
 use App\Core\Identity\Models\ExternalChatPairing;
@@ -272,11 +273,24 @@ class ExternalChatGatewayService
             PlatformAiService::applyRuntimeConfig();
             $platformSettings = PlatformAiService::getSettings();
             $activePlatformProvider = $platformSettings['active_provider'] ?? config('rudimah.ai.default_provider', 'gemini');
-            $activeDetails = $platformSettings['providers'][$activePlatformProvider] ?? [];
-            $modelName = $activeDetails['model'] ?? '';
-            $endpoint = $activeDetails['api_endpoint'] ?? null;
 
-            $provider = $this->providerManager->resolve($activePlatformProvider);
+            $tenantSetting = TenantAiSetting::where('tenant_id', $session->tenant_id)->first();
+            $hasCustomKey = !empty($tenantSetting?->api_key_encrypted) && !empty($tenantSetting?->api_key);
+            $isUsingCustom = $hasCustomKey && !empty($tenantSetting?->provider);
+
+            $providerCode = $isUsingCustom ? $tenantSetting->provider : $activePlatformProvider;
+            $normalizedProvider = (strtolower($providerCode) === 'ninerouter') ? '9router' : strtolower($providerCode);
+            $activeDetails = $isUsingCustom ? [] : ($platformSettings['providers'][$normalizedProvider] ?? []);
+
+            $modelName = $isUsingCustom
+                ? ($tenantSetting->model ?: ($activeDetails['model'] ?? ''))
+                : ($activeDetails['model'] ?? config("rudimah.ai.{$normalizedProvider}_model", ''));
+
+            $endpoint = $isUsingCustom
+                ? $tenantSetting->api_endpoint
+                : ($activeDetails['api_endpoint'] ?? config("rudimah.ai.{$normalizedProvider}_endpoint"));
+
+            $provider = $this->providerManager->resolve($normalizedProvider, $tenantSetting);
             $extracted = $provider->extractReceipt($fileBase64, $mimeType, [
                 'model' => $modelName,
                 'api_endpoint' => $endpoint,
