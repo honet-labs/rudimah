@@ -416,12 +416,13 @@ const transactionColumns = [
           />
         </div>
 
-        <!-- 1. Tampilan Desktop (Tabel Fit Penuh Tanpa Scrollbar Horizontal) -->
+        <!-- 1. Tampilan Desktop (Tabel Fit Penuh Tanpa Scrollbar Horizontal, Scroll Internal Vertikal saat Transaksi > 8-10 Baris) -->
         <div class="hidden md:block overflow-hidden">
           <RdTable
             :columns="transactionColumns"
             :items="filteredBudgetTransactions"
             :loading="isLoadingTransactions"
+            max-height="460px"
             empty-text="Belum ada transaksi pengeluaran yang terhubung pada periode anggaran ini."
           >
             <!-- Kolom 1: Tanggal & ID Ringkas -->

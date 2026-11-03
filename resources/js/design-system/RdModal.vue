@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, watch } from 'vue';
 import RdInfoTooltip from './RdInfoTooltip.vue';
 
 const props = withDefaults(
@@ -30,12 +30,29 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+watch(
+  () => props.modelValue,
+  (val) => {
+    if (typeof document !== 'undefined') {
+      if (val) {
+        document.body.classList.add('overflow-hidden');
+      } else {
+        document.body.classList.remove('overflow-hidden');
+      }
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown);
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
+  if (typeof document !== 'undefined') {
+    document.body.classList.remove('overflow-hidden');
+  }
 });
 </script>
 

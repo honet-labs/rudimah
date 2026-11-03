@@ -12,6 +12,7 @@ withDefaults(
     items?: Record<string, any>[];
     loading?: boolean;
     emptyText?: string;
+    maxHeight?: string;
   }>(),
   {
     items: () => [],
@@ -23,9 +24,17 @@ withDefaults(
 
 <template>
   <div class="w-full overflow-hidden border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 shadow-xs">
-    <div class="overflow-x-auto">
+    <div
+      class="overflow-x-auto"
+      :style="maxHeight ? { maxHeight, overflowY: 'auto' } : undefined"
+    >
       <table class="w-full text-left text-sm text-slate-700 dark:text-slate-300">
-        <thead class="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-xs uppercase font-semibold text-slate-600 dark:text-slate-400">
+        <thead
+          :class="[
+            'border-b border-slate-200 dark:border-slate-800 text-xs uppercase font-semibold text-slate-600 dark:text-slate-400',
+            maxHeight ? 'sticky top-0 z-10' : 'bg-slate-50 dark:bg-slate-800/80'
+          ]"
+        >
           <tr>
             <th
               v-for="col in columns"
@@ -33,6 +42,7 @@ withDefaults(
               :style="{ width: col.width }"
               :class="[
                 'px-4 py-3',
+                maxHeight ? 'sticky top-0 z-10 bg-slate-50 dark:bg-slate-800' : '',
                 col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
               ]"
             >
