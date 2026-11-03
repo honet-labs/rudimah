@@ -292,7 +292,11 @@ class TenantFinancialContextBuilder
         $prompt .= "  }\n";
         $prompt .= "]\n";
         $prompt .= "```\n";
-        $prompt .= "PENTING: Blok ```json:transaction_action``` HANYA boleh disertakan jika pengguna secara eksplisit meminta membuat, mengubah, atau menghapus transaksi. DILARANG menyertakannya jika pengguna hanya bertanya informasi, saldo, atau konsultasi.\n\n";
+        $prompt .= "PENTING & WAJIB:\n";
+        $prompt .= "1. Blok ```json:transaction_action``` adalah SATU-SATUNYA cara sistem backend mengeksekusi dan menyimpan mutasi transaksi ke database. Jika pengguna meminta mencatat, menambah, menginput, atau melaporkan pengeluaran/pemasukan baru, Anda WAJIB MENYERTAKAN blok ```json:transaction_action```!\n";
+        $prompt .= "2. JANGAN PERNAH hanya menjawab dengan kalimat teks tanpa menyertakan blok ```json:transaction_action``` saat pengguna meminta pencatatan transaksi.\n";
+        $prompt .= "3. DILARANG KERAS menulis atau meniru format sistem teknis seperti '[Info Sistem: Mutasi yang diproses: ...]' atau mengarang ID mutasi sendiri. Seluruh data transaksi wajib dideklarasikan di dalam blok ```json:transaction_action```.\n";
+        $prompt .= "4. DILARANG menyertakan blok ```json:transaction_action``` jika pengguna HANYA bertanya informasi saldo, daftar mutasi, anggaran, atau sekadar konsultasi umum.\n\n";
         $prompt .= "=== PEDOMAN RESPON PERCAKAPAN (JELAS, PROFESIONAL, ALAMI, DAN RAMAH) ===\n";
         $prompt .= "1. KEJELASAN KONFIRMASI PENCATATAN:\n";
         $prompt .= "   - Konfirmasikan apa yang telah dicatat dengan kalimat bahasa Indonesia yang ramah, sopan, dan jelas.\n";

@@ -109,4 +109,56 @@ class TenantAiAssistantSecurityTest extends TestCase
         $this->assertNotEquals($tenantAId, $convTenantB->tenant_id);
         $this->assertNotEquals($userAId, $convTenantB->user_id);
     }
+
+    public function test_ai_assistant_extracts_and_cleans_transaction_from_system_info_pattern(): void
+    {
+        $assistantService = app(\App\Core\AI\Services\TenantAssistantService::class);
+        $reflection = new \ReflectionClass($assistantService);
+        $method = $reflection->getMethod('extractTransactionActions');
+        $method->setAccessible(true);
+
+        $userMsg = 'Saya tadi makan malam beli rebusan jagung 7rb dan kacang rebus 10rb dan tadi makan siang beli bakso 16rb, nasi putih 8rb, telor dadar dan kentang mustofa 7rb tolong catet ya';
+        $aiReply = "Pengeluaran makan malam (rebusan jagung Rp 7.000, kacang rebus Rp 10.000) dan makan siang (bakso Rp 16.000, nasi putih Rp 8.000, telur dadar dan kentang mustofa Rp 7.000) total Rp 48.000 tanggal 03 Nov 2026 dicatat ke kategori Makan dan Jajan.\n[Info Sistem: Mutasi yang diproses: ID: 256b9c1d-8a3f-4e5d-9c1b-7f8d3a2b1c0e (Makan malam rebusan jagung, kacang rebus; makan siang bakso, nasi putih, telur dadar, kentang mustofa di [Nama Tempat Tidak Disebutkan], Rp 48.000, 2026-11-03, status: created, items: [{item_name: 'Rebusan Jagung', quantity: 1, price_minor: 7000, total_minor: 7000}, {item_name: 'Kacang Rebus', quantity: 1, price_minor: 10000, total_minor: 10000}, {item_name: 'Bakso', quantity: 1, price_minor: 16000, total_minor: 16000}, {item_name: 'Nasi Putih', quantity: 1, price_minor: 8000, total_minor: 8000}, {item_name: 'Telur Dadar dan Kentang Mustofa', quantity: 1, price_minor: 7000, total_minor: 7000} ])].";
+
+        [$actions, $cleanedReply] = $method->invoke($assistantService, $aiReply, $userMsg);
+
+        $this->assertNotEmpty($actions);
+        $this->assertCount(1, $actions);
+        $firstAction = $actions[0];
+        $this->assertEquals('create', $firstAction['action']);
+        $this->assertEquals(48000, $firstAction['amount_minor']);
+        $this->assertCount(5, $firstAction['items']);
+
+        // Verifikasi bahwa string info sistem teknis telah dibersihkan secara tuntas
+        $this->assertStringNotContainsString('[Info Sistem:', $cleanedReply);
+        $this->assertStringNotContainsString('256b9c1d-8a3f-4e5d-9c1b-7f8d3a2b1c0e', $cleanedReply);
+        $this->assertStringContainsString('Pengeluaran makan malam', $cleanedReply);
+    }
+
+    public function test_ai_assistant_extracts_multi_item_expenses_from_user_message(): void
+    {
+        $assistantService = app(\App\Core\AI\Services\TenantAssistantService::class);
+        $reflection = new \ReflectionClass($assistantService);
+        $method = $reflection->getMethod('parseUserExpenseItems');
+        $method->setAccessible(true);
+
+        $userMsg = 'Saya tadi makan malam beli rebusan jagung 7rb dan kacang rebus 10rb dan tadi makan siang beli bakso 16rb, nasi putih 8rb, telor dadar dan kentang mustofa 7rb tolong catet ya';
+        $items = $method->invoke($assistantService, $userMsg);
+
+        $this->assertNotEmpty($items);
+        $this->assertCount(5, $items);
+        $this->assertEquals('Rebusan Jagung', $items[0]['item_name']);
+        $this->assertEquals(7000, $items[0]['price_minor']);
+        $this->assertEquals('Kacang Rebus', $items[1]['item_name']);
+        $this->assertEquals(10000, $items[1]['price_minor']);
+        $this->assertEquals('Bakso', $items[2]['item_name']);
+        $this->assertEquals(16000, $items[2]['price_minor']);
+        $this->assertEquals('Nasi Putih', $items[3]['item_name']);
+        $this->assertEquals(8000, $items[3]['price_minor']);
+        $this->assertEquals('Telor Dadar Dan Kentang Mustofa', $items[4]['item_name']);
+        $this->assertEquals(7000, $items[4]['price_minor']);
+
+        $total = array_sum(array_column($items, 'total_minor'));
+        $this->assertEquals(48000, $total);
+    }
 }
