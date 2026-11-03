@@ -6,6 +6,7 @@ import RdPageHeader from '../../../design-system/RdPageHeader.vue';
 import RdCard from '../../../design-system/RdCard.vue';
 import RdButton from '../../../design-system/RdButton.vue';
 import RdInput from '../../../design-system/RdInput.vue';
+import RdSelect from '../../../design-system/RdSelect.vue';
 import RdTextarea from '../../../design-system/RdTextarea.vue';
 import RdTable from '../../../design-system/RdTable.vue';
 import RdMoney from '../../../design-system/RdMoney.vue';
@@ -16,7 +17,7 @@ import RdModal from '../../../design-system/RdModal.vue';
 import RdConfirmDialog from '../../../design-system/RdConfirmDialog.vue';
 import RdImageUploadMultiple from '../../../design-system/RdImageUploadMultiple.vue';
 import type { User, Tenant, AppManifest } from '../../../types/core';
-import type { FinanceReminder, AttachmentImage } from '../../../types/pekan';
+import type { FinanceReminder, FinanceCategory, AttachmentImage } from '../../../types/pekan';
 
 const props = withDefaults(
   defineProps<{
@@ -25,9 +26,13 @@ const props = withDefaults(
     tenants?: Tenant[];
     apps?: AppManifest[];
     reminders?: FinanceReminder[];
+    categories?: FinanceCategory[];
+    accounts?: Array<{ id: string; name: string; account_type: string }>;
   }>(),
   {
     reminders: () => [],
+    categories: () => [],
+    accounts: () => [],
     tenants: () => [],
     apps: () => [],
   }
@@ -94,6 +99,28 @@ function openPayFromHistory() {
   }
 }
 
+// Opsi Akun & Kategori untuk Bayar Tagihan
+const accountOptions = computed(() => {
+  if (!props.accounts || props.accounts.length === 0) {
+    return [{ label: 'Kas Utama (Tunai)', value: '' }];
+  }
+  return props.accounts.map(a => {
+    const typeLabel = a.account_type === 'cash' ? 'Tunai' : (a.account_type === 'bank' ? 'Bank' : (a.account_type === 'ewallet' ? 'E-Wallet' : 'Lainnya'));
+    return {
+      label: `${a.name} (${typeLabel})`,
+      value: a.id,
+    };
+  });
+});
+
+const categoryOptions = computed(() => [
+  { label: '-- Tanpa Kategori / Kategori Umum --', value: '' },
+  ...(props.categories || []).map(c => ({
+    label: c.name,
+    value: c.id,
+  }))
+]);
+
 // Modal Aksi Bayar
 const payModalOpen = ref(false);
 const selectedReminder = ref<FinanceReminder | null>(null);
@@ -101,6 +128,8 @@ const selectedReminder = ref<FinanceReminder | null>(null);
 const payForm = useForm({
   payment_date: new Date().toISOString().substring(0, 10),
   amount_minor: 0,
+  account_id: '',
+  category_id: '',
   notes: '',
   images: [] as File[],
 });
@@ -109,6 +138,8 @@ function openPayModal(reminder: FinanceReminder) {
   selectedReminder.value = reminder;
   payForm.payment_date = new Date().toISOString().substring(0, 10);
   payForm.amount_minor = reminder.amount_minor;
+  payForm.account_id = props.accounts?.[0]?.id || '';
+  payForm.category_id = reminder.category_id || (props.categories?.[0]?.id || '');
   payForm.notes = `Pembayaran ${reminder.title}${reminder.total_tenor ? ` (Tenor ${reminder.current_tenor || 1}/${reminder.total_tenor})` : ''}`;
   payForm.images = [];
   payForm.clearErrors();
@@ -483,44 +514,81 @@ function statusLabel(status?: string): string {
       max-width="lg"
     >
       <form @submit.prevent="submitPayment" class="space-y-4">
-        <!-- Tanggal Bayar -->
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-            Tanggal Bayar <span class="text-red-500">*</span>
-          </label>
-          <RdInput
-            v-model="payForm.payment_date"
-            type="date"
-            required
-          />
-          <p v-if="payForm.errors.payment_date" class="text-xs text-red-600 mt-1">
-            {{ payForm.errors.payment_date }}
-          </p>
+        <!-- Baris 1: Tanggal Bayar & Nominal -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <!-- Tanggal Bayar -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Tanggal Bayar <span class="text-red-500">*</span>
+            </label>
+            <RdInput
+              v-model="payForm.payment_date"
+              type="date"
+              required
+            />
+            <p v-if="payForm.errors.payment_date" class="text-xs text-red-600 mt-1">
+              {{ payForm.errors.payment_date }}
+            </p>
+          </div>
+
+          <!-- Nominal Bayar -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Nominal Bayar (Rp) <span class="text-red-500">*</span>
+            </label>
+            <RdInput
+              v-model.number="payForm.amount_minor"
+              type="number"
+              min="1000"
+              step="1000"
+              required
+            />
+            <div class="flex items-center justify-between text-xs text-slate-500 mt-1">
+              <span>Terbilang: <RdMoney :amount-minor="payForm.amount_minor" /></span>
+              <span
+                v-if="selectedReminder && payForm.amount_minor !== selectedReminder.amount_minor"
+                class="text-amber-600 dark:text-amber-400 font-medium"
+              >
+                Tagihan: <RdMoney :amount-minor="selectedReminder.amount_minor" />
+              </span>
+            </div>
+            <p v-if="payForm.errors.amount_minor" class="text-xs text-red-600 mt-1">
+              {{ payForm.errors.amount_minor }}
+            </p>
+          </div>
         </div>
 
-        <!-- Nominal Bayar -->
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-            Nominal Bayar (Rp) <span class="text-red-500">*</span>
-          </label>
-          <RdInput
-            v-model.number="payForm.amount_minor"
-            type="number"
-            min="1000"
-            step="1000"
-            required
-          />
-          <div class="flex items-center justify-between text-xs text-slate-500 mt-1">
-            <span>Terbilang: <RdMoney :amount-minor="payForm.amount_minor" /></span>
-            <span
-              v-if="selectedReminder && payForm.amount_minor !== selectedReminder.amount_minor"
-              class="text-amber-600 dark:text-amber-400 font-medium"
-            >
-              Tagihan Pokok: <RdMoney :amount-minor="selectedReminder.amount_minor" />
-            </span>
+        <!-- Baris 2: Akun Pembayaran (Kas/Bank) & Kategori Pengeluaran -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <RdSelect
+              v-model="payForm.account_id"
+              label="Rekening / Akun Kas Pembayaran"
+              :options="accountOptions"
+              required
+              :error="payForm.errors.account_id"
+            />
           </div>
-          <p v-if="payForm.errors.amount_minor" class="text-xs text-red-600 mt-1">
-            {{ payForm.errors.amount_minor }}
+          <div>
+            <RdSelect
+              v-model="payForm.category_id"
+              label="Kategori Pengeluaran"
+              :options="categoryOptions"
+              :error="payForm.errors.category_id"
+            />
+          </div>
+        </div>
+
+        <!-- Banner Informasi Integrasi Transaksi Otomatis -->
+        <div class="p-3 bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900/50 rounded-lg text-xs space-y-1">
+          <div class="flex items-center gap-1.5 font-semibold text-teal-900 dark:text-teal-200">
+            <svg class="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Otomatis Tercatat ke Buku Kas & Mutasi Transaksi</span>
+          </div>
+          <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+            Pembayaran tagihan ini akan langsung dibukukan secara otomatis ke daftar <strong>Transaksi</strong> dan menyesuaikan saldo rekening kas yang dipilih.
           </p>
         </div>
 

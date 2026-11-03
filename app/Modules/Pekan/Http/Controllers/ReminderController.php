@@ -4,6 +4,7 @@ namespace App\Modules\Pekan\Http\Controllers;
 
 use App\Core\Applications\AppRegistry;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Pekan\Models\FinanceAccount;
 use App\Modules\Pekan\Models\FinanceCategory;
 use App\Modules\Pekan\Models\FinanceReminder;
 use App\Modules\Pekan\Models\FinanceReminderPayment;
@@ -48,6 +49,14 @@ class ReminderController
                 }
             }
 
+            if ($schema->hasTable('finance_transactions')) {
+                if (!$schema->hasColumn('finance_transactions', 'images')) {
+                    $schema->table('finance_transactions', function (Blueprint $table) {
+                        $table->json('images')->nullable()->after('notes');
+                    });
+                }
+            }
+
             if (!$schema->hasTable('finance_reminder_payments')) {
                 $schema->create('finance_reminder_payments', function (Blueprint $table) {
                     $table->uuid('id')->primary();
@@ -86,6 +95,10 @@ class ReminderController
             ->orderBy('name')
             ->get();
 
+        $accounts = FinanceAccount::where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
         $tenants = $user ? $user->getActiveTenants() : [];
 
         return Inertia::render('Pekan/Reminders/Index', [
@@ -100,6 +113,7 @@ class ReminderController
             'apps' => AppRegistry::all(),
             'reminders' => $reminders,
             'categories' => $categories,
+            'accounts' => $accounts,
         ]);
     }
 
@@ -320,12 +334,15 @@ class ReminderController
         $this->ensureSchema();
         $tenant = TenantContext::get();
         $slug = $tenant?->slug ?: $tenantSlug;
+        $tenantId = TenantContext::id() ?: $tenant?->id;
         $reminderId = $request->route('id') ?: $id;
         $reminder = FinanceReminder::findOrFail($reminderId);
 
         $validated = $request->validate([
             'payment_date' => 'required|date',
             'amount_minor' => 'required|integer|min:1',
+            'account_id' => 'nullable|string',
+            'category_id' => 'nullable|string',
             'notes' => 'nullable|string|max:500',
             'images' => 'nullable|array',
             'images.*' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:10240',
@@ -336,7 +353,27 @@ class ReminderController
             $uploadedImages = $this->uploadService->uploadMultiple($request->file('images'), 'reminders');
         }
 
-        // 1. Buat transaksi pengeluaran di buku kas
+        // Resolusi Akun Kas Sumber Dana
+        $accountId = $validated['account_id'] ?? null;
+        $account = $accountId ? FinanceAccount::find($accountId) : FinanceAccount::first();
+        if (!$account) {
+            $account = FinanceAccount::create([
+                'id' => (string) Str::uuid(),
+                'tenant_id' => $tenantId,
+                'name' => 'Kas Utama',
+                'account_type' => 'cash',
+                'currency' => 'IDR',
+                'opening_balance_minor' => 0,
+                'current_balance_minor' => 0,
+                'is_active' => true,
+                'created_by' => auth()->id(),
+            ]);
+        }
+
+        // Resolusi Kategori Pengeluaran
+        $categoryId = $validated['category_id'] ?? $reminder->category_id;
+
+        // 1. Buat transaksi pengeluaran otomatis di buku kas
         $txDescription = 'Pembayaran Tagihan: ' . $reminder->title;
         if (!empty($reminder->total_tenor)) {
             $txDescription .= ' (Tenor ' . ($reminder->current_tenor ?: 1) . '/' . $reminder->total_tenor . ')';
@@ -346,18 +383,38 @@ class ReminderController
             'type' => 'expense',
             'amount_minor' => (int) $validated['amount_minor'],
             'transaction_date' => $validated['payment_date'],
-            'category_id' => $reminder->category_id,
+            'category_id' => $categoryId,
+            'account_id' => $account->id,
+            'payment_method' => $account->name,
+            'merchant_name' => $reminder->title,
             'description' => $txDescription,
             'notes' => $validated['notes'] ?? ('Pembayaran tagihan ' . $reminder->title),
             'images' => $uploadedImages,
         ];
 
-        $transaction = $this->transactionService->createTransaction($txData);
+        // Buat baris rincian item transaksi agar tampil komprehensif di mutasi transaksi
+        $txItems = [
+            [
+                'item_name' => $reminder->title,
+                'quantity' => 1,
+                'price_minor' => (int) $validated['amount_minor'],
+                'discount_minor' => 0,
+                'total_minor' => (int) $validated['amount_minor'],
+                'notes' => $validated['notes'] ?? null,
+            ]
+        ];
 
-        // 2. Catat riwayat pembayaran tagihan
+        $transaction = $this->transactionService->createTransaction($txData, $txItems, $uploadedImages);
+
+        // Jika tagihan semula belum punya kategori namun saat bayar dipilih kategori, simpan ke tagihan
+        if (empty($reminder->category_id) && !empty($categoryId)) {
+            $reminder->category_id = $categoryId;
+        }
+
+        // 2. Catat riwayat pembayaran tagihan dengan foreign key ke transaksi
         $payment = FinanceReminderPayment::create([
             'id' => (string) Str::uuid(),
-            'tenant_id' => $tenant->id,
+            'tenant_id' => $tenantId,
             'reminder_id' => $reminder->id,
             'transaction_id' => $transaction->id,
             'amount_minor' => (int) $validated['amount_minor'],
@@ -407,12 +464,13 @@ class ReminderController
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Pembayaran tagihan berhasil dicatat ke buku kas.',
+                'message' => 'Pembayaran tagihan berhasil dicatat dan otomatis masuk ke daftar transaksi.',
                 'payment' => $payment,
+                'transaction_id' => $transaction->id,
             ]);
         }
 
         return redirect("/t/{$slug}/apps/pekan/reminders")
-            ->with('status', 'Pembayaran tagihan berhasil dicatat ke buku kas.');
+            ->with('status', 'Pembayaran tagihan berhasil dicatat dan otomatis masuk ke daftar transaksi.');
     }
 }
