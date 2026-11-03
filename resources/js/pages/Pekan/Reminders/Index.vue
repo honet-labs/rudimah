@@ -210,7 +210,7 @@ function statusLabel(status?: string): string {
             <!-- ID Tagihan -->
             <template #id="{ value }">
               <code
-                class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-nowrap select-all cursor-default"
+                class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs whitespace-nowrap select-all cursor-default"
                 :title="value"
               >
                 #{{ value && value.length > 8 ? value.substring(0, 8) : value }}
@@ -221,8 +221,8 @@ function statusLabel(status?: string): string {
             <template #title="{ item }">
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
-                  <span class="font-medium text-slate-800 dark:text-slate-100">{{ item.title }}</span>
-                  <RdBadge :variant="statusVariant(item.status)" class="text-[10px] py-0 px-1.5">
+                  <span class="font-medium text-slate-900 dark:text-slate-100 text-sm">{{ item.title }}</span>
+                  <RdBadge :variant="statusVariant(item.status)" size="sm">
                     {{ statusLabel(item.status) }}
                   </RdBadge>
                 </div>
@@ -233,10 +233,10 @@ function statusLabel(status?: string): string {
                     :key="idx"
                     type="button"
                     @click.stop="openPreview(img.url, `${item.title} - Lampiran ${idx + 1}`)"
-                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer"
                     title="Klik untuk melihat bukti tagihan"
                   >
-                    <svg class="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     <span>Berkas {{ idx + 1 }}</span>
@@ -247,27 +247,29 @@ function statusLabel(status?: string): string {
 
             <!-- 3. Kategori -->
             <template #category_name="{ item }">
-              <span class="text-xs text-slate-700 dark:text-slate-300">
+              <span class="text-sm text-slate-700 dark:text-slate-300">
                 {{ item.category_name || item.category?.name || 'Tanpa Kategori' }}
               </span>
             </template>
 
             <!-- 4. Tanggal Jatuh Tempo -->
             <template #due_date="{ item }">
-              <RdDateTime :value="item.due_date" format="date" />
+              <span class="text-sm text-slate-700 dark:text-slate-300">
+                <RdDateTime :value="item.due_date" format="date" />
+              </span>
             </template>
 
             <!-- 5. Tenor -->
             <template #tenor="{ item }">
-              <span v-if="item.total_tenor" class="text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
+              <span v-if="item.total_tenor" class="text-sm font-medium font-mono text-slate-700 dark:text-slate-300">
                 {{ item.current_tenor || 1 }} dari {{ item.total_tenor }}
               </span>
-              <span v-else class="text-xs text-slate-400">Rutin</span>
+              <span v-else class="text-sm text-slate-500 dark:text-slate-400">Rutin</span>
             </template>
 
             <!-- 6. Nominal -->
             <template #amount_minor="{ item }">
-              <span class="font-semibold text-slate-800 dark:text-slate-100">
+              <span class="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 <RdMoney :amount-minor="item.amount_minor" />
               </span>
             </template>
@@ -347,7 +349,7 @@ function statusLabel(status?: string): string {
             <div class="min-w-0 flex-1 space-y-1">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <code
-                  class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[10px] select-all cursor-default"
+                  class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs select-all cursor-default"
                   :title="rem.id"
                 >
                   #{{ rem.id && rem.id.length > 8 ? rem.id.substring(0, 8) : rem.id }}
@@ -360,7 +362,7 @@ function statusLabel(status?: string): string {
                 {{ rem.title }}
               </h4>
             </div>
-            <RdBadge :variant="statusVariant(rem.status)" class="shrink-0 text-xs">
+            <RdBadge :variant="statusVariant(rem.status)" size="sm" class="shrink-0">
               {{ statusLabel(rem.status) }}
             </RdBadge>
           </div>
@@ -376,25 +378,25 @@ function statusLabel(status?: string): string {
             >
               <img :src="img.url" :alt="img.name || 'Bukti tagihan'" class="w-full h-full object-cover" />
             </button>
-            <span class="text-[11px] text-slate-500 dark:text-slate-400">({{ rem.images.length }} berkas)</span>
+            <span class="text-xs text-slate-500 dark:text-slate-400">({{ rem.images.length }} berkas)</span>
           </div>
 
           <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
             <div>
-              <span class="text-slate-400 text-[11px] block">Jatuh Tempo</span>
+              <span class="text-slate-400 text-xs block">Jatuh Tempo</span>
               <span class="font-medium text-slate-700 dark:text-slate-300">
                 <RdDateTime :value="rem.due_date" format="date" />
               </span>
             </div>
             <div class="text-center">
-              <span class="text-slate-400 text-[11px] block">Tenor</span>
+              <span class="text-slate-400 text-xs block">Tenor</span>
               <span v-if="rem.total_tenor" class="font-semibold text-slate-700 dark:text-slate-300 font-mono">
                 {{ rem.current_tenor || 1 }} / {{ rem.total_tenor }}
               </span>
               <span v-else class="text-slate-500 font-medium">Rutin</span>
             </div>
             <div class="text-right">
-              <span class="text-slate-400 text-[11px] block">Nominal</span>
+              <span class="text-slate-400 text-xs block">Nominal</span>
               <span class="text-xs font-bold text-slate-900 dark:text-slate-100">
                 <RdMoney :amount-minor="rem.amount_minor" />
               </span>

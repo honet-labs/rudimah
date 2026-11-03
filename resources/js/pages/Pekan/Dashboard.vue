@@ -178,13 +178,15 @@ const txColumns = [
           </template>
           <RdTable :columns="txColumns" :items="recentTransactions">
             <template #transaction_date="{ value }">
-              <RdDateTime :value="value" format="date" />
+              <span class="text-sm text-slate-700 dark:text-slate-300">
+                <RdDateTime :value="value" format="date" />
+              </span>
             </template>
             <template #category_name="{ value }">
-              <span class="text-xs text-slate-600 dark:text-slate-400">{{ value }}</span>
+              <span class="text-sm text-slate-600 dark:text-slate-400">{{ value }}</span>
             </template>
             <template #amount_minor="{ item }">
-              <span :class="item.type === 'income' ? 'text-teal-800 dark:text-teal-300 font-bold' : 'text-slate-800 dark:text-slate-100 font-semibold'">
+              <span class="text-sm font-semibold" :class="item.type === 'income' ? 'text-teal-800 dark:text-teal-300 !font-bold' : 'text-slate-800 dark:text-slate-100'">
                 <RdMoney :amount-minor="item.amount_minor" :show-sign="item.type === 'income'" :masked="isNominalHidden" />
               </span>
             </template>

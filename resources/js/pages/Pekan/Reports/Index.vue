@@ -77,10 +77,10 @@ const columns = [
         <RdCard title="Komposisi Pengeluaran per Kategori">
           <RdTable :columns="columns" :items="breakdownData">
             <template #percentage="{ value }">
-              <span class="font-mono text-xs font-medium">{{ value }}%</span>
+              <span class="font-mono text-sm font-medium text-slate-700 dark:text-slate-300">{{ value }}%</span>
             </template>
             <template #total_minor="{ value }">
-              <span class="font-semibold text-slate-800 dark:text-slate-100">
+              <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 <RdMoney :amount-minor="value" />
               </span>
             </template>

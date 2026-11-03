@@ -196,7 +196,7 @@ const columns = [
 
           <template #id="{ value }">
             <code
-              class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-nowrap select-all cursor-default"
+              class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs whitespace-nowrap select-all cursor-default"
               :title="value"
             >
               #{{ value && value.length > 8 ? value.substring(0, 8) : value }}
@@ -204,7 +204,9 @@ const columns = [
           </template>
 
           <template #transaction_date="{ value }">
-            <RdDateTime :value="value" format="date" />
+            <span class="text-xs text-slate-700 dark:text-slate-300">
+              <RdDateTime :value="value" format="date" />
+            </span>
           </template>
 
           <template #merchant_name="{ item }">
@@ -249,7 +251,7 @@ const columns = [
                 v-if="item.items.length > 1"
                 type="button"
                 @click.stop="openItemsModal(item)"
-                class="text-[11px] text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 font-medium inline-flex items-center gap-1 hover:underline cursor-pointer group"
+                class="text-xs text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 font-medium inline-flex items-center gap-1 hover:underline cursor-pointer group"
                 title="Klik untuk melihat rincian seluruh item belanja"
               >
                 <span>+{{ item.items.length - 1 }} item lainnya</span>
@@ -271,7 +273,10 @@ const columns = [
           </template>
 
           <template #amount_minor="{ item }">
-            <span :class="item.type === 'income' ? 'text-teal-800 dark:text-teal-300 font-bold' : 'text-slate-800 dark:text-slate-100 font-semibold'">
+            <span
+              class="text-xs whitespace-nowrap"
+              :class="item.type === 'income' ? 'text-teal-800 dark:text-teal-300 font-bold' : 'text-slate-800 dark:text-slate-100 font-semibold'"
+            >
               <RdMoney :amount-minor="item.amount_minor" :show-sign="item.type === 'income'" />
             </span>
           </template>
