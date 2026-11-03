@@ -15,6 +15,7 @@ import RdEmptyState from '../../../design-system/RdEmptyState.vue';
 import RdConfirmDialog from '../../../design-system/RdConfirmDialog.vue';
 import type { User, Tenant } from '../../../types/core';
 import type { FinanceBudget, Transaction } from '../../../types/pekan';
+import { formatQuantity } from '../../../utils/format';
 
 const props = withDefaults(
   defineProps<{
@@ -82,6 +83,15 @@ function openPreview(url: string, title: string, images?: any[]) {
   previewModalOpen.value = true;
 }
 
+// Modal Rincian Multi-Item Transaksi
+const itemsModalOpen = ref(false);
+const selectedTransactionForItems = ref<Transaction | null>(null);
+
+function openItemsModal(tx: Transaction) {
+  selectedTransactionForItems.value = tx;
+  itemsModalOpen.value = true;
+}
+
 async function viewBudgetTransactions(budget: FinanceBudget) {
   selectedBudgetForTransactions.value = budget;
   isTransactionsModalOpen.value = true;
@@ -128,16 +138,15 @@ const totalFilteredSpentMinor = computed(() => {
   return filteredBudgetTransactions.value.reduce((acc, tx) => acc + (tx.amount_minor || 0), 0);
 });
 
+// Kolom Desktop: Ramping, terpadu & proporsional agar 100% muat tanpa memicu scrollbar horizontal
 const transactionColumns = [
-  { key: 'id', label: 'ID', width: '90px' },
-  { key: 'transaction_date', label: 'Tanggal', width: '115px' },
-  { key: 'merchant_name', label: 'Merchant', width: '130px' },
-  { key: 'description', label: 'Keterangan' },
-  { key: 'category_name', label: 'Kategori', width: '110px' },
-  { key: 'payment_method', label: 'Akun / Metode', width: '120px' },
-  { key: 'amount_minor', label: 'Nominal', width: '120px', align: 'right' as const },
+  { key: 'transaction_date', label: 'Tanggal & ID', width: '130px' },
+  { key: 'description', label: 'Transaksi & Merchant' },
+  { key: 'category_name', label: 'Kategori', width: '120px' },
+  { key: 'payment_method', label: 'Akun / Metode', width: '130px' },
+  { key: 'amount_minor', label: 'Nominal', width: '130px', align: 'right' as const },
   { key: 'images', label: 'Struk', width: '75px', align: 'center' as const },
-  { key: 'actions', label: 'Aksi', width: '65px', align: 'center' as const },
+  { key: 'actions', label: 'Aksi', width: '60px', align: 'center' as const },
 ];
 </script>
 
@@ -342,44 +351,44 @@ const transactionColumns = [
       description="Anggaran belanja yang telah diarsipkan atau telah melewati batas akhir berlaku akan tersimpan di sini untuk dievaluasi."
     />
 
-    <!-- Modal Rincian Daftar Transaksi Anggaran -->
+    <!-- Modal Rincian Daftar Transaksi Anggaran (Responsif: Desktop Tabel Pas Tanpa Scroll, Mobile Kartu Vertikal) -->
     <RdModal
       v-model="isTransactionsModalOpen"
       :title="selectedBudgetForTransactions ? `Daftar Transaksi: ${selectedBudgetForTransactions.name}` : 'Daftar Transaksi Anggaran'"
-      max-width="4xl"
+      max-width="5xl"
     >
       <div v-if="selectedBudgetForTransactions" class="space-y-4">
-        <!-- Panel Ringkasan Anggaran -->
-        <div class="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+        <!-- Panel Ringkasan Anggaran (Responsif 2 Kolom di Mobile, 4 Kolom di Desktop) -->
+        <div class="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
             <div>
               <span class="block text-slate-400 text-[11px] mb-0.5">Kategori Anggaran</span>
-              <span class="font-semibold text-slate-800 dark:text-slate-100">
+              <span class="font-semibold text-slate-800 dark:text-slate-100 truncate block">
                 {{ selectedBudgetForTransactions.category_name || 'Semua Kategori' }}
               </span>
             </div>
             <div>
               <span class="block text-slate-400 text-[11px] mb-0.5">Periode Evaluasi</span>
-              <span class="font-semibold text-slate-800 dark:text-slate-100">
+              <span class="font-semibold text-slate-800 dark:text-slate-100 truncate block">
                 {{ selectedBudgetForTransactions.period_label || 'Bulanan' }}
               </span>
             </div>
             <div>
               <span class="block text-slate-400 text-[11px] mb-0.5">Batas Plafon</span>
-              <span class="font-semibold text-slate-800 dark:text-slate-100">
+              <span class="font-semibold text-slate-800 dark:text-slate-100 block">
                 <RdMoney :amount-minor="selectedBudgetForTransactions.amount_limit_minor" />
               </span>
             </div>
             <div>
               <span class="block text-slate-400 text-[11px] mb-0.5">Total Realisasi</span>
-              <span class="font-bold text-teal-800 dark:text-teal-300">
+              <span class="font-bold text-teal-800 dark:text-teal-300 block">
                 <RdMoney :amount-minor="selectedBudgetForTransactions.spent_amount_minor" />
               </span>
             </div>
           </div>
 
           <!-- Progress Bar & Sisa Plafon -->
-          <div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs">
+          <div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 text-xs">
             <div class="flex items-center gap-2">
               <span class="text-slate-500">Penggunaan:</span>
               <RdBadge :variant="selectedBudgetForTransactions.progress_percent >= 100 ? 'danger' : (selectedBudgetForTransactions.progress_percent >= 80 ? 'warning' : 'neutral')">
@@ -407,57 +416,76 @@ const transactionColumns = [
           />
         </div>
 
-        <!-- Tabel Transaksi -->
-        <div class="overflow-hidden">
+        <!-- 1. Tampilan Desktop (Tabel Fit Penuh Tanpa Scrollbar Horizontal) -->
+        <div class="hidden md:block overflow-hidden">
           <RdTable
             :columns="transactionColumns"
             :items="filteredBudgetTransactions"
             :loading="isLoadingTransactions"
             empty-text="Belum ada transaksi pengeluaran yang terhubung pada periode anggaran ini."
           >
-            <template #id="{ value }">
-              <code
-                class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-nowrap select-all cursor-default"
-                :title="value"
-              >
-                #{{ value && value.length > 8 ? value.substring(0, 8) : value }}
-              </code>
+            <!-- Kolom 1: Tanggal & ID Ringkas -->
+            <template #transaction_date="{ item, value }">
+              <div class="space-y-0.5">
+                <div class="text-xs font-medium text-slate-800 dark:text-slate-200">
+                  <RdDateTime :value="value" format="date" />
+                </div>
+                <code
+                  class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono text-[10px] select-all cursor-default block w-fit"
+                  :title="item.id"
+                >
+                  #{{ item.id && item.id.length > 8 ? item.id.substring(0, 8) : item.id }}
+                </code>
+              </div>
             </template>
 
-            <template #transaction_date="{ value }">
-              <RdDateTime :value="value" format="date" />
-            </template>
-
-            <template #merchant_name="{ item }">
-              <span class="text-slate-700 dark:text-slate-300 text-xs block truncate max-w-[130px]" :title="item.merchant_name || '-'">
-                {{ item.merchant_name || '-' }}
-              </span>
-            </template>
-
+            <!-- Kolom 2: Transaksi & Merchant Terpadu -->
             <template #description="{ item }">
-              <span class="font-medium text-slate-800 dark:text-slate-100 text-xs block truncate max-w-[180px]" :title="item.description || '-'">
-                {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : '-' }}
-              </span>
+              <div class="space-y-0.5 max-w-[280px]">
+                <span class="font-semibold text-slate-800 dark:text-slate-100 text-xs block truncate" :title="item.description || '-'">
+                  {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : '-' }}
+                </span>
+                <div v-if="item.merchant_name && item.merchant_name !== item.description" class="text-[11px] text-slate-500 truncate" :title="item.merchant_name">
+                  {{ item.merchant_name }}
+                </div>
+                <div v-if="item.items && item.items.length > 0" class="text-[11px] text-teal-700 dark:text-teal-400 font-medium">
+                  <button
+                    type="button"
+                    @click.stop="openItemsModal(item)"
+                    class="inline-flex items-center gap-1 hover:underline cursor-pointer"
+                    title="Klik untuk melihat rincian item belanja"
+                  >
+                    <span>{{ item.items.length }} item belanja</span>
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </template>
 
+            <!-- Kolom 3: Kategori -->
             <template #category_name="{ value }">
               <span class="text-xs text-slate-700 dark:text-slate-300">
                 {{ value || 'Tanpa Kategori' }}
               </span>
             </template>
 
+            <!-- Kolom 4: Akun / Metode Pembayaran -->
             <template #payment_method="{ item }">
               <span class="text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
                 {{ item.account?.name || item.payment_method || 'Kas Utama' }}
               </span>
             </template>
 
+            <!-- Kolom 5: Nominal Pengeluaran -->
             <template #amount_minor="{ item }">
-              <span class="font-semibold text-slate-800 dark:text-slate-100 text-xs">
+              <span class="font-bold text-slate-900 dark:text-slate-100 text-xs whitespace-nowrap">
                 <RdMoney :amount-minor="item.amount_minor" />
               </span>
             </template>
 
+            <!-- Kolom 6: Lampiran Struk -->
             <template #images="{ item }">
               <div v-if="item.images && item.images.length > 0" class="flex items-center justify-center">
                 <button
@@ -476,12 +504,13 @@ const transactionColumns = [
               <span v-else class="text-xs text-slate-400">-</span>
             </template>
 
+            <!-- Kolom 7: Aksi Detail -->
             <template #actions="{ item }">
               <div class="flex items-center justify-center">
                 <a
                   :href="`/t/${tenant.slug}/apps/pekan/transactions/${item.id}`"
                   target="_blank"
-                  title="Buka detail transaksi di tab baru"
+                  title="Buka detail mutasi transaksi di tab baru"
                   class="p-1 text-slate-500 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors inline-flex items-center justify-center cursor-pointer"
                 >
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -492,31 +521,199 @@ const transactionColumns = [
             </template>
           </RdTable>
         </div>
+
+        <!-- 2. Tampilan Mobile & Tablet Kecil (Daftar Kartu Responsif Vertikal) -->
+        <div class="block md:hidden">
+          <!-- Loading State Mobile -->
+          <div v-if="isLoadingTransactions" class="py-8 text-center text-slate-500 dark:text-slate-400 text-xs">
+            <div class="flex items-center justify-center gap-2">
+              <svg class="animate-spin h-4 w-4 text-teal-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Sedang memuat data transaksi...</span>
+            </div>
+          </div>
+
+          <!-- Empty State Mobile -->
+          <div
+            v-else-if="filteredBudgetTransactions.length === 0"
+            class="py-8 px-4 text-center text-slate-500 dark:text-slate-400 text-xs border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/30"
+          >
+            Belum ada transaksi pengeluaran yang terhubung pada periode anggaran ini.
+          </div>
+
+          <!-- Daftar Kartu Transaksi Mobile -->
+          <div v-else class="space-y-3 max-h-[60vh] overflow-y-auto pr-0.5">
+            <div
+              v-for="item in filteredBudgetTransactions"
+              :key="item.id"
+              class="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2.5"
+            >
+              <!-- Baris 1: Tanggal, Metode, Nominal -->
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-center gap-1.5 flex-wrap text-xs text-slate-500">
+                  <RdDateTime :value="item.transaction_date" format="date" />
+                  <span>·</span>
+                  <span class="font-medium text-slate-700 dark:text-slate-300">
+                    {{ item.account?.name || item.payment_method || 'Kas Utama' }}
+                  </span>
+                </div>
+                <div class="text-right shrink-0">
+                  <span class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    <RdMoney :amount-minor="item.amount_minor" />
+                  </span>
+                </div>
+              </div>
+
+              <!-- Baris 2: Deskripsi & Merchant -->
+              <div>
+                <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                  {{ item.description ? item.description.replace(/^Struk Belanja:\s*/i, '') : (item.merchant_name || 'Pengeluaran') }}
+                </h4>
+                <div v-if="item.merchant_name && item.merchant_name !== item.description" class="text-[11px] text-slate-500 mt-0.5">
+                  {{ item.merchant_name }}
+                </div>
+              </div>
+
+              <!-- Baris 3: ID, Kategori, & Multi-item -->
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                  #{{ item.id && item.id.length > 8 ? item.id.substring(0, 8) : item.id }}
+                </code>
+                <span v-if="item.category_name" class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                  {{ item.category_name }}
+                </span>
+                <button
+                  v-if="item.items && item.items.length > 0"
+                  type="button"
+                  @click.stop="openItemsModal(item)"
+                  class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 border border-teal-200/80 dark:border-teal-800 cursor-pointer"
+                >
+                  {{ item.items.length }} item barang
+                </button>
+              </div>
+
+              <!-- Baris 4: Footer Kartu (Struk & Link Transaksi) -->
+              <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                <div>
+                  <button
+                    v-if="item.images && item.images.length > 0"
+                    type="button"
+                    @click.stop="openPreview(item.images[0].url, `${item.merchant_name || item.description || 'Transaksi'} - Lampiran Struk`, item.images)"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <span>Struk ({{ item.images.length }})</span>
+                  </button>
+                  <span v-else class="text-[11px] text-slate-400">Tanpa lampiran</span>
+                </div>
+
+                <a
+                  :href="`/t/${tenant.slug}/apps/pekan/transactions/${item.id}`"
+                  target="_blank"
+                  class="inline-flex items-center gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 hover:underline cursor-pointer"
+                >
+                  <span>Detail</span>
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <template #footer>
-        <div class="w-full flex items-center justify-between">
+        <div class="w-full flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3">
           <div class="text-xs text-slate-500">
             <span v-if="filteredBudgetTransactions.length > 0">
               Total: <span class="font-semibold text-slate-800 dark:text-slate-200">{{ filteredBudgetTransactions.length }} transaksi</span> (<RdMoney :amount-minor="totalFilteredSpentMinor" />)
             </span>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 justify-end">
             <a
               v-if="selectedBudgetForTransactions"
               :href="`/t/${tenant.slug}/apps/pekan/transactions?search=${encodeURIComponent(selectedBudgetForTransactions.category_name || selectedBudgetForTransactions.name)}`"
-              class="inline-flex"
+              class="inline-flex w-full sm:w-auto"
             >
-              <RdButton variant="outline" size="sm">
+              <RdButton variant="outline" size="sm" class="w-full sm:w-auto justify-center">
                 Buka di Menu Transaksi
               </RdButton>
             </a>
-            <RdButton variant="secondary" size="sm" @click="isTransactionsModalOpen = false">
+            <RdButton variant="secondary" size="sm" @click="isTransactionsModalOpen = false" class="w-full sm:w-auto justify-center">
               Tutup
             </RdButton>
           </div>
         </div>
       </template>
+    </RdModal>
+
+    <!-- Modal Rincian Item Transaksi Multi-Item -->
+    <RdModal
+      v-model="itemsModalOpen"
+      :title="`Rincian Item: ${selectedTransactionForItems?.merchant_name || selectedTransactionForItems?.description || 'Transaksi'}`"
+      max-width="2xl"
+    >
+      <div v-if="selectedTransactionForItems" class="space-y-4">
+        <!-- Header Ringkasan Transaksi -->
+        <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div>
+            <span class="block text-[11px] text-slate-500 font-medium">Nama Transaksi</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-100 truncate block mt-0.5" :title="selectedTransactionForItems.description">
+              {{ selectedTransactionForItems.description || '-' }}
+            </span>
+          </div>
+          <div>
+            <span class="block text-[11px] text-slate-500 font-medium">Nama Merchant</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-100 truncate block mt-0.5" :title="selectedTransactionForItems.merchant_name">
+              {{ selectedTransactionForItems.merchant_name || '-' }}
+            </span>
+          </div>
+          <div>
+            <span class="block text-[11px] text-slate-500 font-medium">Tanggal Transaksi</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-100 block mt-0.5">
+              <RdDateTime :value="selectedTransactionForItems.transaction_date" format="date" />
+            </span>
+          </div>
+          <div>
+            <span class="block text-[11px] text-slate-500 font-medium">Total Nilai</span>
+            <span class="font-bold text-teal-800 dark:text-teal-300 block mt-0.5">
+              <RdMoney :amount-minor="selectedTransactionForItems.amount_minor" />
+            </span>
+          </div>
+        </div>
+
+        <!-- Tabel Item Belanja -->
+        <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold uppercase">
+              <tr>
+                <th class="px-3 py-2">Nama Barang / Menu</th>
+                <th class="px-3 py-2 text-center w-16">Qty</th>
+                <th class="px-3 py-2 text-right w-24">Harga</th>
+                <th class="px-3 py-2 text-right w-24">Diskon</th>
+                <th class="px-3 py-2 text-right w-28">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+              <tr v-for="(it, idx) in selectedTransactionForItems.items" :key="idx" class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                <td class="px-3 py-2.5 font-medium text-slate-800 dark:text-slate-200">{{ it.item_name }}</td>
+                <td class="px-3 py-2.5 text-center font-mono">{{ formatQuantity(it.quantity) }}</td>
+                <td class="px-3 py-2.5 text-right"><RdMoney :amount-minor="it.price_minor || 0" /></td>
+                <td class="px-3 py-2.5 text-right text-slate-500"><RdMoney :amount-minor="it.discount_minor || 0" /></td>
+                <td class="px-3 py-2.5 text-right font-bold text-slate-900 dark:text-slate-100">
+                  <RdMoney :amount-minor="it.total_minor || ((it.price_minor || 0) * (Number(it.quantity) || 1))" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </RdModal>
 
     <!-- Modal Lightbox Pratinjau Foto Struk Transaksi -->
