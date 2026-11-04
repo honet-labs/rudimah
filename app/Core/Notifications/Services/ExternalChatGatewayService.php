@@ -388,13 +388,15 @@ class ExternalChatGatewayService
                     'deleted' => '[Dihapus]',
                     default => ($tx['type'] ?? 'expense') === 'income' ? '[Pemasukan]' : '[Pengeluaran]',
                 };
+                $shortId = !empty($tx['id']) ? '#' . substr($tx['id'], 0, 8) : '';
+                $idPrefix = $shortId ? " `{$shortId}`" : '';
                 $amtStr = MoneyHelper::formatIdr((int) ($tx['amount_minor'] ?? 0));
                 $desc = $tx['description'] ?? 'Transaksi';
                 $dateStr = !empty($tx['date']) ? " ({$tx['date']})" : '';
-                $txLines[] = "• {$actLabel} {$desc}: *{$amtStr}*{$dateStr}";
+                $txLines[] = "• {$actLabel}{$idPrefix} {$desc}: *{$amtStr}*{$dateStr}";
             }
             if (!empty($txLines)) {
-                $extraBlocks[] = "*Rincian Transaksi:*\n" . implode("\n", $txLines);
+                $extraBlocks[] = "*Rincian Transaksi:*\n" . implode("\n", $txLines) . "\n_Tips: Sebutkan ID (misal: \"ubah #id nominal 50rb\") jika ingin meralat._";
             }
         }
 
@@ -407,6 +409,8 @@ class ExternalChatGatewayService
                     'deleted' => '[Dihapus]',
                     default => '[Jadwal Baru]',
                 };
+                $shortId = !empty($rem['id']) ? '#' . substr($rem['id'], 0, 8) : '';
+                $idPrefix = $shortId ? " `{$shortId}`" : '';
                 $amtStr = MoneyHelper::formatIdr((int) ($rem['amount_minor'] ?? 0));
                 $title = $rem['title'] ?? 'Tagihan';
                 $intervalStr = match ($rem['repeat_interval'] ?? 'monthly') {
@@ -417,10 +421,10 @@ class ExternalChatGatewayService
                     default => 'Sekali',
                 };
                 $dueStr = !empty($rem['due_date']) ? "Jatuh tempo: {$rem['due_date']}" : '';
-                $remLines[] = "• {$actLabel} {$title}: *{$amtStr}* ({$intervalStr}, {$dueStr})";
+                $remLines[] = "• {$actLabel}{$idPrefix} {$title}: *{$amtStr}* ({$intervalStr}, {$dueStr})";
             }
             if (!empty($remLines)) {
-                $extraBlocks[] = "*Jadwal Tagihan & Pengingat:*\n" . implode("\n", $remLines);
+                $extraBlocks[] = "*Jadwal Tagihan & Pengingat:*\n" . implode("\n", $remLines) . "\n_Tips: Sebutkan ID tagihan jika ingin meralat atau menghapus jadwal._";
             }
         }
 
@@ -429,22 +433,24 @@ class ExternalChatGatewayService
             $savLines = [];
             foreach ($metadata['recorded_savings'] as $sav) {
                 $name = $sav['name'] ?? 'Tabungan';
+                $shortId = !empty($sav['id']) ? '#' . substr($sav['id'], 0, 8) : '';
+                $idPrefix = $shortId ? " `{$shortId}`" : '';
                 if (($sav['action'] ?? '') === 'deposited') {
                     $amtStr = MoneyHelper::formatIdr((int) ($sav['amount_minor'] ?? 0));
                     $currStr = MoneyHelper::formatIdr((int) ($sav['current_amount_minor'] ?? 0));
                     $targetStr = MoneyHelper::formatIdr((int) ($sav['target_amount_minor'] ?? 0));
                     $pct = $sav['progress_percent'] ?? 0;
-                    $savLines[] = "• [Setoran] {$name}: *+{$amtStr}* (Terkumpul: {$currStr} / {$targetStr} - {$pct}%)";
+                    $savLines[] = "• [Setoran]{$idPrefix} {$name}: *+{$amtStr}* (Terkumpul: {$currStr} / {$targetStr} - {$pct}%)";
                 } elseif (($sav['action'] ?? '') === 'withdrawn') {
                     $amtStr = MoneyHelper::formatIdr((int) ($sav['amount_minor'] ?? 0));
                     $currStr = MoneyHelper::formatIdr((int) ($sav['current_amount_minor'] ?? 0));
-                    $savLines[] = "• [Penarikan] {$name}: *-{$amtStr}* (Sisa: {$currStr})";
+                    $savLines[] = "• [Penarikan]{$idPrefix} {$name}: *-{$amtStr}* (Sisa: {$currStr})";
                 } elseif (($sav['action'] ?? '') === 'deleted') {
-                    $savLines[] = "• [Dihapus] Pos Tabungan: {$name}";
+                    $savLines[] = "• [Dihapus]{$idPrefix} Pos Tabungan: {$name}";
                 } else {
                     $targetStr = MoneyHelper::formatIdr((int) ($sav['target_amount_minor'] ?? 0));
                     $targetDate = !empty($sav['target_date']) ? ", Target: {$sav['target_date']}" : '';
-                    $savLines[] = "• [Target Baru] {$name}: Target *{$targetStr}*{$targetDate}";
+                    $savLines[] = "• [Target Baru]{$idPrefix} {$name}: Target *{$targetStr}*{$targetDate}";
                 }
             }
             if (!empty($savLines)) {

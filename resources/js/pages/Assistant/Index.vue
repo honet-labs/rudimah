@@ -76,6 +76,14 @@ const isSending = ref(false);
 const isLoadingConversation = ref(false);
 const chatContainer = ref<HTMLElement | null>(null);
 const isHistoryDrawerOpen = ref(false);
+const chatInputRef = ref<HTMLInputElement | null>(null);
+
+function insertChatPrompt(promptText: string) {
+  inputMessage.value = promptText;
+  nextTick(() => {
+    chatInputRef.value?.focus();
+  });
+}
 
 // Modal Pengaturan AI
 const isSettingsModalOpen = ref(false);
@@ -649,6 +657,15 @@ onMounted(() => {
                     class="py-1.5 flex items-center justify-between text-[11px]"
                   >
                     <div class="flex items-center gap-2 truncate pr-2">
+                      <button
+                        v-if="tx.id"
+                        type="button"
+                        @click="insertChatPrompt(`Ubah transaksi #${tx.id.substring(0, 8)} `)"
+                        title="Klik untuk mengubah transaksi ini di chat"
+                        class="px-1.5 py-0.5 rounded font-mono font-semibold text-[10px] bg-slate-100 dark:bg-slate-800 text-teal-700 dark:text-teal-400 border border-slate-200 dark:border-slate-700 hover:border-teal-500 hover:text-teal-600 transition-colors cursor-pointer select-all shrink-0"
+                      >
+                        #{{ tx.id.substring(0, 8) }}
+                      </button>
                       <span
                         v-if="tx.action === 'updated'"
                         class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
@@ -716,6 +733,15 @@ onMounted(() => {
                     class="py-1.5 flex items-center justify-between text-[11px]"
                   >
                     <div class="flex items-center gap-2 truncate pr-2">
+                      <button
+                        v-if="rem.id"
+                        type="button"
+                        @click="insertChatPrompt(`Ubah tagihan #${rem.id.substring(0, 8)} `)"
+                        title="Klik untuk mengubah tagihan ini di chat"
+                        class="px-1.5 py-0.5 rounded font-mono font-semibold text-[10px] bg-slate-100 dark:bg-slate-800 text-teal-700 dark:text-teal-400 border border-slate-200 dark:border-slate-700 hover:border-teal-500 hover:text-teal-600 transition-colors cursor-pointer select-all shrink-0"
+                      >
+                        #{{ rem.id.substring(0, 8) }}
+                      </button>
                       <span
                         v-if="rem.action === 'updated'"
                         class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
@@ -789,6 +815,15 @@ onMounted(() => {
                     class="py-1.5 flex items-center justify-between text-[11px]"
                   >
                     <div class="flex items-center gap-2 truncate pr-2">
+                      <button
+                        v-if="sav.id"
+                        type="button"
+                        @click="insertChatPrompt(`Ubah tabungan #${sav.id.substring(0, 8)} `)"
+                        title="Klik untuk mengubah pos tabungan ini di chat"
+                        class="px-1.5 py-0.5 rounded font-mono font-semibold text-[10px] bg-slate-100 dark:bg-slate-800 text-teal-700 dark:text-teal-400 border border-slate-200 dark:border-slate-700 hover:border-teal-500 hover:text-teal-600 transition-colors cursor-pointer select-all shrink-0"
+                      >
+                        #{{ sav.id.substring(0, 8) }}
+                      </button>
                       <span
                         v-if="sav.action === 'deposited'"
                         class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300"
@@ -850,6 +885,7 @@ onMounted(() => {
               @submit.prevent="handleSendMessage()"
             >
               <input
+                ref="chatInputRef"
                 v-model="inputMessage"
                 type="text"
                 placeholder="Tanyakan hal terkait keuangan ruang kerja Anda... (Tekan Enter untuk mengirim)"

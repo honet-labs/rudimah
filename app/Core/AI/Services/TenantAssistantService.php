@@ -423,11 +423,15 @@ class TenantAssistantService
                     // A. AKSI PENGHAPUSAN TRANSAKSI
                     if ($actionType === 'delete') {
                         $targetTx = null;
-                        if (!empty($action['transaction_id'])) {
+                        $candidateTxId = ltrim(trim($action['transaction_id'] ?? ''), '#');
+                        if (empty($candidateTxId) && preg_match('/#([a-f0-9]{6,36})\b/i', $userMessageTrimmed, $idm)) {
+                            $candidateTxId = $idm[1];
+                        }
+                        if (!empty($candidateTxId)) {
                             $targetTx = FinanceTransaction::where('tenant_id', $tenantId)
-                                ->where(function ($q) use ($action) {
-                                    $q->where('id', $action['transaction_id'])
-                                      ->orWhere('id', 'like', $action['transaction_id'] . '%');
+                                ->where(function ($q) use ($candidateTxId) {
+                                    $q->where('id', $candidateTxId)
+                                      ->orWhere('id', 'like', $candidateTxId . '%');
                                 })->first();
                         }
                         if (!$targetTx) {
@@ -455,11 +459,15 @@ class TenantAssistantService
                     // B. AKSI PENGUBAHAN / KOREKSI / RALAT TRANSAKSI (UPDATE)
                     if ($actionType === 'update') {
                         $targetTx = null;
-                        if (!empty($action['transaction_id'])) {
+                        $candidateTxId = ltrim(trim($action['transaction_id'] ?? ''), '#');
+                        if (empty($candidateTxId) && preg_match('/#([a-f0-9]{6,36})\b/i', $userMessageTrimmed, $idm)) {
+                            $candidateTxId = $idm[1];
+                        }
+                        if (!empty($candidateTxId)) {
                             $targetTx = FinanceTransaction::where('tenant_id', $tenantId)
-                                ->where(function ($q) use ($action) {
-                                    $q->where('id', $action['transaction_id'])
-                                      ->orWhere('id', 'like', $action['transaction_id'] . '%');
+                                ->where(function ($q) use ($candidateTxId) {
+                                    $q->where('id', $candidateTxId)
+                                      ->orWhere('id', 'like', $candidateTxId . '%');
                                 })->first();
                         }
                         if (!$targetTx) {
@@ -586,6 +594,48 @@ class TenantAssistantService
                     $firstTx = $recordedTransactions[0];
                     $nominalFormatted = 'Rp ' . number_format($firstTx['amount_minor'] ?? 0, 0, ',', '.');
                     $replyContent = "Transaksi '{$firstTx['description']}' sebesar {$nominalFormatted} telah berhasil dicatat ke dalam sistem.";
+                }
+
+                // Wajib sertakan ID Transaksi pada balasan agar pengguna dapat melakukan perubahan/ralat dengan mudah
+                $txIdSnippets = [];
+                foreach ($recordedTransactions as $rTx) {
+                    if (!empty($rTx['id'])) {
+                        $txIdSnippets[] = '#' . substr($rTx['id'], 0, 8);
+                    }
+                }
+
+                if (!empty($txIdSnippets)) {
+                    $joinedIds = implode(', ', $txIdSnippets);
+                    $hasIdAlready = false;
+                    foreach ($txIdSnippets as $sId) {
+                        if (stripos($replyContent, $sId) !== false) {
+                            $hasIdAlready = true;
+                            break;
+                        }
+                    }
+
+                    if (!$hasIdAlready) {
+                        if ($hasCreate && !$hasUpdate && !$hasDelete) {
+                            $replyContent .= "\n\n(ID Transaksi: {$joinedIds} - sebutkan ID ini jika Anda ingin melakukan perubahan atau pembatalan)";
+                        } elseif ($hasUpdate) {
+                            $replyContent .= "\n\n(ID Transaksi: {$joinedIds} - berhasil diperbarui)";
+                        } elseif ($hasDelete) {
+                            $replyContent .= "\n\n(ID Transaksi: {$joinedIds} - berhasil dihapus)";
+                        }
+                    }
+                }
+            }
+        }
+
+        // Jika pengguna menyatakan koreksi/salah tapi belum menyebutkan rincian nilai pengganti yang baru,
+        // sebutkan transaksi mutasi terakhir yang relevan beserta ID-nya agar pengguna mudah memperbaikinya.
+        if ($isCorrectionIntent && empty($recordedTransactions)) {
+            $lastTx = $this->resolveLastRecordedTransaction($conversation->id, $tenantId);
+            if ($lastTx) {
+                $lastShortId = '#' . substr($lastTx->id, 0, 8);
+                if (stripos($replyContent, $lastShortId) === false) {
+                    $amtStr = MoneyHelper::formatIdr($lastTx->amount_minor);
+                    $replyContent .= "\n\nTransaksi terakhir yang terdeteksi: {$lastShortId} ('{$lastTx->description}', {$amtStr}). Anda dapat menyebutkan bagian yang ingin diperbaiki (misal: 'ubah {$lastShortId} nominal jadi 40rb' atau 'ganti bakso jadi 15rb').";
                 }
             }
         }
@@ -714,6 +764,27 @@ class TenantAssistantService
                         default => 'sekali',
                     };
                     $replyContent = "Baik, jadwal tagihan {$firstRem['title']} sebesar {$nominalFormatted} (jatuh tempo {$dueDateFormatted}, {$intervalLabel}) telah berhasil dimasukkan ke dalam daftar Tagihan & Pengingat.";
+                }
+
+                // Wajib sertakan ID Tagihan pada balasan asisten
+                $remIdSnippets = [];
+                foreach ($recordedReminders as $rRem) {
+                    if (!empty($rRem['id'])) {
+                        $remIdSnippets[] = '#' . substr($rRem['id'], 0, 8);
+                    }
+                }
+                if (!empty($remIdSnippets)) {
+                    $joinedRemIds = implode(', ', $remIdSnippets);
+                    $hasRemIdAlready = false;
+                    foreach ($remIdSnippets as $sId) {
+                        if (stripos($replyContent, $sId) !== false) {
+                            $hasRemIdAlready = true;
+                            break;
+                        }
+                    }
+                    if (!$hasRemIdAlready) {
+                        $replyContent .= "\n\n(ID Tagihan: {$joinedRemIds} - sebutkan ID ini jika Anda ingin melakukan perubahan atau pembatalan)";
+                    }
                 }
             }
         }
@@ -941,6 +1012,27 @@ class TenantAssistantService
                         $targetStr = MoneyHelper::formatIdr((int) $firstSav['target_amount_minor']);
                         $targetDateStr = !empty($firstSav['target_date']) ? ", target pencapaian " . \Carbon\Carbon::parse($firstSav['target_date'])->translatedFormat('d F Y') : '';
                         $replyContent = "Baik, target tabungan '{$firstSav['name']}' sebesar {$targetStr}{$targetDateStr} telah berhasil dibuat ke dalam daftar Tabungan Impian.";
+                    }
+                }
+
+                // Wajib sertakan ID Tabungan pada balasan asisten
+                $savIdSnippets = [];
+                foreach ($recordedSavings as $rSav) {
+                    if (!empty($rSav['id'])) {
+                        $savIdSnippets[] = '#' . substr($rSav['id'], 0, 8);
+                    }
+                }
+                if (!empty($savIdSnippets)) {
+                    $joinedSavIds = implode(', ', $savIdSnippets);
+                    $hasSavIdAlready = false;
+                    foreach ($savIdSnippets as $sId) {
+                        if (stripos($replyContent, $sId) !== false) {
+                            $hasSavIdAlready = true;
+                            break;
+                        }
+                    }
+                    if (!$hasSavIdAlready) {
+                        $replyContent .= "\n\n(ID Tabungan: {$joinedSavIds})";
                     }
                 }
             }

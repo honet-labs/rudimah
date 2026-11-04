@@ -161,4 +161,80 @@ class TenantAiAssistantSecurityTest extends TestCase
         $total = array_sum(array_column($items, 'total_minor'));
         $this->assertEquals(48000, $total);
     }
+
+    public function test_external_chat_gateway_response_includes_short_ids_and_edit_tips(): void
+    {
+        $gatewayService = app(\App\Core\Notifications\Services\ExternalChatGatewayService::class);
+        $reflection = new \ReflectionClass($gatewayService);
+        $method = $reflection->getMethod('formatChatAssistantResponse');
+        $method->setAccessible(true);
+
+        $fakeResponse = (object) [
+            'content' => 'Transaksi berhasil dicatat ke sistem.',
+            'metadata' => [
+                'recorded_transactions' => [
+                    [
+                        'id' => '256b9c1d-8a3f-4e5d-9c1b-7f8d3a2b1c0e',
+                        'type' => 'expense',
+                        'description' => 'Makan malam rebusan jagung',
+                        'amount_minor' => 48000,
+                        'date' => '2026-11-03',
+                        'action' => 'created',
+                    ],
+                ],
+                'recorded_reminders' => [
+                    [
+                        'id' => 'a1b2c3d4-0000-0000-0000-000000000000',
+                        'title' => 'Tagihan Listrik PLN',
+                        'amount_minor' => 150000,
+                        'repeat_interval' => 'monthly',
+                        'due_date' => '2026-11-20',
+                        'action' => 'created',
+                    ],
+                ],
+                'recorded_savings' => [
+                    [
+                        'id' => 'f5e4d3c2-1111-2222-3333-444444444444',
+                        'name' => 'Dana Darurat',
+                        'amount_minor' => 500000,
+                        'current_amount_minor' => 2500000,
+                        'target_amount_minor' => 10000000,
+                        'progress_percent' => 25,
+                        'action' => 'deposited',
+                    ],
+                ],
+            ],
+        ];
+
+        $output = $method->invoke($gatewayService, $fakeResponse);
+
+        // Verifikasi ID transaksi, tagihan, dan tabungan termuat dengan format #<8_karakter>
+        $this->assertStringContainsString('`#256b9c1d`', $output);
+        $this->assertStringContainsString('`#a1b2c3d4`', $output);
+        $this->assertStringContainsString('`#f5e4d3c2`', $output);
+
+        // Verifikasi tips perubahan menggunakan ID disertakan
+        $this->assertStringContainsString('Sebutkan ID (misal: "ubah #id nominal 50rb") jika ingin meralat', $output);
+        $this->assertStringContainsString('Sebutkan ID tagihan jika ingin meralat atau menghapus jadwal', $output);
+    }
+
+    public function test_ai_assistant_extracts_update_action_with_id_prefix(): void
+    {
+        $assistantService = app(\App\Core\AI\Services\TenantAssistantService::class);
+        $reflection = new \ReflectionClass($assistantService);
+        $method = $reflection->getMethod('extractTransactionActions');
+        $method->setAccessible(true);
+
+        $userMsg = 'salah tuh, tolong ubah transaksi #256b9c1d jadi 45rb ya';
+        $aiReply = "Baik, saya perbaiki transaksi tersebut.\n[Info Sistem: Mutasi yang diproses: ID: #256b9c1d (Makan malam, Rp 45.000, 2026-11-03, status: updated)].";
+
+        [$actions, $cleanedReply] = $method->invoke($assistantService, $aiReply, $userMsg);
+
+        $this->assertNotEmpty($actions);
+        $this->assertEquals('update', $actions[0]['action']);
+        $this->assertEquals('256b9c1d', $actions[0]['id']);
+        $this->assertEquals(45000, $actions[0]['amount_minor']);
+        $this->assertStringNotContainsString('[Info Sistem:', $cleanedReply);
+    }
 }
+
