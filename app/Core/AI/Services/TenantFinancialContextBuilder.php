@@ -296,10 +296,10 @@ class TenantFinancialContextBuilder
         $prompt .= "]\n";
         $prompt .= "```\n";
         $prompt .= "PENTING & WAJIB:\n";
-        $prompt .= "1. Blok ```json:transaction_action``` adalah SATU-SATUNYA cara sistem backend mengeksekusi dan menyimpan mutasi transaksi ke database. Jika pengguna meminta mencatat, menambah, menginput, atau melaporkan pengeluaran/pemasukan baru, Anda WAJIB MENYERTAKAN blok ```json:transaction_action```!\n";
-        $prompt .= "2. JANGAN PERNAH hanya menjawab dengan kalimat teks tanpa menyertakan blok ```json:transaction_action``` saat pengguna meminta pencatatan transaksi.\n";
-        $prompt .= "3. DILARANG KERAS menulis atau meniru format sistem teknis seperti '[Info Sistem: Mutasi yang diproses: ...]' atau mengarang ID mutasi sendiri. Seluruh data transaksi wajib dideklarasikan di dalam blok ```json:transaction_action```.\n";
-        $prompt .= "4. DILARANG menyertakan blok ```json:transaction_action``` jika pengguna HANYA bertanya informasi saldo, daftar mutasi, anggaran, atau sekadar konsultasi umum.\n\n";
+        $prompt .= "1. Blok kode JSON aksi (```json:transaction_action```, ```json:reminder_action```, ```json:savings_action```) adalah CARA RESMI sistem backend mengeksekusi dan menyimpan data ke database. Jika pengguna meminta mencatat mutasi pengeluaran/pemasukan baru, menjadwalkan/memasukkan tagihan, atau membuat/menyetor tabungan, Anda WAJIB MENYERTAKAN blok JSON aksi terkait!\n";
+        $prompt .= "2. JANGAN PERNAH hanya menjawab dengan kalimat teks naratif tanpa menyertakan blok JSON aksi saat pengguna meminta input atau pencatatan data ke dalam sistem.\n";
+        $prompt .= "3. DILARANG KERAS menulis atau meniru format sistem teknis seperti '[Info Sistem: Mutasi yang diproses: ...]' atau mengarang ID mutasi sendiri. Seluruh data mutasi wajib dideklarasikan di dalam blok ```json:transaction_action```.\n";
+        $prompt .= "4. DILARANG menyertakan blok kode JSON aksi jika pengguna HANYA bertanya informasi saldo, daftar mutasi, tagihan, anggaran, atau sekadar konsultasi umum.\n\n";
         $prompt .= "=== PEDOMAN RESPON PERCAKAPAN (JELAS, PROFESIONAL, ALAMI, DAN RAMAH) ===\n";
         $prompt .= "1. KEJELASAN KONFIRMASI PENCATATAN (FORMAT ALAMI SEPERTI GAMBAR CONTOH):\n";
         $prompt .= "   - Konfirmasikan apa yang telah dicatat dengan kalimat bahasa Indonesia yang ramah, sopan, dan jelas.\n";

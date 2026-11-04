@@ -312,6 +312,74 @@ class TenantAiAssistantSecurityTest extends TestCase
         $this->assertStringContainsString('kue basah', strtolower($actions[0]['notes']));
         $this->assertEquals(21000, $actions[0]['amount_minor']);
     }
+
+    public function test_ai_assistant_extracts_reminder_actions_properly(): void
+    {
+        $assistantService = app(\App\Core\AI\Services\TenantAssistantService::class);
+        $reflection = new \ReflectionClass($assistantService);
+        $method = $reflection->getMethod('extractReminderActions');
+        $method->setAccessible(true);
+
+        // 1. Ekstraksi dari JSON code block
+        $aiReplyWithJson = "Berikut jadwal tagihan Anda:\n```json:reminder_action\n[\n  {\n    \"action\": \"create\",\n    \"title\": \"Tagihan Internet MyRepublic\",\n    \"amount_minor\": 375000,\n    \"due_date\": \"2026-11-20\",\n    \"repeat_interval\": \"monthly\",\n    \"description\": \"Tagihan internet bulanan\"\n  }\n]\n```";
+        [$actionsJson, $cleanedJson] = $method->invoke($assistantService, $aiReplyWithJson, 'jadwalkan tagihan myrepublic 375rb');
+
+        $this->assertNotEmpty($actionsJson);
+        $this->assertEquals('Tagihan Internet MyRepublic', $actionsJson[0]['title']);
+        $this->assertEquals(375000, $actionsJson[0]['amount_minor']);
+        $this->assertEquals('monthly', $actionsJson[0]['repeat_interval']);
+        $this->assertStringNotContainsString('json:reminder_action', $cleanedJson);
+
+        // 2. Ekstraksi Heuristik tanpa JSON code block
+        $userMsg = 'tolong masukan ini ke tagihan, Tagihan VPS everera 235rb setiap tanggal 1';
+        $aiReplyHeuristic = 'Baik, jadwal tagihan Tagihan VPS Everera sebesar Rp 235.000 telah berhasil dimasukkan ke dalam daftar Tagihan & Pengingat.';
+        [$actionsHeuristic] = $method->invoke($assistantService, $aiReplyHeuristic, $userMsg);
+
+        $this->assertNotEmpty($actionsHeuristic);
+        $this->assertEquals('Tagihan VPS Everera', $actionsHeuristic[0]['title']);
+        $this->assertEquals(235000, $actionsHeuristic[0]['amount_minor']);
+        $this->assertEquals('monthly', $actionsHeuristic[0]['repeat_interval']);
+    }
+
+    public function test_ai_assistant_extracts_savings_actions_properly(): void
+    {
+        $assistantService = app(\App\Core\AI\Services\TenantAssistantService::class);
+        $reflection = new \ReflectionClass($assistantService);
+        $method = $reflection->getMethod('extractSavingsActions');
+        $method->setAccessible(true);
+
+        // 1. Ekstraksi dari JSON code block
+        $aiReplyWithJson = "Baik, setoran telah diproses:\n```json:savings_action\n[\n  {\n    \"action\": \"deposit\",\n    \"name\": \"Dana Darurat\",\n    \"amount_minor\": 500000,\n    \"notes\": \"Setoran tabungan via chat\"\n  }\n]\n```";
+        [$actionsJson, $cleanedJson] = $method->invoke($assistantService, $aiReplyWithJson, 'nabung 500rb ke dana darurat');
+
+        $this->assertNotEmpty($actionsJson);
+        $this->assertEquals('Dana Darurat', $actionsJson[0]['name']);
+        $this->assertEquals('deposit', $actionsJson[0]['action']);
+        $this->assertEquals(500000, $actionsJson[0]['amount_minor']);
+        $this->assertStringNotContainsString('json:savings_action', $cleanedJson);
+
+        // 2. Ekstraksi Heuristik tanpa JSON code block (Setoran)
+        $userDepositMsg = 'nabung 300rb untuk tabungan liburan';
+        $aiDepositReply = 'Baik, setoran sebesar Rp 300.000 ke pos tabungan Liburan telah berhasil dicatat.';
+        [$actionsDeposit] = $method->invoke($assistantService, $aiDepositReply, $userDepositMsg);
+
+        $this->assertNotEmpty($actionsDeposit);
+        $this->assertEquals('Liburan', $actionsDeposit[0]['name']);
+        $this->assertEquals('deposit', $actionsDeposit[0]['action']);
+        $this->assertEquals(300000, $actionsDeposit[0]['amount_minor']);
+
+        // 3. Ekstraksi Heuristik Pembuatan Target Baru
+        $userCreateMsg = 'buat target tabungan Beli Laptop 15 juta target 2026-12-31';
+        $aiCreateReply = 'Baik, target tabungan Beli Laptop sebesar Rp 15.000.000 telah berhasil dibuat.';
+        [$actionsCreate] = $method->invoke($assistantService, $aiCreateReply, $userCreateMsg);
+
+        $this->assertNotEmpty($actionsCreate);
+        $this->assertEquals('Beli Laptop', $actionsCreate[0]['name']);
+        $this->assertEquals('create', $actionsCreate[0]['action']);
+        $this->assertEquals(15000000, $actionsCreate[0]['target_amount_minor']);
+        $this->assertEquals('2026-12-31', $actionsCreate[0]['target_date']);
+    }
 }
+
 
 

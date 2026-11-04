@@ -672,7 +672,39 @@ class TenantAssistantService
                         continue;
                     }
 
-                    // B. AKSI JADWALKAN TAGIHAN BARU / UPDATE
+                    // B. AKSI PERBARUI / EDIT TAGIHAN (UPDATE)
+                    if ($rawRemAction === 'update') {
+                        $targetRem = null;
+                        if (!empty($remAction['reminder_id'])) {
+                            $targetRem = FinanceReminder::where('tenant_id', $tenantId)->find($remAction['reminder_id']);
+                        }
+                        if (!$targetRem && !empty($remTitle)) {
+                            $targetRem = FinanceReminder::where('tenant_id', $tenantId)
+                                ->where('title', 'like', '%' . $remTitle . '%')
+                                ->orderBy('created_at', 'desc')
+                                ->first();
+                        }
+                        if ($targetRem) {
+                            if ($remAmount > 0) $targetRem->amount_minor = $remAmount;
+                            if (!empty($remTitle)) $targetRem->title = $remTitle;
+                            if (!empty($remDueDate)) $targetRem->due_date = $remDueDate;
+                            if (!empty($remInterval)) $targetRem->repeat_interval = $remInterval;
+                            $targetRem->updated_by = auth()->id() ?: null;
+                            $targetRem->save();
+
+                            $recordedReminders[] = [
+                                'id' => $targetRem->id,
+                                'action' => 'updated',
+                                'title' => $targetRem->title,
+                                'amount_minor' => $targetRem->amount_minor,
+                                'due_date' => $targetRem->due_date ? \Carbon\Carbon::parse($targetRem->due_date)->format('Y-m-d') : null,
+                                'repeat_interval' => $targetRem->repeat_interval,
+                            ];
+                            continue;
+                        }
+                    }
+
+                    // C. AKSI JADWALKAN TAGIHAN BARU (CREATE)
                     if ($remAmount <= 0) {
                         continue;
                     }
@@ -682,12 +714,12 @@ class TenantAssistantService
                     $reminder->tenant_id = $tenantId;
                     $reminder->title = $remTitle;
                     $reminder->amount_minor = $remAmount;
-                    $reminder->currency = 'Rp';
+                    $reminder->currency = 'IDR';
                     $reminder->due_date = $remDueDate;
                     $reminder->repeat_interval = $remInterval;
                     $reminder->description = $remAction['description'] ?? "Jadwal {$remTitle} {$remInterval}";
                     $reminder->status = 'pending';
-                    $reminder->created_by = auth()->id();
+                    $reminder->created_by = auth()->id() ?: null;
 
                     // Cari kategori tagihan/utilitas yang cocok
                     $category = FinanceCategory::where('tenant_id', $tenantId)
@@ -792,6 +824,11 @@ class TenantAssistantService
                         if ($depAmount <= 0) {
                             $depAmount = $this->parseIndonesianNominal($userMessageTrimmed);
                         }
+                        if ($depAmount <= 0) {
+                            if (preg_match('/(?:sebesar|senilai|total)?\s*(?:Rp\.?|IDR)?\s*([\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i', $replyContent, $sam)) {
+                                $depAmount = $this->parseIndonesianNominal($sam[1]);
+                            }
+                        }
 
                         if ($depAmount > 0) {
                             $targetSav = null;
@@ -812,10 +849,10 @@ class TenantAssistantService
                                 $targetSav->name = $savName;
                                 $targetSav->target_amount_minor = $depAmount * 10;
                                 $targetSav->current_amount_minor = 0;
-                                $targetSav->currency = 'Rp';
+                                $targetSav->currency = 'IDR';
                                 $targetSav->start_date = now()->toDateString();
                                 $targetSav->status = 'active';
-                                $targetSav->created_by = auth()->id();
+                                $targetSav->created_by = auth()->id() ?: null;
                                 $targetSav->save();
                             }
 
@@ -856,6 +893,11 @@ class TenantAssistantService
                         $wthAmount = (int) ($savAction['amount_minor'] ?? 0);
                         if ($wthAmount <= 0) {
                             $wthAmount = $this->parseIndonesianNominal($userMessageTrimmed);
+                        }
+                        if ($wthAmount <= 0) {
+                            if (preg_match('/(?:sebesar|senilai|total)?\s*(?:Rp\.?|IDR)?\s*([\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i', $replyContent, $sam)) {
+                                $wthAmount = $this->parseIndonesianNominal($sam[1]);
+                            }
                         }
 
                         if ($wthAmount > 0) {
@@ -905,9 +947,14 @@ class TenantAssistantService
                     if ($targetAmount <= 0) {
                         $targetAmount = $this->parseIndonesianNominal($userMessageTrimmed);
                     }
-
                     if ($targetAmount <= 0) {
-                        continue;
+                        if (preg_match('/(?:target|sebesar|senilai)?\s*(?:Rp\.?|IDR)?\s*([\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i', $replyContent, $sam)) {
+                            $targetAmount = $this->parseIndonesianNominal($sam[1]);
+                        }
+                    }
+
+                    if ($targetAmount < 0) {
+                        $targetAmount = 0;
                     }
 
                     $initialAmount = (int) ($savAction['current_amount_minor'] ?? 0);
@@ -919,12 +966,12 @@ class TenantAssistantService
                     $savings->name = $savName;
                     $savings->target_amount_minor = $targetAmount;
                     $savings->current_amount_minor = $initialAmount;
-                    $savings->currency = 'Rp';
+                    $savings->currency = 'IDR';
                     $savings->start_date = now()->toDateString();
                     $savings->target_date = $targetDate;
                     $savings->notes = $savAction['notes'] ?? "Target tabungan {$savName}";
                     $savings->status = ($initialAmount >= $targetAmount && $targetAmount > 0) ? 'completed' : 'active';
-                    $savings->created_by = auth()->id();
+                    $savings->created_by = auth()->id() ?: null;
                     $savings->save();
 
                     $recordedSavings[] = [
@@ -1014,43 +1061,50 @@ class TenantAssistantService
         $isNegatedOrQuestion = (bool) preg_match('/\b(belum|jangan|tidak|bukan|kok|kenapa|mengapa)\s+(?:pernah\s+)?(?:di)?(?:catat|catet|simpan|masuk|input|perbarui|update)\b/i', $userMessageText)
             && !preg_match('/\b(tolong\s+(?:catat|catet)|sekarang\s+(?:catat|catet)|catat\s+ulang|catet\s+ulang|masukkan\s+ulang|buatkan\s+baru)\b/i', $userMessageText);
 
-        $isReminderScheduleIntent = (bool) preg_match('/\b(?:masuk(?:in|kan)?|jadwal(?:kan)?|tambah(?:kan)?|catat|catet)\s+(?:ini\s+)?ke\s+tagihan\b/i', $userMessageText)
-            || (bool) preg_match('/\b(jadwal(?:kan)?|pengingat)\s+tagihan\b/i', $userMessageText);
+        $isReminderScheduleIntent = (bool) preg_match('/\b(?:masuk(?:in|kan)?|jadwal(?:kan)?|tambah(?:kan)?|catat|catet|simpan|buat(?:kan)?|ingatkan)\s+(?:ini\s+)?(?:ke\s+tagihan|tagihan|jadwal\s+tagihan|pengingat)\b/i', $userMessageText)
+            || (bool) preg_match('/\b(jadwal(?:kan)?|pengingat)\s+tagihan\b/i', $userMessageText)
+            || (bool) preg_match('/\btagihan\b.*?\b(?:setiap|tiap|jatuh\s+tempo|bulanan|mingguan|tahunan)\b/i', $userMessageText)
+            || (bool) preg_match('/\btagihan\s+([A-Za-z0-9\s]{2,30}?)\s+(?:sebesar\s+)?(?:rp\.?|idr)?\s*[\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?/i', $userMessageText);
 
-        $isSavingsIntent = (bool) preg_match('/\b(?:buat(?:kan)?|tambah(?:kan)?|bikin)\s+(?:target\s+)?tabungan\b/i', $userMessageText)
-            || (bool) preg_match('/\b(?:nabung|menabung|setor|setorkan)\s+.*?ke\s+(?:tabungan|pos\s+tabungan)\b/i', $userMessageText)
-            || (bool) preg_match('/\b(?:tarik|ambil)\s+.*?dari\s+tabungan\b/i', $userMessageText);
+        $isSavingsIntent = (bool) preg_match('/\b(?:buat(?:kan)?|tambah(?:kan)?|bikin|pos)\s+(?:target\s+)?tabungan\b/i', $userMessageText)
+            || (bool) preg_match('/\b(?:nabung|menabung|setor|setorkan|tabung|simpan)\s+.*?\b(?:ke|untuk|buat|di)\s+(?:tabungan|pos\s+tabungan)\b/i', $userMessageText)
+            || (bool) preg_match('/\b(?:nabung|menabung|tabung)\s+(?:sebesar\s+)?(?:rp\.?|idr)?\s*[\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?/i', $userMessageText)
+            || (bool) preg_match('/\b(?:tarik|ambil)\s+.*?dari\s+tabungan\b/i', $userMessageText)
+            || (bool) preg_match('/\b(?:hapus|batalkan)\s+(?:target\s+)?tabungan\b/i', $userMessageText);
 
         if ($isInformationalQuery || $isNegatedOrQuestion || $isReminderScheduleIntent || $isSavingsIntent) {
             // Bersihkan blok kode JSON action jika model AI keliru menyertakannya saat menjawab pertanyaan informasi atau penjadwalan tagihan/tabungan
-            $cleaned = preg_replace('/```(?:json:transaction_action|json)?\s*(\[\s*\{.*?\}\s*\]|\{\s*"type"\s*:.*?\}\s*)\s*```/is', '', $replyContent);
+            $cleaned = preg_replace('/```(?:json:transaction_action|transaction_action)\s*[\s\S]*?```/is', '', $replyContent);
             $cleaned = preg_replace('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?).*?\]/is', '', $cleaned);
             return [[], trim($cleaned ?: $replyContent)];
         }
 
-        // 1. Ekstraksi Primer: Blok ```json:transaction_action ... ``` atau ```json ... ``` (array)
-        if (preg_match('/```(?:json:transaction_action|json)?\s*(\[\s*\{.*?\}\s*\])\s*```/is', $replyContent, $matches)) {
-            $parsed = json_decode($matches[1], true);
-            if (is_array($parsed) && !empty($parsed)) {
-                $cleaned = trim(str_replace($matches[0], '', $replyContent));
-                $cleaned = preg_replace('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?).*?\]/is', '', $cleaned);
-                return [$parsed, trim($cleaned)];
+        // 1. Ekstraksi Primer: Blok ```json:transaction_action ... ``` atau ```transaction_action ... ``` atau ```json ... ```
+        if (preg_match('/```(?:json:transaction_action|transaction_action|json)?\s*([\s\S]*?)\s*```/i', $replyContent, $fenceMatches)) {
+            $codeBlock = trim($fenceMatches[1]);
+            if (preg_match('/(\[\s*[\s\S]*\s*\]|\{\s*[\s\S]*\s*\})/s', $codeBlock, $jsonMatches)) {
+                $rawJson = trim($jsonMatches[1]);
+                $cleanJson = preg_replace('/,\s*([\]\}])/', '$1', $rawJson);
+                $parsed = json_decode($cleanJson, true);
+                if (is_array($parsed) && !empty($parsed)) {
+                    $firstElement = isset($parsed[0]) ? $parsed[0] : $parsed;
+                    $isTxPayload = isset($firstElement['type'])
+                        || isset($firstElement['amount_minor'])
+                        || (isset($firstElement['action']) && in_array(strtolower($firstElement['action']), ['create', 'update', 'delete']) && !isset($firstElement['repeat_interval']) && !isset($firstElement['target_amount_minor']));
+                    if ($isTxPayload) {
+                        $cleaned = trim(str_replace($fenceMatches[0], '', $replyContent));
+                        $cleaned = preg_replace('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?).*?\]/is', '', $cleaned);
+                        return [isset($parsed['type']) || isset($parsed['action']) ? [$parsed] : $parsed, trim($cleaned)];
+                    }
+                }
             }
         }
 
-        // 2. Ekstraksi Sekunder: Blok objek tunggal ```json:transaction_action { ... } ```
-        if (preg_match('/```(?:json:transaction_action|json)?\s*(\{\s*"type"\s*:.*?\}\s*)\s*```/is', $replyContent, $matches)) {
-            $parsed = json_decode($matches[1], true);
-            if (is_array($parsed) && !empty($parsed)) {
-                $cleaned = trim(str_replace($matches[0], '', $replyContent));
-                $cleaned = preg_replace('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?).*?\]/is', '', $cleaned);
-                return [[$parsed], trim($cleaned)];
-            }
-        }
-
-        // 3. Ekstraksi Tertier: JSON array mentah tanpa markdown fence
-        if (preg_match('/(\[\s*\{\s*"type"\s*:.*?"amount_minor"\s*:.*?\}\s*\])/is', $replyContent, $matches)) {
-            $parsed = json_decode($matches[1], true);
+        // 2. Ekstraksi Sekunder: JSON array mentah tanpa markdown fence
+        if (preg_match('/(\[\s*\{\s*"(?:type|action)"\s*:[\s\S]*?"amount_minor"\s*:[\s\S]*?\}\s*\])/i', $replyContent, $matches)) {
+            $rawJson = trim($matches[1]);
+            $cleanJson = preg_replace('/,\s*([\]\}])/', '$1', $rawJson);
+            $parsed = json_decode($cleanJson, true);
             if (is_array($parsed) && !empty($parsed)) {
                 $cleaned = trim(str_replace($matches[0], '', $replyContent));
                 $cleaned = preg_replace('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?).*?\]/is', '', $cleaned);
@@ -1139,22 +1193,27 @@ class TenantAssistantService
             }
         }
 
-        // 5. Ekstraksi Cerdas: Permintaan Eksplisit Pencatatan Transaksi dari Pengguna
-        $isUserAskingToRecord = !$isNegatedOrQuestion && (bool) preg_match('/\b(masuk(?:in|kan)?|catat(?:kan|in)?|catet(?:in)?|nyatet|tambah(?:kan)?|simpan|input|buatkan\s+mutasi|beli|makan|minum|jajan|belanja|bayar)\b/i', $userMessageText);
+        // 5. Ekstraksi Cerdas: Permintaan Eksplisit Pencatatan Transaksi dari Pengguna atau Konfirmasi AI
+        $isUserAskingToRecord = !$isNegatedOrQuestion && (bool) preg_match('/\b(masuk(?:in|kan)?|catat(?:kan|in)?|catet(?:in)?|nyatet|tambah(?:kan)?|simpan|input|buatkan\s+mutasi|beli|makan|minum|jajan|belanja|bayar|sarapan|ngopi|kopi|isi\s+bensin|bensin|pertamax|pertalite|solar|parkir|ongkir|pulsa|paket\s+data|listrik|token|obat|gaji|honor|upah|transfer)\b/i', $userMessageText);
+        $isAiConfirmingRecord = (bool) preg_match('/\b(catat|mencatat|dicatat|berhasil\s+dicatat|dimasukkan|memasukkan|telah\s+masuk|disimpan|menyimpan|didaftarkan|tersimpan|dibukukan|berhasil\s+disimpan)\b/i', $replyContent);
 
-        if ($isUserAskingToRecord) {
+        if ($isUserAskingToRecord || $isAiConfirmingRecord) {
             // A. Urai item-item transaksi dari teks pesan pengguna
             $userItems = $this->parseUserExpenseItems($userMessageText);
 
-            // B. Ekstraksi nominal & kategori dari balasan konfirmasi AI jika ada
-            $isAiConfirmingRecord = (bool) preg_match('/\b(dicatat|berhasil\s+dicatat|dimasukkan|telah\s+masuk|disimpan|didaftarkan)\b/i', $replyContent);
-
+            // B. Ekstraksi nominal & kategori dari balasan konfirmasi AI atau pesan pengguna
             $narrativeAmountMinor = 0;
-            if (preg_match('/(?:total\s+(?:sebesar\s+)?|sebesar\s+|senilai\s+)?(?:Rp\.?|IDR)?\s*([\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)\s*(?:tanggal|\btanggal\b|ke\s+kategori|dicatat|dimasukkan|berhasil)/i', $replyContent, $totM)) {
+            if (preg_match('/(?:total\s+(?:sebesar\s+)?|sebesar\s+|senilai\s+)?(?:Rp\.?|IDR)?\s*([\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)\s*(?:tanggal|\btanggal\b|ke\s+kategori|dicatat|dimasukkan|berhasil|tersimpan)/i', $replyContent, $totM)) {
                 $narrativeAmountMinor = $this->parseIndonesianNominal($totM[1]);
             }
-            if ($narrativeAmountMinor <= 0 && preg_match('/(?:total|sebesar)\s+(?:Rp\.?|IDR)?\s*([\d\.,]+)/i', $replyContent, $totM2)) {
-                $narrativeAmountMinor = (int) preg_replace('/[^\d]/', '', $totM2[1]);
+            if ($narrativeAmountMinor <= 0 && preg_match('/(?:total|sebesar|senilai)\s+(?:Rp\.?|IDR)?\s*([\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i', $replyContent, $totM2)) {
+                $narrativeAmountMinor = $this->parseIndonesianNominal($totM2[1]);
+            }
+            if ($narrativeAmountMinor <= 0 && preg_match('/(?:Rp\.?|IDR)\s*([\d\.,]+)/i', $replyContent, $totM3)) {
+                $narrativeAmountMinor = (int) preg_replace('/[^\d]/', '', $totM3[1]);
+            }
+            if ($narrativeAmountMinor <= 0) {
+                $narrativeAmountMinor = $this->parseIndonesianNominal($userMessageText);
             }
 
             $categoryCandidate = null;
@@ -1171,6 +1230,14 @@ class TenantAssistantService
                 } catch (\Throwable $e) {}
             }
 
+            $merchantCandidate = null;
+            if (preg_match('/\bdi\s+([A-Za-z0-9\s]{2,35}?)(?:\s+(?:sebesar|seharga|senilai|\d|rp|\,|$|\.))/i', $userMessageText . ' ' . $replyContent, $umMatch)) {
+                $cand = trim($umMatch[1]);
+                if (!preg_match('/^(hari|sini|situ|sana|atas|bawah|dalam|luar|kemarin|tadi)$/i', $cand)) {
+                    $merchantCandidate = ucwords($cand);
+                }
+            }
+
             // Jika user menyebutkan beberapa item belanjaan secara spesifik
             if (!empty($userItems)) {
                 $itemsTotal = array_sum(array_column($userItems, 'total_minor'));
@@ -1182,13 +1249,6 @@ class TenantAssistantService
                     $desc .= ' dan ' . (count($userItems) - 3) . ' item lainnya';
                 }
 
-                $merchantCandidate = null;
-                if (preg_match('/\bdi\s+(?:di\s+)?([A-Za-z0-9\s]{2,35}?)(?:\s+(?:sebesar|seharga|senilai|\d|rp|\,|$|\.))/i', $userMessageText, $umMatch)) {
-                    $cand = trim($umMatch[1]);
-                    if (!preg_match('/^(hari|sini|situ|sana|atas|bawah|dalam|luar|kemarin|tadi)$/i', $cand)) {
-                        $merchantCandidate = ucwords($cand);
-                    }
-                }
                 if (!empty($merchantCandidate) && stripos($desc, $merchantCandidate) === false) {
                     $desc .= " di {$merchantCandidate}";
                 }
@@ -1219,52 +1279,41 @@ class TenantAssistantService
                 return [[$txAction], trim($cleaned)];
             }
 
-            // Jika AI mengonfirmasi pencatatan nominal tertentu namun rincian item tidak terurai di pesan user:
-            if ($isAiConfirmingRecord && $narrativeAmountMinor > 0) {
-                $aiItems = [];
-                if (preg_match_all('/([A-Za-z0-9\s]{2,35}?)\s+(?:Rp\.?|IDR)\s*([\d\.,]+)/i', $replyContent, $aiItemMatches, PREG_SET_ORDER)) {
-                    foreach ($aiItemMatches as $aim) {
-                        $itName = trim($aim[1]);
-                        if (!in_array(strtolower($itName), ['total', 'subtotal', 'sebesar', 'senilai', 'saldo'])) {
-                            $itPrice = (int) preg_replace('/[^\d]/', '', $aim[2]);
-                            if ($itPrice > 0) {
-                                $aiItems[] = [
-                                    'item_name' => ucwords($itName),
-                                    'quantity' => 1,
-                                    'price_minor' => $itPrice,
-                                    'total_minor' => $itPrice,
-                                    'discount_minor' => 0,
-                                ];
-                            }
-                        }
-                    }
-                }
+            // Jika rincian item tunggal atau nominal dari pesan user/AI valid
+            if ($narrativeAmountMinor > 0) {
+                $cleanUserText = trim($userMessageText);
+                $cleanUserText = preg_replace('/(?:tolong|segera|mohon)?\s*(?:di)?(?:catat(?:kan|in)?|catet(?:in)?|simpan|masuk(?:in|kan)?|nyatet|input)\s*(?:ya|dong|min|om)?[\.!]?$/i', '', $cleanUserText);
+                $cleanUserText = preg_replace('/^(?:tolong|segera|mohon)?\s*(?:di)?(?:catat(?:kan|in)?|catet(?:in)?|simpan|masuk(?:in|kan)?|nyatet|input)\s*/i', '', $cleanUserText);
+                $cleanUserText = trim($cleanUserText, " \t\n\r\0\x0B.,;:-");
 
-                $desc = 'Pengeluaran via Asisten AI';
-                if (!empty($aiItems)) {
-                    $itemNames = array_map(fn($it) => $it['item_name'], array_slice($aiItems, 0, 3));
-                    $desc = 'Beli ' . implode(', ', $itemNames);
-                    if (count($aiItems) > 3) {
-                        $desc .= ' dan ' . (count($aiItems) - 3) . ' item lainnya';
-                    }
-                }
+                $shortTitle = $this->generateShortTransactionSummary($cleanUserText ?: 'Pengeluaran', $userMessageText, $merchantCandidate);
+                $isIncome = (bool) preg_match('/(pemasukan|gaji|income|transfer masuk|honor|upah)\b/i', $userMessageText);
+                $type = $isIncome ? 'income' : 'expense';
 
-                $shortTitle = $this->generateShortTransactionSummary($desc, $userMessageText);
                 $txAction = [
                     'action' => 'create',
-                    'type' => 'expense',
+                    'type' => $type,
                     'description' => $shortTitle,
-                    'notes' => $desc,
-                    'merchant_name' => null,
+                    'notes' => $cleanUserText ?: $shortTitle,
+                    'merchant_name' => $merchantCandidate,
                     'amount_minor' => $narrativeAmountMinor,
                     'date' => $txDate,
                     'category' => $categoryCandidate,
-                    'items' => $aiItems,
+                    'items' => [
+                        [
+                            'item_name' => $shortTitle,
+                            'quantity' => 1,
+                            'price_minor' => $narrativeAmountMinor,
+                            'total_minor' => $narrativeAmountMinor,
+                            'discount_minor' => 0,
+                        ],
+                    ],
                 ];
 
                 $cleaned = preg_replace('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?).*?\]/is', '', $replyContent);
                 return [[$txAction], trim($cleaned)];
             }
+        }
 
             // C. Ekstraksi format list baris item standar ("- Item: Rp XX.XXX")
             $transactions = [];
@@ -1327,7 +1376,7 @@ class TenantAssistantService
 
         // Pola item dan nominal dalam bahasa Indonesia:
         // "<nama item> <angka nominal>"
-        $pattern = '/(?:(?:dan|serta|sama|\,)\s+)?(?:(?:tadi\s+)?(?:makan\s+(?:siang|malam|pagi)\s+)?(?:beli\s+)?)?([a-zA-Z0-9\s]{2,40}?)\s+([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))|\b\d{4,8}\b)(?=(?:\s*(?:dan|serta|sama|\,|\.|\;|\btolong\b|\bcatat\b|\bcatet\b|\bya\b|\bbeli\b|\bdi\b|$)))/i';
+        $pattern = '/(?:(?:dan|serta|sama|\,)\s+)?(?:(?:tadi\s+)?(?:makan\s+(?:siang|malam|pagi)\s+)?(?:beli\s+)?)?([a-zA-Z0-9\s\&\+\-\/\.]{2,80}?)\s+([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))|\b\d{4,8}\b)(?=(?:\s*(?:dan|serta|sama|\,|\.|\;|\btolong\b|\bcatat\b|\bcatet\b|\bya\b|\bbeli\b|\bdi\b|$)))/i';
 
         $items = [];
         if (preg_match_all($pattern, $cleanedText, $matches, PREG_SET_ORDER)) {
@@ -1339,6 +1388,8 @@ class TenantAssistantService
                 $rawItemName = preg_replace('/^(?:dan|serta|sama|lalu|juga|tadi|beli|makan|minum)\s+/i', '', $rawItemName);
                 $rawItemName = preg_replace('/^(?:makan\s+(?:siang|malam|pagi)\s+)/i', '', $rawItemName);
                 $rawItemName = preg_replace('/^(?:beli\s+)/i', '', $rawItemName);
+                $rawItemName = preg_replace('/^(?:sarapan|jajan|jajanan)\s+/i', '', $rawItemName);
+                $rawItemName = preg_replace('/\s+di\s+[a-zA-Z0-9\s]+$/i', '', $rawItemName);
                 $rawItemName = trim($rawItemName);
 
                 // Abaikan jika nama item adalah kata keterangan waktu atau umum
@@ -1888,34 +1939,46 @@ class TenantAssistantService
      */
     protected function extractReminderActions(string $replyContent, string $userMessageText): array
     {
-        // 1. Ekstraksi Primer: Blok ```json:reminder_action ... ```
-        if (preg_match('/```(?:json:reminder_action|reminder_action)?\s*(\[\s*\{.*?\}\s*\])\s*```/is', $replyContent, $matches)) {
-            $parsed = json_decode($matches[1], true);
-            if (is_array($parsed) && !empty($parsed)) {
-                $cleaned = trim(str_replace($matches[0], '', $replyContent));
-                return [$parsed, $cleaned];
+        // 1. Ekstraksi Primer: Blok ```json:reminder_action ... ``` atau ```reminder_action ... ``` atau ```json ... ``` dengan payload reminder
+        if (preg_match('/```(?:json:reminder_action|reminder_action|json)?\s*([\s\S]*?)\s*```/i', $replyContent, $fenceMatches)) {
+            $codeBlock = trim($fenceMatches[1]);
+            if (preg_match('/(\[\s*[\s\S]*\s*\]|\{\s*[\s\S]*\s*\})/s', $codeBlock, $jsonMatches)) {
+                $cleanJson = preg_replace('/,\s*([\]\}])/', '$1', trim($jsonMatches[1]));
+                $parsed = json_decode($cleanJson, true);
+                if (is_array($parsed) && !empty($parsed)) {
+                    $firstElement = isset($parsed[0]) ? $parsed[0] : $parsed;
+                    $isReminderPayload = isset($firstElement['title'])
+                        || isset($firstElement['repeat_interval'])
+                        || (isset($firstElement['action']) && in_array(strtolower($firstElement['action']), ['create', 'update', 'delete']) && isset($firstElement['due_date']));
+                    if ($isReminderPayload) {
+                        $cleaned = trim(str_replace($fenceMatches[0], '', $replyContent));
+                        return [isset($parsed['title']) ? [$parsed] : $parsed, trim($cleaned)];
+                    }
+                }
             }
         }
 
-        // 2. Ekstraksi Sekunder: Blok objek tunggal ```json:reminder_action { ... } ```
-        if (preg_match('/```(?:json:reminder_action|reminder_action)?\s*(\{\s*"title"\s*:.*?\}\s*)\s*```/is', $replyContent, $matches)) {
-            $parsed = json_decode($matches[1], true);
+        // 2. Ekstraksi Sekunder: JSON array/objek tanpa markdown fence
+        if (preg_match('/(\[\s*\{[\s\S]*?"title"\s*:[\s\S]*?\}\s*\]|\{\s*[\s\S]*?"title"\s*:[\s\S]*?"(?:amount_minor|due_date|repeat_interval)"[\s\S]*?\})/i', $replyContent, $matches)) {
+            $cleanJson = preg_replace('/,\s*([\]\}])/', '$1', trim($matches[1]));
+            $parsed = json_decode($cleanJson, true);
             if (is_array($parsed) && !empty($parsed)) {
                 $cleaned = trim(str_replace($matches[0], '', $replyContent));
-                return [[$parsed], $cleaned];
+                return [isset($parsed['title']) ? [$parsed] : $parsed, trim($cleaned)];
             }
         }
 
-        // 3. Ekstraksi Heuristik jika pengguna berniat menjadwalkan/memasukkan tagihan
-        // (contoh: "tolong masukan ini ke tagihan, Tagihan VPS everera 235rb setiap tanggal 1")
-        $isReminderScheduleIntent = (bool) preg_match('/\b(?:masuk(?:in|kan)?|jadwal(?:kan)?|tambah(?:kan)?|catat)\s+(?:ini\s+)?ke\s+tagihan\b/i', $userMessageText)
+        // 3. Ekstraksi Heuristik jika pengguna berniat menjadwalkan/memasukkan tagihan ATAU jika AI mengonfirmasi penjadwalan tagihan
+        $isReminderScheduleIntent = (bool) preg_match('/\b(?:masuk(?:in|kan)?|jadwal(?:kan)?|tambah(?:kan)?|catat|catet|simpan|buat(?:kan)?|ingatkan)\s+(?:ini\s+)?(?:ke\s+tagihan|tagihan|jadwal\s+tagihan|pengingat)\b/i', $userMessageText)
             || (bool) preg_match('/\b(jadwal(?:kan)?|pengingat)\s+tagihan\b/i', $userMessageText)
-            || (bool) preg_match('/\btagihan\b.*?\b(?:setiap|tiap|jatuh\s+tempo|bulanan)\b/i', $userMessageText);
+            || (bool) preg_match('/\btagihan\b.*?\b(?:setiap|tiap|jatuh\s+tempo|bulanan|mingguan|tahunan)\b/i', $userMessageText)
+            || (bool) preg_match('/\btagihan\s+([A-Za-z0-9\s]{2,30}?)\s+(?:sebesar\s+)?(?:rp\.?|idr)?\s*[\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?/i', $userMessageText);
 
-        if ($isReminderScheduleIntent) {
-            $extracted = $this->extractReminderFromUserText($userMessageText);
+        $isAiConfirmingReminder = (bool) preg_match('/\b(?:jadwal\s+tagihan|tagihan\s+.*?\b(?:berhasil\s+(?:dijadwalkan|dimasukkan|dicatat|disimpan)|telah\s+(?:dijadwalkan|dimasukkan|dicatat)|sudah\s+dijadwalkan))\b/i', $replyContent);
+
+        if ($isReminderScheduleIntent || $isAiConfirmingReminder) {
+            $extracted = $this->extractReminderFromUserText($userMessageText, $replyContent);
             if ($extracted) {
-                // Bersihkan blok tindakan yang mungkin salah
                 $cleaned = preg_replace('/```(?:json:reminder_action|reminder_action|json)?\s*[\s\S]*?```/i', '', $replyContent);
                 return [[$extracted], trim($cleaned ?: $replyContent)];
             }
@@ -1925,14 +1988,26 @@ class TenantAssistantService
     }
 
     /**
-     * Mengekstrak rincian jadwal tagihan secara heuristik dari kalimat pengguna.
+     * Mengekstrak rincian jadwal tagihan secara heuristik dari kalimat pengguna dan balasan AI.
      */
-    protected function extractReminderFromUserText(string $userText): ?array
+    protected function extractReminderFromUserText(string $userText, string $replyContent = ''): ?array
     {
         $amountMinor = 0;
-        // Cari nominal uang: 235rb, Rp 235.000, 235000, 235 ribu
-        if (preg_match('/(?:rp\.?\s*)?([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i', $userText, $am)) {
-            $amountMinor = $this->parseIndonesianNominal($am[0]);
+        $combinedText = $userText . ' ' . $replyContent;
+
+        // Cari nominal uang terverifikasi: nominal dengan embel-embel Rp, rb, ribu, k, juta, jt, atau bilangan bulat >= 1000
+        if (preg_match_all('/(?:(?:rp\.?|idr)\s*([\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)|([\d\.,]+)\s*(?:ribu|rb|k|juta|jt)|\b(\d{4,9})\b)/i', $combinedText, $allMatches, PREG_SET_ORDER)) {
+            $candidates = [];
+            foreach ($allMatches as $m) {
+                $rawStr = !empty($m[1]) ? $m[1] : (!empty($m[2]) ? $m[0] : $m[3]);
+                $val = $this->parseIndonesianNominal($rawStr);
+                if ($val >= 1000) {
+                    $candidates[] = $val;
+                }
+            }
+            if (!empty($candidates)) {
+                $amountMinor = max($candidates);
+            }
         }
 
         if ($amountMinor <= 0) {
@@ -1959,6 +2034,15 @@ class TenantAssistantService
             $candidate = trim($tm[1]);
             if (!empty($candidate)) {
                 $title = stripos($candidate, 'tagihan') === false ? 'Tagihan ' . ucwords($candidate) : ucwords($candidate);
+            }
+        }
+
+        if (empty($title)) {
+            if (preg_match('/(?:tagihan\s+jadwal|jadwal\s+tagihan|tagihan)\s+([A-Za-z0-9\s\-_]{3,35}?)(?:\s+sebesar|\s+jatuh|\s+\d|\s*$)/i', $replyContent, $rtm)) {
+                $candidate = trim($rtm[1]);
+                if (!empty($candidate)) {
+                    $title = stripos($candidate, 'tagihan') === false ? 'Tagihan ' . ucwords($candidate) : ucwords($candidate);
+                }
             }
         }
 
@@ -2061,32 +2145,46 @@ class TenantAssistantService
      */
     protected function extractSavingsActions(string $replyContent, string $userMessageText): array
     {
-        // 1. Ekstraksi Primer: Blok ```json:savings_action ... ```
-        if (preg_match('/```(?:json:savings_action|savings_action)?\s*(\[\s*\{.*?\}\s*\])\s*```/is', $replyContent, $matches)) {
-            $parsed = json_decode($matches[1], true);
-            if (is_array($parsed) && !empty($parsed)) {
-                $cleaned = trim(str_replace($matches[0], '', $replyContent));
-                return [$parsed, $cleaned];
+        // 1. Ekstraksi Primer: Blok ```json:savings_action ... ``` atau ```savings_action ... ``` atau ```json ... ``` dengan payload savings
+        if (preg_match('/```(?:json:savings_action|savings_action|json)?\s*([\s\S]*?)\s*```/i', $replyContent, $fenceMatches)) {
+            $codeBlock = trim($fenceMatches[1]);
+            if (preg_match('/(\[\s*[\s\S]*\s*\]|\{\s*[\s\S]*\s*\})/s', $codeBlock, $jsonMatches)) {
+                $cleanJson = preg_replace('/,\s*([\]\}])/', '$1', trim($jsonMatches[1]));
+                $parsed = json_decode($cleanJson, true);
+                if (is_array($parsed) && !empty($parsed)) {
+                    $firstElement = isset($parsed[0]) ? $parsed[0] : $parsed;
+                    $isSavingsPayload = isset($firstElement['name'])
+                        || isset($firstElement['target_amount_minor'])
+                        || (isset($firstElement['action']) && in_array(strtolower($firstElement['action']), ['create', 'deposit', 'withdraw', 'delete']));
+                    if ($isSavingsPayload) {
+                        $cleaned = trim(str_replace($fenceMatches[0], '', $replyContent));
+                        return [isset($parsed['name']) ? [$parsed] : $parsed, trim($cleaned)];
+                    }
+                }
             }
         }
 
-        // 2. Ekstraksi Sekunder: Blok objek tunggal ```json:savings_action { ... } ```
-        if (preg_match('/```(?:json:savings_action|savings_action)?\s*(\{\s*"name"\s*:.*?\}\s*)\s*```/is', $replyContent, $matches)) {
-            $parsed = json_decode($matches[1], true);
+        // 2. Ekstraksi Sekunder: JSON array/objek tanpa markdown fence
+        if (preg_match('/(\[\s*\{[\s\S]*?"name"\s*:[\s\S]*?\}\s*\]|\{\s*[\s\S]*?"name"\s*:[\s\S]*?"(?:target_amount_minor|amount_minor|action)"[\s\S]*?\})/i', $replyContent, $matches)) {
+            $cleanJson = preg_replace('/,\s*([\]\}])/', '$1', trim($matches[1]));
+            $parsed = json_decode($cleanJson, true);
             if (is_array($parsed) && !empty($parsed)) {
                 $cleaned = trim(str_replace($matches[0], '', $replyContent));
-                return [[$parsed], $cleaned];
+                return [isset($parsed['name']) ? [$parsed] : $parsed, trim($cleaned)];
             }
         }
 
-        // 3. Ekstraksi Heuristik jika pengguna berniat membuat/menabung/menarik tabungan
-        $isSavingsIntent = (bool) preg_match('/\b(?:buat(?:kan)?|tambah(?:kan)?|bikin)\s+(?:target\s+)?tabungan\b/i', $userMessageText)
-            || (bool) preg_match('/\b(?:nabung|menabung|setor|setorkan)\s+.*?ke\s+(?:tabungan|pos\s+tabungan)\b/i', $userMessageText)
+        // 3. Ekstraksi Heuristik jika pengguna berniat membuat/menabung/menarik tabungan ATAU AI mengonfirmasi tindakan tabungan
+        $isSavingsIntent = (bool) preg_match('/\b(?:buat(?:kan)?|tambah(?:kan)?|bikin|pos)\s+(?:target\s+)?tabungan\b/i', $userMessageText)
+            || (bool) preg_match('/\b(?:nabung|menabung|setor|setorkan|tabung|simpan)\s+.*?\b(?:ke|untuk|buat|di)\s+(?:tabungan|pos\s+tabungan)\b/i', $userMessageText)
+            || (bool) preg_match('/\b(?:nabung|menabung|tabung)\s+(?:sebesar\s+)?(?:rp\.?|idr)?\s*[\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?/i', $userMessageText)
             || (bool) preg_match('/\b(?:tarik|ambil)\s+.*?dari\s+tabungan\b/i', $userMessageText)
             || (bool) preg_match('/\b(?:hapus|batalkan)\s+(?:target\s+)?tabungan\b/i', $userMessageText);
 
-        if ($isSavingsIntent) {
-            $extracted = $this->extractSavingsFromUserText($userMessageText);
+        $isAiConfirmingSavings = (bool) preg_match('/\b(?:target\s+tabungan|pos\s+tabungan|setoran\s+tabungan|penarikan\s+tabungan|tabungan\s+.*?\b(?:berhasil\s+(?:dibuat|dicatat|disimpan|dihapus)|telah\s+(?:dibuat|dicatat|disimpan)))\b/i', $replyContent);
+
+        if ($isSavingsIntent || $isAiConfirmingSavings) {
+            $extracted = $this->extractSavingsFromUserText($userMessageText, $replyContent);
             if ($extracted) {
                 $cleaned = preg_replace('/```(?:json:savings_action|savings_action|json)?\s*[\s\S]*?```/i', '', $replyContent);
                 return [[$extracted], trim($cleaned ?: $replyContent)];
@@ -2097,18 +2195,31 @@ class TenantAssistantService
     }
 
     /**
-     * Mengekstrak rincian aksi tabungan secara heuristik dari teks pengguna.
+     * Mengekstrak rincian aksi tabungan secara heuristik dari teks pengguna dan balasan AI.
      */
-    protected function extractSavingsFromUserText(string $userText): ?array
+    protected function extractSavingsFromUserText(string $userText, string $replyContent = ''): ?array
     {
         $amountMinor = 0;
-        if (preg_match('/(?:rp\.?\s*)?([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i', $userText, $am)) {
-            $amountMinor = $this->parseIndonesianNominal($am[0]);
+        $combinedText = $userText . ' ' . $replyContent;
+
+        // Cari nominal uang terverifikasi: nominal dengan embel-embel Rp, rb, ribu, k, juta, jt, atau bilangan bulat >= 1000
+        if (preg_match_all('/(?:(?:rp\.?|idr)\s*([\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)|([\d\.,]+)\s*(?:ribu|rb|k|juta|jt)|\b(\d{4,9})\b)/i', $combinedText, $allMatches, PREG_SET_ORDER)) {
+            $candidates = [];
+            foreach ($allMatches as $m) {
+                $rawStr = !empty($m[1]) ? $m[1] : (!empty($m[2]) ? $m[0] : $m[3]);
+                $val = $this->parseIndonesianNominal($rawStr);
+                if ($val >= 1000) {
+                    $candidates[] = $val;
+                }
+            }
+            if (!empty($candidates)) {
+                $amountMinor = max($candidates);
+            }
         }
 
         // Deteksi Aksi
         $action = 'create';
-        if (preg_match('/\b(?:nabung|menabung|setor|setorkan|masuk(?:in|kan)?)\b/i', $userText)) {
+        if (preg_match('/\b(?:nabung|menabung|setor|setorkan|masuk(?:in|kan)?|simpan|isi)\b/i', $userText)) {
             $action = 'deposit';
         } elseif (preg_match('/\b(?:tarik|ambil)\b/i', $userText)) {
             $action = 'withdraw';
@@ -2118,10 +2229,19 @@ class TenantAssistantService
 
         // Resolusi Nama Tabungan
         $name = '';
-        if (preg_match('/(?:ke\s+tabungan|dari\s+tabungan|target\s+tabungan|pos\s+tabungan|tabungan)\s+([A-Za-z0-9\s\-_]{3,40}?)(?:\s+\d|\s+sebesar|\s+seharga|\s+target|\s*$)/i', $userText, $nm)) {
+        if (preg_match('/(?:ke\s+tabungan|dari\s+tabungan|target\s+tabungan|pos\s+tabungan|untuk\s+tabungan|di\s+tabungan|tabungan)\s+([A-Za-z0-9\s\-_]{3,40}?)(?:\s+\d|\s+sebesar|\s+seharga|\s+target|\s*$)/i', $userText, $nm)) {
             $candidate = trim($nm[1]);
             if (!empty($candidate)) {
                 $name = ucwords($candidate);
+            }
+        }
+
+        if (empty($name)) {
+            if (preg_match('/(?:pos\s+tabungan|target\s+tabungan|tabungan)\s+[\'"]?([A-Za-z0-9\s\-_]{3,35}?)[\'"]?(?:\s+sebesar|\s+telah|\s+berhasil|\s*$)/i', $replyContent, $rnm)) {
+                $candidate = trim($rnm[1]);
+                if (!empty($candidate)) {
+                    $name = ucwords($candidate);
+                }
             }
         }
 
@@ -2149,7 +2269,7 @@ class TenantAssistantService
             return [
                 'action' => 'create',
                 'name' => $name,
-                'target_amount_minor' => $amountMinor,
+                'target_amount_minor' => max(0, $amountMinor),
                 'current_amount_minor' => 0,
                 'target_date' => $targetDate,
                 'notes' => trim($userText),
@@ -2180,4 +2300,5 @@ class TenantAssistantService
         ];
     }
 }
+
 

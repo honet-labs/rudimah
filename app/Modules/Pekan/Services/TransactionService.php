@@ -36,7 +36,7 @@ class TransactionService
                     'opening_balance_minor' => 0,
                     'current_balance_minor' => 0,
                     'is_active' => true,
-                    'created_by' => auth()->id() ?? 'system',
+                    'created_by' => auth()->id() ?: null,
                 ]);
             }
             $resolvedAccountId = $account->id;
@@ -71,8 +71,8 @@ class TransactionService
                 'receipt_discount_minor' => (int) ($data['receipt_discount_minor'] ?? 0),
                 'notes' => $data['notes'] ?? null,
                 'images' => $images ?? ($data['images'] ?? null),
-                'created_by' => auth()->id() ?? 'system',
-                'updated_by' => auth()->id() ?? 'system',
+                'created_by' => auth()->id() ?: null,
+                'updated_by' => auth()->id() ?: null,
             ]);
 
             // Simpan baris item jika ada
@@ -87,8 +87,8 @@ class TransactionService
                     'discount_minor' => (int) ($item['discount_minor'] ?? 0),
                     'total_minor' => (int) $item['total_minor'],
                     'notes' => $item['notes'] ?? null,
-                    'created_by' => auth()->id() ?? 'system',
-                    'updated_by' => auth()->id() ?? 'system',
+                    'created_by' => auth()->id() ?: null,
+                    'updated_by' => auth()->id() ?: null,
                 ]);
             }
 
@@ -155,7 +155,7 @@ class TransactionService
                 'receipt_number' => $data['receipt_number'] ?? $transaction->receipt_number,
                 'payment_method' => $data['payment_method'] ?? $transaction->payment_method,
                 'notes' => $data['notes'] ?? $transaction->notes,
-                'updated_by' => auth()->id() ?? 'system',
+                'updated_by' => auth()->id() ?: null,
             ];
 
             if ($images !== null || array_key_exists('images', $data)) {
@@ -178,8 +178,8 @@ class TransactionService
                         'discount_minor' => (int) ($item['discount_minor'] ?? 0),
                         'total_minor' => (int) $item['total_minor'],
                         'notes' => $item['notes'] ?? null,
-                        'created_by' => auth()->id() ?? 'system',
-                        'updated_by' => auth()->id() ?? 'system',
+                        'created_by' => auth()->id() ?: null,
+                        'updated_by' => auth()->id() ?: null,
                     ]);
                 }
             }
@@ -269,7 +269,7 @@ class TransactionService
                 'name' => $categoryName,
                 'category_type' => in_array($type, ['income', 'expense', 'savings']) ? $type : 'expense',
                 'is_active' => true,
-                'created_by' => auth()->id() ?? 'system',
+                'created_by' => auth()->id() ?: null,
             ]);
             return $newCat->id;
         }
