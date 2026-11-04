@@ -236,5 +236,32 @@ class TenantAiAssistantSecurityTest extends TestCase
         $this->assertEquals(45000, $actions[0]['amount_minor']);
         $this->assertStringNotContainsString('[Info Sistem:', $cleanedReply);
     }
+
+    public function test_ai_assistant_extracts_and_cleans_mie_yamin_case_properly(): void
+    {
+        $assistantService = app(\App\Core\AI\Services\TenantAssistantService::class);
+        $reflection = new \ReflectionClass($assistantService);
+        $method = $reflection->getMethod('extractTransactionActions');
+        $method->setAccessible(true);
+
+        $userMsg = 'makan siang beli mie yamin 24rb beli di di mie ayam bakso tenan';
+        $aiReply = "Transaksi baru dicatat: Mie Yamin, Rp 24.000, Mie Ayam Bakso Tenanan, 2026-11-03.\nKategori: Makan dan Jajan.\nID: `a1b2c3d4-e5f6-7890-1234-567890abcdef` (contoh ID baru).\n-> `skipped: edit transaksi sebelumnya, add when user specifies which part of previous transaction is wrong.`.";
+
+        [$actions, $cleanedReply] = $method->invoke($assistantService, $aiReply, $userMsg);
+
+        $this->assertNotEmpty($actions);
+        $this->assertEquals('create', $actions[0]['action']);
+        $this->assertEquals(24000, $actions[0]['amount_minor']);
+        $this->assertNotEmpty($actions[0]['items']);
+        $this->assertEquals('Mie Yamin', $actions[0]['items'][0]['item_name']);
+
+        // Verifikasi output balasan bersih tanpa dummy ID atau catatan internal
+        $this->assertStringNotContainsString('a1b2c3d4', $cleanedReply);
+        $this->assertStringNotContainsString('contoh ID baru', $cleanedReply);
+        $this->assertStringNotContainsString('skipped:', $cleanedReply);
+        $this->assertStringContainsString('Pengeluaran', $cleanedReply);
+        $this->assertStringContainsString('Rp 24.000', $cleanedReply);
+    }
 }
+
 

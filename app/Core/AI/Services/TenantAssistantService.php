@@ -595,35 +595,6 @@ class TenantAssistantService
                     $nominalFormatted = 'Rp ' . number_format($firstTx['amount_minor'] ?? 0, 0, ',', '.');
                     $replyContent = "Transaksi '{$firstTx['description']}' sebesar {$nominalFormatted} telah berhasil dicatat ke dalam sistem.";
                 }
-
-                // Wajib sertakan ID Transaksi pada balasan agar pengguna dapat melakukan perubahan/ralat dengan mudah
-                $txIdSnippets = [];
-                foreach ($recordedTransactions as $rTx) {
-                    if (!empty($rTx['id'])) {
-                        $txIdSnippets[] = '#' . substr($rTx['id'], 0, 8);
-                    }
-                }
-
-                if (!empty($txIdSnippets)) {
-                    $joinedIds = implode(', ', $txIdSnippets);
-                    $hasIdAlready = false;
-                    foreach ($txIdSnippets as $sId) {
-                        if (stripos($replyContent, $sId) !== false) {
-                            $hasIdAlready = true;
-                            break;
-                        }
-                    }
-
-                    if (!$hasIdAlready) {
-                        if ($hasCreate && !$hasUpdate && !$hasDelete) {
-                            $replyContent .= "\n\n(ID Transaksi: {$joinedIds} - sebutkan ID ini jika Anda ingin melakukan perubahan atau pembatalan)";
-                        } elseif ($hasUpdate) {
-                            $replyContent .= "\n\n(ID Transaksi: {$joinedIds} - berhasil diperbarui)";
-                        } elseif ($hasDelete) {
-                            $replyContent .= "\n\n(ID Transaksi: {$joinedIds} - berhasil dihapus)";
-                        }
-                    }
-                }
             }
         }
 
@@ -764,27 +735,6 @@ class TenantAssistantService
                         default => 'sekali',
                     };
                     $replyContent = "Baik, jadwal tagihan {$firstRem['title']} sebesar {$nominalFormatted} (jatuh tempo {$dueDateFormatted}, {$intervalLabel}) telah berhasil dimasukkan ke dalam daftar Tagihan & Pengingat.";
-                }
-
-                // Wajib sertakan ID Tagihan pada balasan asisten
-                $remIdSnippets = [];
-                foreach ($recordedReminders as $rRem) {
-                    if (!empty($rRem['id'])) {
-                        $remIdSnippets[] = '#' . substr($rRem['id'], 0, 8);
-                    }
-                }
-                if (!empty($remIdSnippets)) {
-                    $joinedRemIds = implode(', ', $remIdSnippets);
-                    $hasRemIdAlready = false;
-                    foreach ($remIdSnippets as $sId) {
-                        if (stripos($replyContent, $sId) !== false) {
-                            $hasRemIdAlready = true;
-                            break;
-                        }
-                    }
-                    if (!$hasRemIdAlready) {
-                        $replyContent .= "\n\n(ID Tagihan: {$joinedRemIds} - sebutkan ID ini jika Anda ingin melakukan perubahan atau pembatalan)";
-                    }
                 }
             }
         }
@@ -1014,27 +964,6 @@ class TenantAssistantService
                         $replyContent = "Baik, target tabungan '{$firstSav['name']}' sebesar {$targetStr}{$targetDateStr} telah berhasil dibuat ke dalam daftar Tabungan Impian.";
                     }
                 }
-
-                // Wajib sertakan ID Tabungan pada balasan asisten
-                $savIdSnippets = [];
-                foreach ($recordedSavings as $rSav) {
-                    if (!empty($rSav['id'])) {
-                        $savIdSnippets[] = '#' . substr($rSav['id'], 0, 8);
-                    }
-                }
-                if (!empty($savIdSnippets)) {
-                    $joinedSavIds = implode(', ', $savIdSnippets);
-                    $hasSavIdAlready = false;
-                    foreach ($savIdSnippets as $sId) {
-                        if (stripos($replyContent, $sId) !== false) {
-                            $hasSavIdAlready = true;
-                            break;
-                        }
-                    }
-                    if (!$hasSavIdAlready) {
-                        $replyContent .= "\n\n(ID Tabungan: {$joinedSavIds})";
-                    }
-                }
             }
         }
 
@@ -1043,7 +972,9 @@ class TenantAssistantService
 
         // 7a. Pastikan format teks sistem internal tidak pernah bocor ke antarmuka pengguna
         $replyContent = preg_replace('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?).*?\]/is', '', $replyContent);
-        $replyContent = trim($replyContent);
+        $replyContent = preg_replace('/ID:\s*`?[a-f0-9\-]{8,36}`?\s*(?:\(contoh\s+ID\s+baru\))?\.?/i', '', $replyContent);
+        $replyContent = preg_replace('/->\s*`?skipped:[^`\n]+`?\.?/i', '', $replyContent);
+        $replyContent = trim(preg_replace('/\n{3,}/', "\n\n", $replyContent));
 
         // 7b. Ekstraksi atau Pembuatan Visualisasi Grafik Apache ECharts
         $chartOption = $this->extractChartOption($replyContent, $userMessageText, $tenantId);
@@ -1247,11 +1178,22 @@ class TenantAssistantService
                     $desc .= ' dan ' . (count($userItems) - 3) . ' item lainnya';
                 }
 
+                $merchantCandidate = null;
+                if (preg_match('/\bdi\s+(?:di\s+)?([A-Za-z0-9\s]{2,35}?)(?:\s+(?:sebesar|seharga|senilai|\d|rp|\,|$|\.))/i', $userMessageText, $umMatch)) {
+                    $cand = trim($umMatch[1]);
+                    if (!preg_match('/^(hari|sini|situ|sana|atas|bawah|dalam|luar|kemarin|tadi)$/i', $cand)) {
+                        $merchantCandidate = ucwords($cand);
+                    }
+                }
+                if (!empty($merchantCandidate) && stripos($desc, $merchantCandidate) === false) {
+                    $desc .= " di {$merchantCandidate}";
+                }
+
                 $txAction = [
                     'action' => 'create',
                     'type' => 'expense',
                     'description' => $desc,
-                    'merchant_name' => null,
+                    'merchant_name' => $merchantCandidate,
                     'amount_minor' => $finalAmount,
                     'date' => $txDate,
                     'category' => $categoryCandidate,
@@ -1259,6 +1201,15 @@ class TenantAssistantService
                 ];
 
                 $cleaned = preg_replace('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?).*?\]/is', '', $replyContent);
+                $cleaned = preg_replace('/ID:\s*`?[a-f0-9\-]{8,36}`?\s*(?:\(contoh\s+ID\s+baru\))?\.?/i', '', $cleaned);
+                $cleaned = preg_replace('/->\s*`?skipped:[^`\n]+`?\.?/i', '', $cleaned);
+                $cleaned = trim(preg_replace('/\n{3,}/', "\n\n", $cleaned));
+                if (empty($cleaned) || preg_match('/^Transaksi\s+baru\s+dicatat/i', $cleaned)) {
+                    $nominalFormatted = 'Rp ' . number_format($finalAmount, 0, ',', '.');
+                    $catStr = $categoryCandidate ?: 'Makan dan Jajan';
+                    $cleaned = "Pengeluaran {$desc} sebesar {$nominalFormatted} tanggal {$txDate} dicatat ke kategori {$catStr}.";
+                }
+
                 return [[$txAction], trim($cleaned)];
             }
 
@@ -1366,7 +1317,7 @@ class TenantAssistantService
 
         // Pola item dan nominal dalam bahasa Indonesia:
         // "<nama item> <angka nominal>"
-        $pattern = '/(?:(?:dan|serta|sama|\,)\s+)?(?:(?:tadi\s+)?(?:makan\s+(?:siang|malam|pagi)\s+)?(?:beli\s+)?)?([a-zA-Z0-9\s]{2,40}?)\s+([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))|\b\d{4,8}\b)(?=(?:\s*(?:dan|serta|sama|\,|\.|\;|\btolong\b|\bcatat\b|\bcatet\b|\bya\b|$)))/i';
+        $pattern = '/(?:(?:dan|serta|sama|\,)\s+)?(?:(?:tadi\s+)?(?:makan\s+(?:siang|malam|pagi)\s+)?(?:beli\s+)?)?([a-zA-Z0-9\s]{2,40}?)\s+([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))|\b\d{4,8}\b)(?=(?:\s*(?:dan|serta|sama|\,|\.|\;|\btolong\b|\bcatat\b|\bcatet\b|\bya\b|\bbeli\b|\bdi\b|$)))/i';
 
         $items = [];
         if (preg_match_all($pattern, $cleanedText, $matches, PREG_SET_ORDER)) {
