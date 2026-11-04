@@ -318,23 +318,24 @@ class TenantAssistantService
                         }
                     }
 
-                    // Resolusi Deskripsi Lengkap
-                    $description = trim($action['description'] ?? '');
-                    if (empty($description) || in_array(strtolower($description), ['transaksi', 'makan', 'makan siang', 'makan malam', 'makan pagi', 'pengeluaran'])) {
-                        if (preg_match('/(?:makan\s+(?:siang|pagi|malam)?\s*(?:makai|pakai|menu)?\s*)([A-Za-z0-9\s]{2,40}?)(?:\s+(?:sebesar|seharga|senilai|\d|rp|di\b|$))/i', $userMessageTrimmed, $dMatch)) {
-                            $dishName = trim($dMatch[1]);
-                            if (!empty($dishName)) {
-                                $prefix = preg_match('/makan\s+(siang|malam|pagi)/i', $userMessageTrimmed, $pm) ? ucwords($pm[0]) . ' ' : 'Makan ';
-                                $description = $prefix . $dishName;
-                            }
-                        }
+                    // Resolusi Deskripsi Ringkas & Catatan Tambahan Lengkap
+                    $rawDescription = trim($action['description'] ?? '');
+                    $rawNotes = trim($action['notes'] ?? '');
+
+                    // Catatan Tambahan (notes): Simpan informasi lengkap dan detail
+                    $fullDetailedNotes = $rawNotes;
+                    if (empty($fullDetailedNotes) || in_array(strtolower($fullDetailedNotes), ['dicatat secara otomatis melalui asisten ai', 'transaksi'])) {
+                        $fullDetailedNotes = $rawDescription;
                     }
-                    if (!empty($merchantName) && stripos($description, $merchantName) === false) {
-                        $description .= ' di ' . $merchantName;
+                    if (empty($fullDetailedNotes) || in_array(strtolower($fullDetailedNotes), ['transaksi', 'makan', 'makan siang', 'makan malam', 'makan pagi', 'pengeluaran'])) {
+                        $fullDetailedNotes = $userMessageTrimmed;
                     }
-                    if (empty($description)) {
-                        $description = 'Pengeluaran via Asisten AI';
+                    if (!empty($merchantName) && stripos($fullDetailedNotes, $merchantName) === false) {
+                        $fullDetailedNotes .= ' di ' . $merchantName;
                     }
+
+                    // Nama Transaksi (description): Cukup summary atau singkatan ringkas (contoh: "Sarapan", "Makan Siang", "Beli Bensin")
+                    $description = $this->generateShortTransactionSummary($rawDescription, $userMessageTrimmed, $merchantName);
 
                     // Deteksi Harga Satuan dan Kuantitas/Volume (misal BBM per liter atau timbangan per kg)
                     $unitPriceInfo = $this->detectUnitPriceAndVolume($userMessageTrimmed, $amountMinor);
@@ -485,6 +486,9 @@ class TenantAssistantService
                             if (!empty($description)) {
                                 $updatePayload['description'] = $description;
                             }
+                            if (!empty($fullDetailedNotes)) {
+                                $updatePayload['notes'] = $fullDetailedNotes;
+                            }
                             if (!empty($merchantName)) {
                                 $updatePayload['merchant_name'] = $merchantName;
                             }
@@ -529,7 +533,7 @@ class TenantAssistantService
                         'merchant_name' => $merchantName,
                         'category' => $action['category'] ?? null,
                         'transaction_date' => $action['date'] ?? now()->toDateString(),
-                        'notes' => 'Dicatat secara otomatis melalui Asisten AI',
+                        'notes' => $fullDetailedNotes ?: 'Dicatat secara otomatis melalui Asisten AI',
                     ], $items);
 
                     $formattedDate = $tx->transaction_date ? \Carbon\Carbon::parse($tx->transaction_date)->format('Y-m-d') : now()->toDateString();
@@ -1189,10 +1193,12 @@ class TenantAssistantService
                     $desc .= " di {$merchantCandidate}";
                 }
 
+                $shortTitle = $this->generateShortTransactionSummary($desc, $userMessageText, $merchantCandidate);
                 $txAction = [
                     'action' => 'create',
                     'type' => 'expense',
-                    'description' => $desc,
+                    'description' => $shortTitle,
+                    'notes' => $desc,
                     'merchant_name' => $merchantCandidate,
                     'amount_minor' => $finalAmount,
                     'date' => $txDate,
@@ -1207,7 +1213,7 @@ class TenantAssistantService
                 if (empty($cleaned) || preg_match('/^Transaksi\s+baru\s+dicatat/i', $cleaned)) {
                     $nominalFormatted = 'Rp ' . number_format($finalAmount, 0, ',', '.');
                     $catStr = $categoryCandidate ?: 'Makan dan Jajan';
-                    $cleaned = "Pengeluaran {$desc} sebesar {$nominalFormatted} tanggal {$txDate} dicatat ke kategori {$catStr}.";
+                    $cleaned = "Pengeluaran {$shortTitle} sebesar {$nominalFormatted} tanggal {$txDate} dicatat ke kategori {$catStr}.";
                 }
 
                 return [[$txAction], trim($cleaned)];
@@ -1243,10 +1249,12 @@ class TenantAssistantService
                     }
                 }
 
+                $shortTitle = $this->generateShortTransactionSummary($desc, $userMessageText);
                 $txAction = [
                     'action' => 'create',
                     'type' => 'expense',
-                    'description' => $desc,
+                    'description' => $shortTitle,
+                    'notes' => $desc,
                     'merchant_name' => null,
                     'amount_minor' => $narrativeAmountMinor,
                     'date' => $txDate,
@@ -1277,9 +1285,11 @@ class TenantAssistantService
                     $amountMinor = (int) $nominalDigits;
 
                     if ($amountMinor > 0 && strlen($itemDesc) >= 2) {
+                        $shortTitle = $this->generateShortTransactionSummary($itemDesc, $userMessageText);
                         $transactions[] = [
                             'type' => $type,
-                            'description' => $itemDesc,
+                            'description' => $shortTitle,
+                            'notes' => $itemDesc,
                             'amount_minor' => $amountMinor,
                             'date' => now()->toDateString(),
                             'category' => null,
@@ -1350,6 +1360,107 @@ class TenantAssistantService
         }
 
         return $items;
+    }
+
+    /**
+     * Menghasilkan nama transaksi ringkas (summary / singkatan) untuk field description,
+     * seperti "Sarapan", "Makan Siang", "Makan Malam", "Beli Bensin", "Jajan", dll.
+     */
+    protected function generateShortTransactionSummary(string $rawDescription, string $userMessageText = '', ?string $merchantName = null): string
+    {
+        $source = strtolower(trim($userMessageText . ' ' . $rawDescription));
+
+        // 1. Pola Waktu Makan & Minum
+        if (preg_match('/\b(sarapan|makan\s+pagi)\b/i', $source)) {
+            return 'Sarapan';
+        }
+        if (preg_match('/\bmakan\s+siang\b/i', $source)) {
+            return 'Makan Siang';
+        }
+        if (preg_match('/\bmakan\s+malam\b/i', $source)) {
+            return 'Makan Malam';
+        }
+        if (preg_match('/\b(ngopi|kopi|coffee|cafe)\b/i', $source)) {
+            return 'Kopi';
+        }
+        if (preg_match('/\b(jajan|jajanan|kue|snack|camilan|gorengan)\b/i', $source)) {
+            return 'Jajan';
+        }
+
+        // 2. Pola Transportasi & Bahan Bakar
+        if (preg_match('/\b(bensin|bbm|pertamax|pertalite|solar|biosolar|dexlite|spbu|pom\s+bensin)\b/i', $source)) {
+            return 'Beli Bensin';
+        }
+        if (preg_match('/\b(parkir|ongkir|ongkos|tol|e-toll|etoll|angkot|busway|krl|mrt|lrt|ojek|grab|gojek|maxim)\b/i', $source)) {
+            return 'Transportasi';
+        }
+
+        // 3. Pola Belanja & Tagihan
+        if (preg_match('/\bbelanja\s+bulanan\b/i', $source)) {
+            return 'Belanja Bulanan';
+        }
+        if (preg_match('/\bbelanja\s+mingguan\b/i', $source)) {
+            return 'Belanja Mingguan';
+        }
+        if (preg_match('/\b(belanja|supermarket|minimarket|pasar)\b/i', $source)) {
+            return 'Belanja';
+        }
+        if (preg_match('/\b(obat|apotek|dokter|klinik|rumah\s+sakit|vitamin)\b/i', $source)) {
+            return 'Beli Obat';
+        }
+        if (preg_match('/\b(pulsa|kuota|paket\s+data)\b/i', $source)) {
+            return 'Beli Pulsa';
+        }
+        if (preg_match('/\b(listrik|pln|token)\b/i', $source)) {
+            return 'Listrik';
+        }
+        if (preg_match('/\b(pdam|air)\b/i', $source)) {
+            return 'Tagihan Air';
+        }
+        if (preg_match('/\b(wifi|internet|indihome|biznet|myrepublic)\b/i', $source)) {
+            return 'Internet';
+        }
+
+        // 4. Pola Pemasukan
+        if (preg_match('/\b(gaji|payroll|honor|upah)\b/i', $source)) {
+            return 'Gaji';
+        }
+        if (preg_match('/\b(bonus|insentif|thr)\b/i', $source)) {
+            return 'Bonus';
+        }
+        if (preg_match('/\b(transfer\s+masuk|pemasukan|piutang|kembalian)\b/i', $source)) {
+            return 'Pemasukan';
+        }
+
+        // 5. Cek jika rawDescription atau pesan user menyebutkan menu makanan spesifik
+        if (preg_match('/\bmakan\b/i', $source)) {
+            if (preg_match('/(?:makan\s+(?:siang|pagi|malam)?\s*(?:makai|pakai|menu)?\s*)([A-Za-z0-9\s]{2,25}?)(?:\s+(?:sebesar|seharga|senilai|\d|rp|di\b|$))/i', $source, $mDish)) {
+                $cand = trim($mDish[1]);
+                if (!empty($cand) && mb_strlen($cand) <= 25 && count(explode(' ', $cand)) <= 3) {
+                    return ucwords($cand);
+                }
+            }
+            return 'Makan';
+        }
+
+        // 6. Jika rawDescription dari AI sudah cukup singkat (<= 3 kata dan <= 25 karakter)
+        $cleanDesc = trim($rawDescription);
+        if ($merchantName) {
+            $cleanDesc = trim(preg_replace('/\s+di\s+' . preg_quote($merchantName, '/') . '/i', '', $cleanDesc));
+        }
+        $cleanDesc = trim(preg_replace('/^(?:beli|bayar|tadi|pesan|isi)\s+/i', '', $cleanDesc));
+        $words = preg_split('/\s+/', $cleanDesc);
+        if (!empty($cleanDesc) && count($words) <= 3 && mb_strlen($cleanDesc) <= 25) {
+            return ucwords($cleanDesc);
+        }
+
+        // 7. Ambil maksimal 2 kata pertama dari cleanDesc
+        if (!empty($words) && !empty($words[0])) {
+            $shortSlice = array_slice($words, 0, min(2, count($words)));
+            return ucwords(implode(' ', $shortSlice));
+        }
+
+        return 'Pengeluaran';
     }
 
     /**

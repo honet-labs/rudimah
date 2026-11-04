@@ -235,8 +235,9 @@ class TenantFinancialContextBuilder
         $prompt .= "     * 'merchant_name': Jika membeli BBM (Pertamax, Pertalite, Dexlite, Biosolar) dan nama tempat tidak spesifik, otomatis isi 'SPBU Pertamina' (atau SPBU sesuai brand seperti Shell, BP).\n";
         $prompt .= "     * 'category': Kategori relevan (misal: 'Transportasi' atau 'Belanja Kebutuhan').\n";
         $prompt .= "   - KETENTUAN FIELD JSON:\n";
-        $prompt .= "     * \"description\": Deskripsi lengkap dan detail yang mencerminkan nama transaksi dan keperluan secara utuh (contoh: \"Beli bensin Pertamax di SPBU Pertamina\").\n";
-        $prompt .= "     * \"merchant_name\": Nama toko, warung, vendor, penyedia, atau tempat jika disebutkan (contoh: \"SPBU Pertamina\", \"Warung Madura\", \"Indomaret\"). Jika tidak disebutkan, isi null.\n";
+        $prompt .= "     * \"description\": Cukup nama transaksi RINGKAS / SUMMARY / SINGKATAN (1-3 kata saja, contoh: \"Sarapan\", \"Makan Siang\", \"Makan Malam\", \"Beli Bensin\", \"Jajan\", \"Kopi\", \"Belanja\"). DILARANG menulis kalimat panjang atau menyertakan nama merchant/tempat di sini.\n";
+        $prompt .= "     * \"notes\": Catatan tambahan LENGKAP dan detail yang mencerminkan nama transaksi dan keperluan secara utuh (contoh: \"Beli sarapan jajanan kue basah di tukang kue basah\", \"Makan siang soto betawi di kantin kemendagri\").\n";
+        $prompt .= "     * \"merchant_name\": Nama toko, warung, vendor, penyedia, atau tempat jika disebutkan (contoh: \"SPBU Pertamina\", \"Warung Madura\", \"Indomaret\", \"Tukang Kue Basah\"). Jika tidak disebutkan, isi null.\n";
         $prompt .= "     * \"amount_minor\": Total nominal belanja integer Rupiah (misal: 35000).\n";
         $prompt .= "     * \"date\": Tanggal transaksi format YYYY-MM-DD (contoh: \"{$todayDate}\").\n";
         $prompt .= "     * \"type\": \"expense\" untuk pengeluaran, \"income\" untuk pemasukan.\n";
@@ -248,7 +249,8 @@ class TenantFinancialContextBuilder
         $prompt .= "  {\n";
         $prompt .= "    \"action\": \"create\",\n";
         $prompt .= "    \"type\": \"expense\",\n";
-        $prompt .= "    \"description\": \"Makan siang soto betawi di kantin kemendagri\",\n";
+        $prompt .= "    \"description\": \"Makan Siang\",\n";
+        $prompt .= "    \"notes\": \"Makan siang soto betawi di kantin kemendagri\",\n";
         $prompt .= "    \"merchant_name\": \"Kantin Kemendagri\",\n";
         $prompt .= "    \"amount_minor\": 30000,\n";
         $prompt .= "    \"date\": \"{$todayDate}\",\n";
@@ -275,7 +277,8 @@ class TenantFinancialContextBuilder
         $prompt .= "    \"transaction_id\": \"UUID_TRANSAKSI_YANG_DIUBAH\",\n";
         $prompt .= "    \"date\": \"{$todayDate}\",\n";
         $prompt .= "    \"amount_minor\": 35000,\n";
-        $prompt .= "    \"description\": \"Makan siang soto betawi di kantin kemendagri\",\n";
+        $prompt .= "    \"description\": \"Makan Siang\",\n";
+        $prompt .= "    \"notes\": \"Makan siang soto betawi di kantin kemendagri\",\n";
         $prompt .= "    \"merchant_name\": \"Kantin Kemendagri\",\n";
         $prompt .= "    \"category\": \"Makanan & Minuman\"\n";
         $prompt .= "  }\n";

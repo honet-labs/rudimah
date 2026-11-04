@@ -262,6 +262,56 @@ class TenantAiAssistantSecurityTest extends TestCase
         $this->assertStringContainsString('Pengeluaran', $cleanedReply);
         $this->assertStringContainsString('Rp 24.000', $cleanedReply);
     }
+
+    public function test_generate_short_transaction_summary_produces_concise_titles(): void
+    {
+        $assistantService = app(\App\Core\AI\Services\TenantAssistantService::class);
+        $reflection = new \ReflectionClass($assistantService);
+        $method = $reflection->getMethod('generateShortTransactionSummary');
+        $method->setAccessible(true);
+
+        // Sarapan & Jajan
+        $this->assertEquals('Sarapan', $method->invoke($assistantService, 'Beli sarapan jajanan kue basah di tukang kue basah', 'Beli sarapan jajanan kue basah di tukang kue basah', 'Tukang Kue Basah'));
+
+        // Makan Siang & Makan Malam
+        $this->assertEquals('Makan Siang', $method->invoke($assistantService, 'makan siang soto betawi', 'makan siang soto betawi'));
+        $this->assertEquals('Makan Malam', $method->invoke($assistantService, 'makan malam bakso', 'makan malam bakso'));
+
+        // Minum Kopi & Jajanan
+        $this->assertEquals('Kopi', $method->invoke($assistantService, 'ngopi santai', 'beli kopi kenangan'));
+        $this->assertEquals('Jajan', $method->invoke($assistantService, 'beli kue basah dan gorengan', 'jajan gorengan'));
+
+        // Bahan Bakar & Transportasi
+        $this->assertEquals('Beli Bensin', $method->invoke($assistantService, 'beli pertamax 35rb di spbu pertamina', 'isi pertamax'));
+        $this->assertEquals('Transportasi', $method->invoke($assistantService, 'bayar parkir motor', 'parkir'));
+
+        // Belanja & Tagihan
+        $this->assertEquals('Belanja Bulanan', $method->invoke($assistantService, 'belanja bulanan di supermarket', 'belanja bulanan'));
+        $this->assertEquals('Belanja', $method->invoke($assistantService, 'belanja sayur mayur di pasar', 'belanja sayur'));
+        $this->assertEquals('Beli Obat', $method->invoke($assistantService, 'beli obat flu dan batuk di apotek', 'beli obat'));
+        $this->assertEquals('Beli Pulsa', $method->invoke($assistantService, 'beli paket data internet telkomsel', 'beli pulsa 50rb'));
+        $this->assertEquals('Listrik', $method->invoke($assistantService, 'beli token pln 100rb', 'token listrik'));
+        $this->assertEquals('Tagihan Air', $method->invoke($assistantService, 'bayar tagihan pdam', 'bayar air'));
+        $this->assertEquals('Internet', $method->invoke($assistantService, 'bayar langganan wifi indihome', 'wifi'));
+    }
+
+    public function test_transaction_description_is_short_summary_and_notes_contains_full_details(): void
+    {
+        $assistantService = app(\App\Core\AI\Services\TenantAssistantService::class);
+        $reflection = new \ReflectionClass($assistantService);
+        $method = $reflection->getMethod('extractTransactionActions');
+        $method->setAccessible(true);
+
+        $userMsg = 'Beli sarapan jajanan kue basah di tukang kue basah kue basah 21000 tolong catat';
+        $aiReply = "Pengeluaran Sarapan sebesar Rp 21.000 tanggal 2026-11-04 dicatat ke kategori Makan dan Jajan.";
+
+        [$actions] = $method->invoke($assistantService, $aiReply, $userMsg);
+
+        $this->assertNotEmpty($actions);
+        $this->assertEquals('Sarapan', $actions[0]['description']);
+        $this->assertStringContainsString('kue basah', strtolower($actions[0]['notes']));
+        $this->assertEquals(21000, $actions[0]['amount_minor']);
+    }
 }
 
 

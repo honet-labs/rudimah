@@ -324,10 +324,11 @@ class ExternalChatGatewayService
                 }
             }
 
-            $desc = "Belanja di {$merchantName}";
+            $fullNotes = "Belanja di {$merchantName}";
             if (!empty($caption)) {
-                $desc .= " (" . trim($caption) . ")";
+                $fullNotes .= " (" . trim($caption) . ")";
             }
+            $fullNotes .= ". Dipindai dan dicatat otomatis via {$channelLabel}";
 
             $this->transactionService->createTransaction([
                 'type' => 'expense',
@@ -335,8 +336,8 @@ class ExternalChatGatewayService
                 'merchant_name' => $merchantName,
                 'receipt_number' => $receiptNo,
                 'transaction_date' => $date,
-                'description' => $desc,
-                'notes' => "Dipindai dan dicatat otomatis via {$channelLabel}",
+                'description' => 'Belanja',
+                'notes' => $fullNotes,
             ], $items);
 
             $totalFormatted = MoneyHelper::formatIdr($totalMinor);
