@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import RudimahAppShell from '../../layouts/RudimahAppShell.vue';
 import RdButton from '../../design-system/RdButton.vue';
 import RdInput from '../../design-system/RdInput.vue';
@@ -146,7 +146,53 @@ function scrollToBottom() {
   });
 }
 
+let pollingTimer: ReturnType<typeof setInterval> | null = null;
+let pollAttempts = 0;
+
+function stopPolling() {
+  if (pollingTimer) {
+    clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
+  pollAttempts = 0;
+}
+
+function startPollingForReply(convId: string) {
+  stopPolling();
+  isSending.value = true;
+  pollAttempts = 0;
+
+  pollingTimer = setInterval(async () => {
+    pollAttempts++;
+    if (pollAttempts > 25 || activeConversationId.value !== convId) {
+      stopPolling();
+      isSending.value = false;
+      return;
+    }
+
+    try {
+      const res = await secureFetch(`/t/${props.tenant.slug}/assistant/conversations/${convId}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const serverMsgs: Message[] = data.messages || [];
+        const last = serverMsgs.length > 0 ? serverMsgs[serverMsgs.length - 1] : null;
+        if (last && last.role === 'assistant') {
+          messages.value = serverMsgs;
+          stopPolling();
+          isSending.value = false;
+          scrollToBottom();
+        }
+      }
+    } catch {
+      // Abaikan kendala jaringan sementara saat polling di latar belakang
+    }
+  }, 2000);
+}
+
 async function loadConversation(id: string) {
+  stopPolling();
   activeConversationId.value = id;
   isLoadingConversation.value = true;
   try {
@@ -159,6 +205,15 @@ async function loadConversation(id: string) {
       const data = await res.json();
       messages.value = data.messages || [];
       scrollToBottom();
+
+      // Jika pesan terakhir masih dari pengguna (artinya AI di server sedang memproses/insert transaksi di background),
+      // jalankan polling transparan agar saat selesai balasan dan mutasi langsung muncul di layar pengguna
+      const lastMsg = messages.value.length > 0 ? messages.value[messages.value.length - 1] : null;
+      if (lastMsg && lastMsg.role === 'user') {
+        startPollingForReply(id);
+      } else {
+        isSending.value = false;
+      }
     }
   } catch (err) {
     console.error('Gagal memuat percakapan', err);
@@ -253,38 +308,29 @@ async function handleSendMessage(promptText?: string) {
 
     if (res.ok) {
       const data = await res.json();
+      stopPolling();
       messages.value.push(data.reply);
+      isSending.value = false;
       // Perbarui judul pada daftar
       const conv = conversationsList.value.find((c) => c.id === currentConvId);
       if (conv && conv.title === 'Percakapan Baru') {
         conv.title = text.slice(0, 35) + (text.length > 35 ? '...' : '');
       }
     } else {
-      const err = await res.json().catch(() => ({}));
-      const errorMsg =
-        err?.message ||
-        err?.error ||
-        err?.detail ||
-        (err?.errors ? Object.values(err.errors).flat().join(', ') : '') ||
-        'Terjadi kesalahan saat memproses jawaban asisten.';
-      messages.value.push({
-        id: 'err-' + Date.now(),
-        conversation_id: currentConvId,
-        role: 'assistant',
-        content: errorMsg,
-        created_at: new Date().toISOString(),
-      });
+      // Jika terjadi response status selain 200 (misal 504 gateway timeout karena LLM lama),
+      // jangan panik: backend tetap mengeksekusi insert via ignore_user_abort.
+      // Coba polling server untuk mengecek apakah balasan akhirnya berhasil tersimpan.
+      startPollingForReply(currentConvId);
     }
   } catch (err) {
-    messages.value.push({
-      id: 'err-' + Date.now(),
-      conversation_id: currentConvId,
-      role: 'assistant',
-      content: 'Gagal terhubung ke layanan AI ruang kerja. Pastikan koneksi server tersedia.',
-      created_at: new Date().toISOString(),
-    });
+    // Jika koneksi terputus saat request berlangsung (pengguna berpindah tab atau reload),
+    // jangan langsung tampilkan pesan error merah jika backend masih memproses di server.
+    // Mulai polling untuk menunggu hasil akhir backend.
+    startPollingForReply(currentConvId);
   } finally {
-    isSending.value = false;
+    if (!pollingTimer) {
+      isSending.value = false;
+    }
     scrollToBottom();
   }
 }
@@ -376,10 +422,40 @@ async function resetToPlatformDefault() {
   }
 }
 
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible' && activeConversationId.value) {
+    // Saat pengguna kembali ke tab ini setelah berpindah tab atau membuka aplikasi lain:
+    // jika sedang menunggu jawaban AI, langsung periksa pembaruan pesan terbaru di server
+    if (isSending.value || (messages.value.length > 0 && messages.value[messages.value.length - 1]?.role === 'user')) {
+      secureFetch(`/t/${props.tenant.slug}/assistant/conversations/${activeConversationId.value}`, {
+        headers: { Accept: 'application/json' },
+      }).then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          const serverMsgs: Message[] = data.messages || [];
+          const last = serverMsgs.length > 0 ? serverMsgs[serverMsgs.length - 1] : null;
+          if (last && last.role === 'assistant') {
+            messages.value = serverMsgs;
+            stopPolling();
+            isSending.value = false;
+            scrollToBottom();
+          }
+        }
+      }).catch(() => {});
+    }
+  }
+}
+
 onMounted(() => {
   if (activeConversationId.value) {
     loadConversation(activeConversationId.value);
   }
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+});
+
+onUnmounted(() => {
+  stopPolling();
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>
 

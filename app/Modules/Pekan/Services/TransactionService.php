@@ -16,6 +16,10 @@ class TransactionService
 {
     public function createTransaction(array $data, array $items = [], ?array $images = null): FinanceTransaction
     {
+        // Pastikan commit transaksi keuangan tidak pernah terhenti atau terpotong
+        // meskipun browser klien menutup koneksi saat request berlangsung
+        ignore_user_abort(true);
+
         $tenantId = TenantContext::id();
         if (!$tenantId) {
             throw new \RuntimeException('Konteks ruang kerja belum aktif.');
@@ -23,7 +27,9 @@ class TransactionService
 
         return DB::connection('pekan')->transaction(function () use ($data, $items, $images, $tenantId) {
             $accountId = $data['account_id'] ?? null;
-            $account = $accountId ? FinanceAccount::find($accountId) : FinanceAccount::first();
+            $account = $accountId 
+                ? FinanceAccount::where('tenant_id', $tenantId)->where('id', $accountId)->first() 
+                : FinanceAccount::where('tenant_id', $tenantId)->first();
 
             // Jika belum ada akun kas di ruang kerja ini, buatkan akun default otomatis
             if (!$account) {
@@ -114,6 +120,7 @@ class TransactionService
 
     public function updateTransaction(FinanceTransaction $transaction, array $data, array $items = [], ?array $images = null): FinanceTransaction
     {
+        ignore_user_abort(true);
         $tenantId = TenantContext::id();
 
         return DB::connection('pekan')->transaction(function () use ($transaction, $data, $items, $images, $tenantId) {

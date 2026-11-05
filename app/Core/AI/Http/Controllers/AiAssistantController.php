@@ -192,6 +192,13 @@ class AiAssistantController
      */
     public function sendMessage(Request $request, string $tenantSlug, string $id): JsonResponse
     {
+        // Pastikan eksekusi AI dan pencatatan transaksi tetap berjalan tuntas hingga selesai
+        // meskipun tab browser ditutup, koneksi terputus, atau pengguna berpindah halaman
+        ignore_user_abort(true);
+        if (!ini_get('safe_mode')) {
+            @set_time_limit(180);
+        }
+
         $validated = $request->validate([
             'message' => 'required|string|max:4000',
         ]);

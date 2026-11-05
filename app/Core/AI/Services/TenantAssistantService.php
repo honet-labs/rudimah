@@ -87,6 +87,13 @@ class TenantAssistantService
      */
     public function sendMessage(AiConversation $conversation, string $userMessageText): AiMessage
     {
+        // Lindungi proses eksekusi dari pemutusan koneksi klien (tab ditutup, refresh, atau berpindah tab)
+        // agar seluruh operasi database dan AI tetap berjalan tuntas hingga selesai
+        ignore_user_abort(true);
+        if (!ini_get('safe_mode')) {
+            @set_time_limit(180);
+        }
+
         $tenantId = TenantContext::id();
         $userId = auth()->id();
 
@@ -598,6 +605,12 @@ class TenantAssistantService
                     $firstTx = $recordedTransactions[0];
                     $nominalFormatted = 'Rp ' . number_format($firstTx['amount_minor'] ?? 0, 0, ',', '.');
                     $replyContent = "Transaksi '{$firstTx['description']}' sebesar {$nominalFormatted} telah berhasil dicatat ke dalam sistem.";
+                }
+            } elseif ($isExplicitCreate && !empty($parsedActions)) {
+                // Jika pengguna meminta pencatatan transaksi tetapi eksekusi database gagal,
+                // cegah asisten memberikan klaim berhasil palsu
+                if (preg_match('/(?:Tercatat|Berhasil\s+dicatat|Sudah\s+dicatat)/i', $replyContent)) {
+                    $replyContent = "Terjadi kendala saat menyimpan mutasi transaksi ke dalam sistem. Mohon coba ulangi instruksi Anda.";
                 }
             }
         }
