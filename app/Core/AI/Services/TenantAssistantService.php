@@ -1351,7 +1351,6 @@ class TenantAssistantService
                     return [$transactions, trim($cleaned)];
                 }
             }
-        }
 
         $cleaned = preg_replace('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?).*?\]/is', '', $replyContent);
         return [[], trim($cleaned)];

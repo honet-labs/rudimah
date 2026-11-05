@@ -65,11 +65,15 @@ class HermesProvider implements AiProviderInterface
                 ];
             }
 
-        $status = $response->status();
-        $errBody = mb_strimwidth($response->body(), 0, 300, '...');
-        Log::warning('Hermes API returned non-200', ['status' => $status, 'endpoint' => $endpoint, 'body' => $errBody]);
+            $status = $response->status();
+            $errBody = mb_strimwidth($response->body(), 0, 300, '...');
+            Log::warning('Hermes API returned non-200', ['status' => $status, 'endpoint' => $endpoint, 'body' => $errBody]);
 
-        throw new \RuntimeException("Permintaan ke Hermes ({$endpoint}) gagal (HTTP {$status}): {$errBody}");
+            throw new \RuntimeException("Permintaan ke Hermes ({$endpoint}) gagal (HTTP {$status}): {$errBody}");
+        } catch (\Throwable $e) {
+            Log::error('Hermes API exception: ' . $e->getMessage(), ['endpoint' => $endpoint]);
+            throw $e;
+        }
     }
 
     public function extractReceipt(string $fileBase64, string $mimeType, array $options = []): array
