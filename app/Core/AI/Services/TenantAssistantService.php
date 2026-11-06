@@ -261,16 +261,32 @@ class TenantAssistantService
             ];
         }
 
+        // Jika terjadi error pada provider AI (misal timeout atau gangguan gateway),
+        // cek apakah pengguna mengirim instruksi transaksi/koreksi langsung.
+        // Jika ya, selesaikan mutasi secara lokal agar pengguna tidak terganggu kegagalan gateway eksternal.
+        $parsedActions = [];
+        $cleanedReply = $replyContent;
+        if (!empty($meta['error'])) {
+            [$fallbackActions, $fallbackCleaned] = $this->extractTransactionActions('', $userMessageText, $conversation->id, $tenantId);
+            if (!empty($fallbackActions)) {
+                $parsedActions = $fallbackActions;
+                $cleanedReply = '';
+                unset($meta['error'], $meta['error_detail']);
+            }
+        }
+
         if (empty(trim($replyContent))) {
             $replyContent = "Maaf, asisten tidak menghasilkan respon yang dapat ditampilkan. Silakan coba ajukan pertanyaan kembali.";
         }
 
         // 6. Deteksi dan Eksekusi Tindakan Transaksi (Pencatatan, Pengubahan/Ralat, dan Penghapusan)
         $recordedTransactions = [];
-        [$parsedActions, $cleanedReply] = $this->extractTransactionActions($replyContent, $userMessageText);
+        if (empty($parsedActions)) {
+            [$parsedActions, $cleanedReply] = $this->extractTransactionActions($replyContent, $userMessageText, $conversation->id, $tenantId);
+        }
 
         $userMessageTrimmed = trim($userMessageText);
-        $isCorrectionIntent = (bool) preg_match('/\b(salah|rubah|ubah|ralat|koreksi|ganti|edit|revisi|bukan\b.*?\btapi)\b/i', $userMessageTrimmed);
+        $isCorrectionIntent = (bool) preg_match('/\b(salah|rubah|ubah|ralat|koreksi|ganti|edit|revisi|bukan\b.*?\btapi|ko\s+tanggal|kok\s+tanggal|masih\s+tanggal)\b/i', $userMessageTrimmed);
         $isDeleteIntent = (bool) preg_match('/\b(hapus|batalkan|delete)\s+(transaksi|mutasi|catatan)\b/i', $userMessageTrimmed);
         $isExplicitCreate = (bool) preg_match('/\b(catat|catet|nyatet|tambah|masuk(?:in|kan)?|simpan|input|buatkan|tadi\s+(?:makan|beli|minum|jajan|belanja)|beli|makan|bayar)\b/i', $userMessageTrimmed);
 
@@ -468,8 +484,12 @@ class TenantAssistantService
                     if ($actionType === 'update') {
                         $targetTx = null;
                         $candidateTxId = ltrim(trim($action['transaction_id'] ?? ''), '#');
-                        if (empty($candidateTxId) && preg_match('/#([a-f0-9]{6,36})\b/i', $userMessageTrimmed, $idm)) {
-                            $candidateTxId = $idm[1];
+                        if (empty($candidateTxId)) {
+                            if (preg_match('/(?:#|id\s*:?\s*|transaksi\s+(?:id\s*:?\s*)?)([a-f0-9]{8,36})\b/i', $userMessageTrimmed, $idm)) {
+                                $candidateTxId = $idm[1];
+                            } elseif (preg_match('/#([a-f0-9]{6,36})\b/i', $userMessageTrimmed, $idm)) {
+                                $candidateTxId = $idm[1];
+                            }
                         }
                         if (!empty($candidateTxId)) {
                             $targetTx = FinanceTransaction::where('tenant_id', $tenantId)
@@ -484,8 +504,9 @@ class TenantAssistantService
 
                         if ($targetTx) {
                             $updatePayload = [];
-                            if (!empty($action['date'])) {
-                                $updatePayload['transaction_date'] = $action['date'];
+                            $resolvedUpdateDate = $this->resolveTransactionDate($userMessageTrimmed, $action['date'] ?? null, $targetTx->transaction_date);
+                            if (!empty($resolvedUpdateDate)) {
+                                $updatePayload['transaction_date'] = $resolvedUpdateDate;
                             }
                             if ($amountMinor > 0) {
                                 $updatePayload['amount_minor'] = $amountMinor;
@@ -533,13 +554,15 @@ class TenantAssistantService
                         $type = 'expense';
                     }
 
+                    $resolvedTxDate = $this->resolveTransactionDate($userMessageTrimmed, $action['date'] ?? null);
+
                     $tx = $this->transactionService->createTransaction([
                         'type' => $type,
                         'amount_minor' => $amountMinor,
                         'description' => $description,
                         'merchant_name' => $merchantName,
                         'category' => $action['category'] ?? null,
-                        'transaction_date' => $action['date'] ?? now()->toDateString(),
+                        'transaction_date' => $resolvedTxDate,
                         'notes' => $fullDetailedNotes ?: 'Dicatat secara otomatis melalui Asisten AI',
                     ], $items);
 
@@ -571,6 +594,13 @@ class TenantAssistantService
                 if ($hasCreate && !$hasUpdate) {
                     $replyContent = preg_replace('/(?:Deskripsi|Transaksi)\s+diperbarui\s*:/i', 'Transaksi berhasil dicatat:', $replyContent);
                     $replyContent = preg_replace('/berhasil\s+diperbarui/i', 'berhasil dicatat', $replyContent);
+
+                    // Sinkronkan penyebutan tanggal di balasan AI jika sempat berbeda
+                    $firstCreated = collect($recordedTransactions)->firstWhere('action', 'created');
+                    if ($firstCreated && !empty($firstCreated['date'])) {
+                        $realDateFormatted = \Carbon\Carbon::parse($firstCreated['date'])->translatedFormat('d F Y');
+                        $replyContent = preg_replace('/\b\d{1,2}\s+(?:Jan|Feb|Mar|Apr|Mei|May|Jun|Jul|Agu|Aug|Sep|Okt|Oct|Nov|Des|Dec)[a-z]*\s+\d{4}\b/i', $realDateFormatted, $replyContent);
+                    }
                 }
 
                 // Bersihkan kalimat matematika janggal/halusinasi jika ada (seperti "Total dua transaksi Rp 30.000 untuk hari ini")
@@ -578,7 +608,7 @@ class TenantAssistantService
 
                 // Jika transaksi mencatat pembelian berbasis satuan (misal BBM per liter atau timbangan),
                 // pastikan balasan asisten merinci volume dan harga satuannya
-                if (!empty($detectedUnitPriceInfo) && $detectedUnitPriceInfo['unit_price'] > 0 && $hasCreate) {
+                if (!empty($detectedUnitPriceInfo) && $detectedUnitPriceInfo['unit_price'] > 0 && $hasCreate && in_array($detectedUnitPriceInfo['unit'], ['liter', 'ltr', 'lt', 'kg', 'kilo', 'gram', 'gr', 'pcs', 'pc', 'bungkus', 'buah', 'meter'])) {
                     $qtyFormatted = number_format($detectedUnitPriceInfo['quantity'], $detectedUnitPriceInfo['quantity'] == round($detectedUnitPriceInfo['quantity']) ? 0 : 2, ',', '.');
                     $unitPriceFormatted = 'Rp ' . number_format($detectedUnitPriceInfo['unit_price'], 0, ',', '.');
                     $unitLabel = $detectedUnitPriceInfo['unit'];
@@ -593,8 +623,11 @@ class TenantAssistantService
 
                 if ($hasUpdate) {
                     $replyContent = preg_replace('/Transaksi\s+dicatat\s*:/i', 'Transaksi berhasil diperbarui:', $replyContent);
-                    if (empty(trim($replyContent))) {
-                        $replyContent = "Transaksi berhasil diperbarui di dalam sistem.";
+                    if (empty(trim($replyContent)) || preg_match('/(?:Terjadi kendala saat menghubungi layanan AI|cURL error)/i', $replyContent) || preg_match('/(?:Koreksi tanggal\. Selesai\.)/i', $replyContent)) {
+                        $firstUp = collect($recordedTransactions)->firstWhere('action', 'updated');
+                        $upDate = $firstUp['date'] ? \Carbon\Carbon::parse($firstUp['date'])->translatedFormat('d F Y') : 'hari ini';
+                        $shortId = '#' . substr($firstUp['id'], 0, 8);
+                        $replyContent = "Transaksi {$shortId} ('{$firstUp['description']}') telah berhasil diperbarui ke tanggal {$upDate}.";
                     }
                 } elseif ($hasDelete) {
                     $replyContent = preg_replace('/Transaksi\s+dicatat\s*:/i', 'Transaksi berhasil dihapus:', $replyContent);
@@ -1065,11 +1098,11 @@ class TenantAssistantService
      * Mengekstrak instruksi pencatatan transaksi baik dari blok JSON terstruktur,
      * format info sistem teknis, narasi konfirmasi asisten, maupun dari pesan eksplisit pengguna.
      */
-    protected function extractTransactionActions(string $replyContent, string $userMessageText): array
+    protected function extractTransactionActions(string $replyContent, string $userMessageText, ?string $conversationId = null, ?string $tenantId = null): array
     {
         // 0. Cegah pencatatan mutasi transaksi jika pesan pengguna jelas berupa pertanyaan informasional atau keluhan/pertanyaan klarifikasi
         $isInformationalQuery = (bool) preg_match('/^\s*(berapa|apa|apakah|kapan|cek|info|lihat|tampilkan|daftar)\b/i', $userMessageText)
-            && !preg_match('/\b(catat|catet|nyatet|masuk|simpan|input|buatkan mutasi|bayar)\b/i', $userMessageText);
+            && !preg_match('/\b(catat|catet|nyatet|masuk|simpan|input|buatkan mutasi|bayar|ubah|ganti|ralat)\b/i', $userMessageText);
 
         $isNegatedOrQuestion = (bool) preg_match('/\b(belum|jangan|tidak|bukan|kok|kenapa|mengapa)\s+(?:pernah\s+)?(?:di)?(?:catat|catet|simpan|masuk|input|perbarui|update)\b/i', $userMessageText)
             && !preg_match('/\b(tolong\s+(?:catat|catet)|sekarang\s+(?:catat|catet)|catat\s+ulang|catet\s+ulang|masukkan\s+ulang|buatkan\s+baru)\b/i', $userMessageText);
@@ -1125,6 +1158,78 @@ class TenantAssistantService
             }
         }
 
+        // 3. Ekstraksi Aksi Koreksi / Ralat / Ubah Transaksi (UPDATE Intent dari Bahasa Alami Pengguna atau Asisten)
+        $isUpdateOrCorrectionIntent = (bool) preg_match('/\b(ubah|rubah|ganti|ralat|koreksi|revisi|edit|ko\s+tanggal|kok\s+tanggal|masih\s+tanggal|bukan\s+tanggal|sekarang\s+kan\s+tanggal)\b/i', $userMessageText)
+            || (bool) preg_match('/bukan\b.*?\btapi\b/i', $userMessageText)
+            || (bool) preg_match('/\b(diubah|berhasil\s+diubah|berhasil\s+diperbarui|telah\s+diperbarui)\b/i', $replyContent);
+
+        if ($isUpdateOrCorrectionIntent) {
+            $candidateTxId = null;
+            if (preg_match('/(?:#|id\s*:?\s*|transaksi\s+(?:id\s*:?\s*)?)([a-f0-9]{8,36})\b/i', $userMessageText, $uidM)) {
+                $candidateTxId = $uidM[1];
+            } elseif (preg_match('/#([a-f0-9]{6,36})\b/i', $userMessageText, $uidM2)) {
+                $candidateTxId = $uidM2[1];
+            } elseif (preg_match('/\bID\s*`?([a-f0-9]{8,36})`?/i', $replyContent, $ridM)) {
+                $candidateTxId = $ridM[1];
+            }
+
+            $currentTenantId = $tenantId ?: TenantContext::id();
+            $targetTx = null;
+            if ($candidateTxId && $currentTenantId) {
+                $targetTx = FinanceTransaction::where('tenant_id', $currentTenantId)
+                    ->where(function ($q) use ($candidateTxId) {
+                        $q->where('id', $candidateTxId)
+                          ->orWhere('id', 'like', $candidateTxId . '%');
+                    })->first();
+            }
+
+            if (!$targetTx && $currentTenantId) {
+                $targetTx = $this->resolveLastRecordedTransaction($conversationId, $currentTenantId);
+            }
+
+            if ($targetTx) {
+                $isDateChange = (bool) preg_match('/\b(tanggal|tgl|hari\s+ini|sekarang|kemarin)\b/i', $userMessageText)
+                    || (bool) preg_match('/(?:diubah|koreksi\s+tanggal)\s+(\d{4}-\d{2}-\d{2})/i', $replyContent);
+
+                $resolvedDate = null;
+                if ($isDateChange) {
+                    $resolvedDate = $this->resolveTransactionDate($userMessageText, null, $targetTx->transaction_date);
+                }
+
+                $resolvedAmount = null;
+                if (preg_match('/(?:nominal|harga|sebesar|senilai|jumlah|jadi)\s*(?:sebesar\s+)?(?:rp\.?|idr)?\s*([\d\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i', $userMessageText, $amtM)) {
+                    $parsedAmt = $this->parseIndonesianNominal($amtM[1]);
+                    if ($parsedAmt > 0) {
+                        $resolvedAmount = $parsedAmt;
+                    }
+                }
+
+                $resolvedDesc = null;
+                if (preg_match('/(?:ganti|ubah)\s+(?:nama|deskripsi|keterangan)\s+(?:jadi|menjadi)\s+([a-zA-Z0-9\s]+?)(?:\.|$)/i', $userMessageText, $descM)) {
+                    $resolvedDesc = trim($descM[1]);
+                }
+
+                if ($resolvedDate || $resolvedAmount || $resolvedDesc) {
+                    $updateAction = [
+                        'action' => 'update',
+                        'transaction_id' => $targetTx->id,
+                    ];
+                    if ($resolvedDate) {
+                        $updateAction['date'] = $resolvedDate;
+                    }
+                    if ($resolvedAmount) {
+                        $updateAction['amount_minor'] = $resolvedAmount;
+                    }
+                    if ($resolvedDesc) {
+                        $updateAction['description'] = $resolvedDesc;
+                    }
+
+                    $cleaned = preg_replace('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?).*?\]/is', '', $replyContent);
+                    return [[$updateAction], trim($cleaned)];
+                }
+            }
+        }
+
         // 4. Ekstraksi Format [Info Sistem: Mutasi yang diproses: ...] (Jika model AI menghasilkan string format info sistem teknis)
         if (preg_match('/\[(?:Info Sistem|System Info):\s*(?:Mutasi yang diproses|Processed transactions?):\s*(.*?)(?:\]\s*\.?|$)/is', $replyContent, $infoMatches)) {
             $infoRaw = $infoMatches[1];
@@ -1152,10 +1257,7 @@ class TenantAssistantService
                 }
             }
 
-            $txDate = now()->toDateString();
-            if (preg_match('/(\d{4}-\d{2}-\d{2})/', $infoRaw, $dm)) {
-                $txDate = $dm[1];
-            }
+            $txDate = $this->resolveTransactionDate($userMessageText, preg_match('/(\d{4}-\d{2}-\d{2})/', $infoRaw, $dm) ? $dm[1] : null);
 
             $action = 'create';
             if (preg_match('/status:\s*(created|updated|deleted|dicatat|diperbarui|dihapus)/i', $infoRaw, $sm)) {
@@ -1234,14 +1336,7 @@ class TenantAssistantService
                 $categoryCandidate = trim($catM[1]);
             }
 
-            $txDate = now()->toDateString();
-            if (preg_match('/(\d{4}-\d{2}-\d{2})/', $replyContent, $dm)) {
-                $txDate = $dm[1];
-            } elseif (preg_match('/(\d{1,2})\s+(Jan|Feb|Mar|Apr|Mei|May|Jun|Jul|Agu|Aug|Sep|Okt|Oct|Nov|Des|Dec)[a-z]*\s+(\d{4})/i', $replyContent, $tdm)) {
-                try {
-                    $txDate = \Carbon\Carbon::parse("{$tdm[1]} {$tdm[2]} {$tdm[3]}")->format('Y-m-d');
-                } catch (\Throwable $e) {}
-            }
+            $txDate = $this->resolveTransactionDate($userMessageText);
 
             $merchantCandidate = null;
             if (preg_match('/\bdi\s+([A-Za-z0-9\s]{2,35}?)(?:\s+(?:sebesar|seharga|senilai|\d|rp|\,|$|\.))/i', $userMessageText . ' ' . $replyContent, $umMatch)) {
@@ -1739,26 +1834,28 @@ class TenantAssistantService
      * Mencari transaksi sasaran yang baru saja dicatat pada percakapan ini
      * atau transaksi mutasi paling baru di ruang kerja (sebagai target update/koreksi).
      */
-    protected function resolveLastRecordedTransaction(string $conversationId, string $tenantId, ?string $description = null): ?FinanceTransaction
+    protected function resolveLastRecordedTransaction(?string $conversationId, string $tenantId, ?string $description = null): ?FinanceTransaction
     {
         // 1. Cari dari pesan asisten paling baru di percakapan ini yang memiliki metadata recorded_transactions
-        $lastAssistantWithTx = AiMessage::where('conversation_id', $conversationId)
-            ->where('tenant_id', $tenantId)
-            ->where('role', 'assistant')
-            ->whereNotNull('metadata')
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->first(function ($msg) {
-                return !empty($msg->metadata['recorded_transactions']);
-            });
+        if ($conversationId) {
+            $lastAssistantWithTx = AiMessage::where('conversation_id', $conversationId)
+                ->where('tenant_id', $tenantId)
+                ->where('role', 'assistant')
+                ->whereNotNull('metadata')
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->first(function ($msg) {
+                    return !empty($msg->metadata['recorded_transactions']);
+                });
 
-        if ($lastAssistantWithTx && !empty($lastAssistantWithTx->metadata['recorded_transactions'])) {
-            $recentTxs = $lastAssistantWithTx->metadata['recorded_transactions'];
-            $lastTxMeta = end($recentTxs);
-            if (!empty($lastTxMeta['id'])) {
-                $found = FinanceTransaction::where('tenant_id', $tenantId)->find($lastTxMeta['id']);
-                if ($found) {
-                    return $found;
+            if ($lastAssistantWithTx && !empty($lastAssistantWithTx->metadata['recorded_transactions'])) {
+                $recentTxs = $lastAssistantWithTx->metadata['recorded_transactions'];
+                $lastTxMeta = end($recentTxs);
+                if (!empty($lastTxMeta['id'])) {
+                    $found = FinanceTransaction::where('tenant_id', $tenantId)->find($lastTxMeta['id']);
+                    if ($found) {
+                        return $found;
+                    }
                 }
             }
         }
@@ -1833,14 +1930,25 @@ class TenantAssistantService
      */
     protected function detectUnitPriceAndVolume(string $text, int $totalAmountMinor): ?array
     {
+        // Guard ketat: Hanya aktif jika teks pesan pengguna secara eksplisit menyebutkan indikator harga satuan / BBM / timbangan
+        $hasUnitPricingIndicator = (bool) preg_match('/\b(per\s+(?:liter|ltr|kg|kilo|gram|meter|pcs|buah)|(?:\/|@)\s*(?:liter|ltr|kg|kilo|gram|meter|pcs|buah)|sekilo(?:nya)?|seliter(?:nya)?|semeter(?:nya)?|1\s*(?:liter|ltr|kg|kilo|gram|meter)|bensin|pertamax|pertalite|solar|dexlite|biosolar|bahan\s+bakar|bbm|spbu|timbangan)\b/i', $text)
+            || (bool) preg_match('/@\s*(?:rp\.?\s*)?\d+/i', $text);
+
+        if (!$hasUnitPricingIndicator) {
+            return null;
+        }
+
+        // Unit hanya yang valid dengan batas kata (\b), dilarang mencocokkan huruf 'm' tunggal yang sering merupakan akhiran nama makanan (seperti 'sumsum')
+        $unitRegex = '\b(liter|ltr|lt|kg|kilo|gram|gr|pcs|pc|bungkus|buah|meter)\b';
+
         // Pola 1: "untuk 1liternya Rp15.950", "seliternya 10rb", "sekilonya 25.000", "harga 1 liter 15950", "per liter 10rb"
-        $pattern1 = '/(?:untuk|harga|seharga|senilai|adalah|sebesar|per|tiap|@)?\s*(?:1|se)?\s*(liter|ltr|lt|kg|kilo|gram|gr|pcs|pc|bungkus|buah|meter|m)\s*(?:nya)?\s*(?:seharga|senilai|adalah|sebesar|rp\.?|:|@)?\s*([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i';
+        $pattern1 = '/(?:untuk|harga|seharga|senilai|adalah|sebesar|per|tiap|@)?\s*(?:1|se)?\s*' . $unitRegex . '\s*(?:nya)?\s*(?:seharga|senilai|adalah|sebesar|rp\.?|:|@)?\s*([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)/i';
 
         // Pola 2: "15.950/liter", "15rb per liter", "28000 per kg"
-        $pattern2 = '/(?:rp\.?\s*)?([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)\s*(?:\/|\s+per\s+)\s*(liter|ltr|lt|kg|kilo|gram|gr|pcs|pc|bungkus|buah|meter|m)/i';
+        $pattern2 = '/(?:rp\.?\s*)?([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)\s*(?:\/|\s+per\s+)\s*' . $unitRegex . '/i';
 
         // Pola 3: "@ 15.950", "@ Rp 15.950"
-        $pattern3 = '/@\s*(?:rp\.?\s*)?([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)(?:\s*(?:\/|\s+per\s+)?(liter|ltr|lt|kg|kilo|gram|gr|pcs|pc|bungkus|buah|meter|m))?/i';
+        $pattern3 = '/@\s*(?:rp\.?\s*)?([0-9\.,]+(?:\s*(?:ribu|rb|k|juta|jt))?)(?:\s*(?:\/|\s+per\s+)?' . $unitRegex . ')?/i';
 
         $unitPrice = 0;
         $unit = '';
@@ -1871,7 +1979,7 @@ class TenantAssistantService
         }
 
         // Jika pengguna justru menyebutkan kuantitas dan harga satuan: misal "2.5 liter harganya 15950 per liter"
-        if (preg_match('/([0-9]+(?:[\.,][0-9]+)?)\s*(liter|ltr|lt|kg|kilo|gram|gr|pcs|pc|bungkus|buah|meter|m)\b/i', $text, $qm)) {
+        if (preg_match('/([0-9]+(?:[\.,][0-9]+)?)\s*' . $unitRegex . '/i', $text, $qm)) {
             $rawQty = str_replace(',', '.', $qm[1]);
             $qty = (float) $rawQty;
             if ($qty > 0) {
@@ -1888,6 +1996,117 @@ class TenantAssistantService
             'quantity' => 1,
             'unit' => $unit,
         ];
+    }
+
+    /**
+     * Menyelesaikan tanggal transaksi secara akurat berdasarkan pesan pengguna,
+     * kandidat tanggal dari ekstraksi, dan waktu saat ini (now).
+     * Pesan pengguna adalah Single Source of Truth untuk waktu/tanggal relatif dan eksplisit.
+     */
+    public function resolveTransactionDate(string $userText, ?string $candidateDate = null, ?string $referenceDate = null): string
+    {
+        $today = now()->toDateString();
+        $userTextTrimmed = trim($userText);
+
+        if (empty($userTextTrimmed)) {
+            return $candidateDate && preg_match('/^\d{4}-\d{2}-\d{2}$/', $candidateDate) ? $candidateDate : $today;
+        }
+
+        // 1. Keterangan Waktu Relatif Hari Ini (MANDATORY: Mengesampingkan tanggal halusinasi AI)
+        if (preg_match('/\b(hari\s+ini|sekarang|saat\s+ini|tadi\s+pagi|pagi\s+ini|siang\s+ini|sore\s+ini|malam\s+ini|barusan|tadi)\b/i', $userTextTrimmed)) {
+            if (!preg_match('/\b(bukan|bukanlah|jangan)\s+(?:hari\s+ini|sekarang)\b/i', $userTextTrimmed)) {
+                return $today;
+            }
+        }
+
+        // 2. Keterangan Waktu Relatif Kemarin Lusa
+        if (preg_match('/\bkemarin\s+lusa\b/i', $userTextTrimmed)) {
+            return now()->subDays(2)->toDateString();
+        }
+
+        // 3. Keterangan Waktu Relatif Kemarin
+        if (preg_match('/\bkemarin\b/i', $userTextTrimmed)) {
+            return now()->subDay()->toDateString();
+        }
+
+        // 4. Keterangan Waktu Relatif Besok
+        if (preg_match('/\bbesok\b/i', $userTextTrimmed)) {
+            return now()->addDay()->toDateString();
+        }
+
+        // 5. Pola Sanggahan / Koreksi Tanggal dalam Kalimat (contoh: "ko tanggal 3? sekarang kan tanggal 6", "masih tanggal 3 bukan tanggal 6", "bukan tgl 3 tapi tgl 6")
+        if (preg_match('/(?:sekarang\s+kan|seharusnya|mestinya|harusnya|jadikan|ubah\s+(?:ke|jadi)|ganti\s+(?:ke|jadi)|tapi|melainkan)\s+(?:tanggal|tgl)?\s*(\d{1,2})(?:\s+([A-Za-z]+)(?:\s+(\d{4}))?)?/i', $userTextTrimmed, $corrM)) {
+            return $this->formatDayMonthYearToIso($corrM[1], $corrM[2] ?? null, $corrM[3] ?? null);
+        }
+
+        // Pola khusus: "masih tanggal X bukan tanggal Y" -> Y adalah tanggal yang diinginkan
+        if (preg_match('/masih\s+(?:tanggal|tgl)\s*(\d{1,2}).*?bukan\s+(?:tanggal|tgl)?\s*(\d{1,2})/i', $userTextTrimmed, $masihM)) {
+            return $this->formatDayMonthYearToIso($masihM[2]);
+        }
+
+        // 6. Tanggal Eksplisit Format ISO (YYYY-MM-DD) dalam Teks Pengguna
+        if (preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $userTextTrimmed, $isoM)) {
+            return $isoM[1];
+        }
+
+        // 7. Tanggal Eksplisit Format Bahasa Indonesia (DD Month YYYY atau DD Month) dalam Teks Pengguna
+        $monthPattern = '(?:Jan(?:uari)?|Feb(?:ruari)?|Mar(?:et)?|Apr(?:il)?|Mei|May|Jun(?:i)?|Jul(?:i)?|Agu(?:stus)?|Aug(?:ust)?|Sep(?:tember)?|Okt(?:ober)?|Oct(?:ober)?|Nov(?:ember)?|Des(?:ember)?|Dec(?:ember)?)';
+        if (preg_match('/(?:tanggal|tgl)?\s*(\d{1,2})\s+(' . $monthPattern . ')(?:\s+(\d{4}))?/i', $userTextTrimmed, $dmM)) {
+            return $this->formatDayMonthYearToIso($dmM[1], $dmM[2], $dmM[3] ?? null);
+        }
+
+        // 8. Tanggal Eksplisit Angka Tanggal Saja (contoh: "tanggal 6", "tgl 6", "pada tgl 6")
+        if (preg_match('/\b(?:tanggal|tgl)\s+(\d{1,2})\b/i', $userTextTrimmed, $dayM)) {
+            $dayNum = (int) $dayM[1];
+            if ($dayNum >= 1 && $dayNum <= 31) {
+                return $this->formatDayMonthYearToIso((string) $dayNum);
+            }
+        }
+
+        // 9. Jika ada candidate date yang valid
+        if (!empty($candidateDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $candidateDate)) {
+            return $candidateDate;
+        }
+
+        // 10. Default Aman: Selalu gunakan tanggal HARI INI
+        return $today;
+    }
+
+    /**
+     * Memformat hari, nama bulan (opsional), dan tahun (opsional) menjadi string ISO YYYY-MM-DD.
+     */
+    protected function formatDayMonthYearToIso(string $day, ?string $monthStr = null, ?string $yearStr = null): string
+    {
+        $dayNum = str_pad(trim($day), 2, '0', STR_PAD_LEFT);
+        $now = now();
+        $year = !empty($yearStr) && is_numeric($yearStr) ? (int) $yearStr : (int) $now->format('Y');
+
+        if (!empty($monthStr)) {
+            $monthMap = [
+                'jan' => '01', 'januari' => '01', 'january' => '01',
+                'feb' => '02', 'februari' => '02', 'february' => '02',
+                'mar' => '03', 'maret' => '03', 'march' => '03',
+                'apr' => '04', 'april' => '04',
+                'mei' => '05', 'may' => '05',
+                'jun' => '06', 'juni' => '06', 'june' => '06',
+                'jul' => '07', 'juli' => '07', 'july' => '07',
+                'agu' => '08', 'agustus' => '08', 'aug' => '08', 'august' => '08',
+                'sep' => '09', 'sept' => '09', 'september' => '09',
+                'okt' => '10', 'oktober' => '10', 'oct' => '10', 'october' => '10',
+                'nov' => '11', 'november' => '11',
+                'des' => '12', 'desember' => '12', 'dec' => '12', 'december' => '12',
+            ];
+            $key = strtolower(trim($monthStr));
+            $monthNum = $monthMap[$key] ?? $now->format('m');
+        } else {
+            $monthNum = $now->format('m');
+        }
+
+        try {
+            return \Carbon\Carbon::createFromDate($year, (int) $monthNum, (int) $dayNum)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return now()->toDateString();
+        }
     }
 
     /**

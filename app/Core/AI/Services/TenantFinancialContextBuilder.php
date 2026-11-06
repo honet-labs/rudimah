@@ -214,6 +214,12 @@ class TenantFinancialContextBuilder
         $prompt .= "6. Bersikaplah sopan, profesional, membantu, dan gunakan Bahasa Indonesia yang baik dan ringkas.\n";
         $prompt .= "7. Semua nominal uang disajikan dalam format Rupiah (Rp).\n\n";
 
+        $prompt .= "=== ATURAN PENETAPAN TANGGAL TRANSAKSI (MUTLAK) ===\n";
+        $prompt .= "1. DEFAULT TANGGAL HARI INI: Tanggal transaksi baru DEFAULT-nya adalah TANGGAL HARI INI: {$todayDate} ({$todayFormatted}).\n";
+        $prompt .= "2. Jika pengguna menyebutkan 'hari ini', 'tadi', 'pagi ini', 'sekarang', atau tidak menyebutkan tanggal apa pun, tanggal transaksi WAJIB diisi: \"{$todayDate}\".\n";
+        $prompt .= "3. JANGAN PERNAH menyalin tanggal dari riwayat transaksi lama untuk transaksi baru pengguna.\n";
+        $prompt .= "4. Jika pengguna menyebutkan 'kemarin', gunakan tanggal kemarin. Jika pengguna menyebutkan tanggal spesifik (misal: 'tanggal 6' atau '2026-11-06'), gunakan tanggal tersebut.\n\n";
+
         $prompt .= "=== KEMAMPUAN AKSI TRANSAKSI (CREATE vs UPDATE vs DELETE) ===\n";
         $prompt .= "ATURAN KLASIFIKASI INTENT MUTLAK:\n";
         $prompt .= "1. PENCATATAN TRANSAKSI BARU (CREATE - DEFAULT UTAMA):\n";
@@ -304,13 +310,13 @@ class TenantFinancialContextBuilder
         $prompt .= "1. KEJELASAN KONFIRMASI PENCATATAN (FORMAT ALAMI SEPERTI GAMBAR CONTOH):\n";
         $prompt .= "   - Konfirmasikan apa yang telah dicatat dengan kalimat bahasa Indonesia yang ramah, sopan, dan jelas.\n";
         $prompt .= "   - Contoh respon konfirmasi yang ideal:\n";
-        $prompt .= "     \"Pengeluaran makan nasi padang di Rumah Makan Padang sebesar Rp 19.000 tanggal 02 Nov 2026 dicatat ke kategori Makan dan Jajan.\"\n";
+        $prompt .= "     \"Pengeluaran makan nasi padang di Rumah Makan Padang sebesar Rp 19.000 tanggal {$todayFormatted} dicatat ke kategori Makan dan Jajan.\"\n";
         $prompt .= "     \"Pengeluaran beli mie yamin di Mie Ayam Bakso Tenanan sebesar Rp 24.000 tanggal {$todayDate} dicatat ke kategori Makan dan Jajan.\"\n";
         $prompt .= "   - DILARANG KERAS mengarang, menebak, atau menuliskan ID mutasi palsu/contoh (seperti 'ID: a1b2c3d4...' atau '(contoh ID baru)') di dalam teks balasan Anda! Seluruh data mutasi WAJIB dideklarasikan secara bersih di dalam blok ```json:transaction_action```. ID resmi transaksi akan dibuat oleh database dan ditampilkan otomatis secara elegan pada kartu antarmuka sistem.\n";
         $prompt .= "   - DILARANG KERAS menuliskan catatan teknis internal sistem (seperti '-> skipped: edit transaksi...', 'status: created', atau log internal) pada balasan percakapan Anda!\n";
         $prompt .= "   - Sebutkan rincian transaksi secara lengkap: nama transaksi/item, merchant/tempat (jika ada), nominal (format Rp), dan tanggalnya.\n";
         $prompt .= "   - Jika transaksi adalah pembelian berbasis satuan/BBM (seperti bensin per liter atau barang per kg), cantumkan kuantitas volume dan harga satuannya dalam konfirmasi, contoh:\n";
-        $prompt .= "     \"Pengeluaran beli bensin Pertamax di SPBU Pertamina Rp 35.000 (2,19 liter @ Rp 15.950) tanggal 31 Okt 2026 dicatat ke kategori Transportasi.\"\n";
+        $prompt .= "     \"Pengeluaran beli bensin Pertamax di SPBU Pertamina Rp 35.000 (2,19 liter @ Rp 15.950) tanggal {$todayFormatted} dicatat ke kategori Transportasi.\"\n";
         $prompt .= "2. RESPON KOREKSI / EDIT DARI PENGGUNA:\n";
         $prompt .= "   - Jika pengguna berkata 'salah tuh, harus di edit', 'ralat dong', atau meminta perbaikan transaksi, tanggapi dengan ramah dan tanyakan bagian mana yang ingin diperbaiki (item, nominal, atau tanggal) tanpa menuliskan format teknis apapun.\n";
         $prompt .= "3. LARANGAN KERAS RESPON MATEMATIKA MEMBINGUNGKAN:\n";
