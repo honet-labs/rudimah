@@ -32,7 +32,7 @@ const props = defineProps<{
       <template #actions>
         <a href="/workspaces" class="w-full sm:w-auto">
           <RdButton variant="outline" size="sm" class="w-full sm:w-auto">
-            Kembali ke Pemilih Ruang Kerja
+            Kembali ke Pemilih Ruang
           </RdButton>
         </a>
       </template>
@@ -60,7 +60,7 @@ const props = defineProps<{
         <div class="space-y-1">
           <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Arsitektur Modul Terpadu RUDIMAH</h4>
           <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            Setiap modul aplikasi yang terdaftar di platform RUDIMAH berbagi otentikasi identitas bersama (SSO), isolasi data ruang kerja (Multi-Tenant Fail-Closed), token antarmuka sistem terpadu, dan kecerdasan buatan terpusat.
+            Setiap modul aplikasi yang terdaftar di platform RUDIMAH berbagi otentikasi identitas bersama (SSO), isolasi data ruang (Multi-Tenant Fail-Closed), token antarmuka sistem terpadu, dan kecerdasan buatan terpusat.
           </p>
         </div>
       </div>

@@ -72,7 +72,7 @@ const userName = computed(() => {
 const currentTenant = computed(() => {
   return props.tenant || {
     id: '',
-    name: 'Ruang Kerja',
+    name: 'Ruang',
     slug: '',
     status: 'active',
     role: 'owner',
@@ -108,12 +108,12 @@ const pekanNavItems = computed(() => [
 
 const adminNavItems = computed(() => [
   { name: 'Ringkasan Sistem', path: '/admin', icon: 'server' },
-  { name: 'Semua Ruang Kerja', path: '/admin/workspaces', icon: 'building' },
+  { name: 'Semua Ruang', path: '/admin/workspaces', icon: 'building' },
   { name: 'Pengguna Terdaftar', path: '/admin/users', icon: 'users' },
   { name: 'Penyedia AI Platform', path: '/admin/ai', icon: 'cpu' },
   { name: 'Kanal Notifikasi & OTP', path: '/admin/notifications', icon: 'bell' },
   { name: 'Katalog Modul Aplikasi', path: '/admin/apps', icon: 'apps' },
-  { name: 'Pilih Ruang Kerja', path: '/workspaces', icon: 'arrow-left' },
+  { name: 'Pilih Ruang', path: '/workspaces', icon: 'arrow-left' },
 ]);
 
 const currentNavItems = computed(() => {
@@ -219,7 +219,7 @@ function isCurrentRoute(targetPath: string): boolean {
         <!-- Tenant Switcher atau Indikator Global Platform (Khusus Desktop) -->
         <div v-if="appKey === 'admin'" class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
           <span class="w-2 h-2 rounded-full bg-teal-600"></span>
-          <span class="hidden sm:inline">Platform Global (Seluruh Ruang Kerja)</span>
+          <span class="hidden sm:inline">Platform Global (Seluruh Ruang)</span>
           <span class="sm:hidden">Global Admin</span>
         </div>
         <div v-else class="hidden md:inline-block">
@@ -439,7 +439,7 @@ function isCurrentRoute(targetPath: string): boolean {
               </div>
               <div v-else class="space-y-1.5">
                 <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  <span>Ruang Kerja</span>
+                  <span>Ruang</span>
                   <span class="text-[10px] text-slate-400">{{ tenantRole }}</span>
                 </div>
                 <RdTenantSwitcher

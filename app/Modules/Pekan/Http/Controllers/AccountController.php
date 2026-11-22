@@ -18,7 +18,7 @@ class AccountController
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
-            abort(403, 'Konteks ruang kerja tidak valid.');
+            abort(403, 'Konteks ruang tidak valid.');
         }
 
         $validated = $request->validate([
@@ -49,7 +49,7 @@ class AccountController
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
-            abort(403, 'Konteks ruang kerja tidak valid.');
+            abort(403, 'Konteks ruang tidak valid.');
         }
 
         $accountId = $request->route('id') ?: $id;
@@ -79,7 +79,7 @@ class AccountController
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
-            abort(403, 'Konteks ruang kerja tidak valid.');
+            abort(403, 'Konteks ruang tidak valid.');
         }
 
         $accountId = $request->route('id') ?: $id;

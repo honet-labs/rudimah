@@ -50,7 +50,7 @@ const filteredTenants = computed(() => {
 });
 
 const tenantColumns = [
-  { key: 'name', label: 'Nama Ruang Kerja' },
+  { key: 'name', label: 'Nama Ruang' },
   { key: 'slug', label: 'Slug URL' },
   { key: 'members_count', label: 'Anggota', width: '90px', align: 'center' as const },
   { key: 'created_at', label: 'Terdaftar', width: '130px' },
@@ -67,14 +67,14 @@ const tenantColumns = [
     app-name="Administrasi Sistem"
   >
     <RdPageHeader
-      title="Semua Ruang Kerja"
-      description="Kelola seluruh tenant ruang kerja keluarga maupun usaha yang terdaftar di platform RUDIMAH"
-      :breadcrumbs="[{ label: 'Administrasi', href: '/admin' }, { label: 'Semua Ruang Kerja' }]"
+      title="Semua Ruang"
+      description="Kelola seluruh ruang keluarga maupun usaha yang terdaftar di platform RUDIMAH"
+      :breadcrumbs="[{ label: 'Administrasi', href: '/admin' }, { label: 'Semua Ruang' }]"
     >
       <template #actions>
         <a href="/workspaces" class="w-full sm:w-auto">
           <RdButton variant="outline" size="sm" class="w-full sm:w-auto">
-            Kembali ke Pemilih Ruang Kerja
+            Kembali ke Pemilih Ruang
           </RdButton>
         </a>
       </template>
@@ -94,7 +94,7 @@ const tenantColumns = [
     <!-- Ringkasan Cepat -->
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
       <RdCard padding>
-        <span class="text-xs text-slate-500 font-medium truncate block">Total Ruang Kerja</span>
+        <span class="text-xs text-slate-500 font-medium truncate block">Total Ruang</span>
         <div class="text-2xl font-bold text-slate-900 dark:text-white mt-1">
           {{ props.tenantsList?.length || 0 }}
         </div>
@@ -102,7 +102,7 @@ const tenantColumns = [
       </RdCard>
 
       <RdCard padding>
-        <span class="text-xs text-slate-500 font-medium truncate block">Ruang Kerja Aktif</span>
+        <span class="text-xs text-slate-500 font-medium truncate block">Ruang Aktif</span>
         <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
           {{ props.tenantsList?.filter(t => t.status === 'active').length || 0 }}
         </div>
@@ -124,8 +124,8 @@ const tenantColumns = [
         <div class="sm:col-span-2">
           <RdInput
             v-model="searchQuery"
-            label="Cari Ruang Kerja"
-            placeholder="Ketik nama ruang kerja atau slug..."
+            label="Cari Ruang"
+            placeholder="Ketik nama ruang atau slug..."
           />
         </div>
         <div>
@@ -140,8 +140,8 @@ const tenantColumns = [
 
     <!-- Tabel Ruang Kerja -->
     <RdCard
-      title="Daftar Ruang Kerja"
-      :description="`Menampilkan ${filteredTenants.length} dari ${props.tenantsList?.length || 0} ruang kerja terdaftar`"
+      title="Daftar Ruang"
+      :description="`Menampilkan ${filteredTenants.length} dari ${props.tenantsList?.length || 0} ruang terdaftar`"
     >
       <RdTable :columns="tenantColumns" :items="filteredTenants">
         <template #name="{ item }">
@@ -166,13 +166,13 @@ const tenantColumns = [
         <template #actions="{ item }">
           <a :href="`/t/${item.slug}/apps/pekan/dashboard`" class="inline-block whitespace-nowrap">
             <RdButton variant="outline" size="sm">
-              Buka Ruang Kerja
+              Buka Ruang
             </RdButton>
           </a>
         </template>
         <template #empty>
           <div class="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
-            Tidak ada ruang kerja yang sesuai dengan kriteria pencarian.
+            Tidak ada ruang yang sesuai dengan kriteria pencarian.
           </div>
         </template>
       </RdTable>

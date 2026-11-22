@@ -210,7 +210,7 @@ class PlatformNotificationService
 
         try {
             Mail::raw(
-                "Halo,\n\nIni adalah pesan konfirmasi pengujian pengiriman email notifikasi dari Platform RUDIMAH (Ruang Digital Manajemen Harian).\n\nKanal Email (SMTP) Anda pada host {$mailHost} telah berhasil terhubung dan siap melayani seluruh ruang kerja.\n\nWaktu uji coba: " . now()->toIso8601String() . "\n\nSalam,\nTim Administrator RUDIMAH",
+                "Halo,\n\nIni adalah pesan konfirmasi pengujian pengiriman email notifikasi dari Platform RUDIMAH (Ruang Digital Manajemen Harian).\n\nKanal Email (SMTP) Anda pada host {$mailHost} telah berhasil terhubung dan siap melayani seluruh ruang.\n\nWaktu uji coba: " . now()->toIso8601String() . "\n\nSalam,\nTim Administrator RUDIMAH",
                 function ($message) use ($recipientEmail) {
                     $message->to($recipientEmail)
                         ->subject('[RUDIMAH] Uji Coba Pengiriman Notifikasi Email Berhasil');

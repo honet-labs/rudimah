@@ -16,7 +16,7 @@ class LocalMockProvider implements AiProviderInterface
         $lastMsg = end($messages)['content'] ?? '';
         $model = $options['model'] ?? 'local-mock-v1';
 
-        $reply = "Halo dari Local Mock Assistant ({$model}). Pesan Anda: \"" . mb_strimwidth($lastMsg, 0, 80, '...') . "\" telah diterima dalam batas aman ruang kerja Anda.";
+        $reply = "Halo dari Local Mock Assistant ({$model}). Pesan Anda: \"" . mb_strimwidth($lastMsg, 0, 80, '...') . "\" telah diterima dalam batas aman ruang Anda.";
 
         return [
             'content' => $reply,

@@ -7,10 +7,12 @@ const props = withDefaults(
     maxSizeMb?: number;
     label?: string;
     description?: string;
+    disabled?: boolean;
   }>(),
   {
     accept: 'image/*,.pdf',
     maxSizeMb: 10,
+    disabled: false,
     label: 'Unggah Dokumen atau Kuitansi',
     description: 'Format yang didukung: JPG, PNG, atau PDF (maksimal 10MB)',
   }
@@ -22,9 +24,10 @@ const emit = defineEmits<{
 
 const isDragging = ref(false);
 const errorMessage = ref<string | null>(null);
+const selectedName = ref('');
 
 function handleFiles(files: FileList | null) {
-  if (!files || files.length === 0) return;
+  if (props.disabled || !files || files.length === 0) return;
   const file = files[0];
 
   if (file.size > props.maxSizeMb * 1024 * 1024) {
@@ -33,6 +36,7 @@ function handleFiles(files: FileList | null) {
   }
 
   errorMessage.value = null;
+  selectedName.value = file.name;
   emit('file-selected', file);
 }
 
@@ -44,6 +48,7 @@ function onDrop(e: DragEvent) {
 function onChange(e: Event) {
   const target = e.target as HTMLInputElement;
   handleFiles(target.files);
+  target.value = '';
 }
 </script>
 
@@ -62,13 +67,20 @@ function onChange(e: Event) {
       @dragover.prevent="isDragging = true"
       @dragleave.prevent="isDragging = false"
       @drop.prevent="onDrop"
-      @click="($refs.fileInput as HTMLInputElement).click()"
+      @click="!disabled && ($refs.fileInput as HTMLInputElement).click()"
+      role="button"
+      :tabindex="disabled ? -1 : 0"
+      :aria-disabled="disabled"
+      @keydown.enter.prevent="!disabled && ($refs.fileInput as HTMLInputElement).click()"
+      @keydown.space.prevent="!disabled && ($refs.fileInput as HTMLInputElement).click()"
     >
       <input
         ref="fileInput"
         type="file"
         :accept="accept"
+        :disabled="disabled"
         class="hidden"
+        @click.stop
         @change="onChange"
       />
       <div class="flex flex-col items-center justify-center">
@@ -86,5 +98,6 @@ function onChange(e: Event) {
     <p v-if="errorMessage" class="text-xs text-red-600 font-medium mt-1">
       {{ errorMessage }}
     </p>
+    <p v-if="selectedName" class="text-xs mt-1" role="status">Berkas dipilih: {{ selectedName }}</p>
   </div>
 </template>

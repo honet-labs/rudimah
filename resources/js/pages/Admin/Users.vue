@@ -71,7 +71,7 @@ const userColumns = [
   { key: 'email', label: 'Alamat Email' },
   { key: 'has_mfa', label: 'Keamanan MFA', width: '130px', align: 'center' as const },
   { key: 'is_super_admin', label: 'Hak Akses', width: '130px', align: 'center' as const },
-  { key: 'workspaces_count', label: 'Ruang Kerja', width: '120px', align: 'center' as const },
+  { key: 'workspaces_count', label: 'Ruang', width: '120px', align: 'center' as const },
   { key: 'created_at', label: 'Terdaftar', width: '120px' },
 ];
 </script>
@@ -91,7 +91,7 @@ const userColumns = [
       <template #actions>
         <a href="/workspaces" class="w-full sm:w-auto">
           <RdButton variant="outline" size="sm" class="w-full sm:w-auto">
-            Kembali ke Pemilih Ruang Kerja
+            Kembali ke Pemilih Ruang
           </RdButton>
         </a>
       </template>
@@ -188,7 +188,7 @@ const userColumns = [
           </RdBadge>
         </template>
         <template #workspaces_count="{ value }">
-          <span class="text-xs font-medium whitespace-nowrap">{{ value }} Ruang Kerja</span>
+          <span class="text-xs font-medium whitespace-nowrap">{{ value }} Ruang</span>
         </template>
         <template #created_at="{ value }">
           <span class="text-xs text-slate-500 whitespace-nowrap">{{ value || '-' }}</span>

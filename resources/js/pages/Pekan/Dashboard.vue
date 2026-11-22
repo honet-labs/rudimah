@@ -79,7 +79,7 @@ const txColumns = [
     <RdPageHeader
       title="Dasbor Keuangan"
       description="Ringkasan arus kas, anggaran belanja, dan capaian tabungan bulan berjalan"
-      :breadcrumbs="[{ label: 'Ruang Kerja', href: '/workspaces' }, { label: 'PEKAN', href: `/t/${tenant?.slug || ''}/apps/pekan/dashboard` }, { label: 'Dasbor' }]"
+      :breadcrumbs="[{ label: 'Ruang', href: '/workspaces' }, { label: 'PEKAN', href: `/t/${tenant?.slug || ''}/apps/pekan/dashboard` }, { label: 'Dasbor' }]"
     >
       <template #actions>
         <!-- Tombol Sensor / Buka Sensor Nominal (Default: Sembunyi) -->
@@ -126,9 +126,9 @@ const txColumns = [
     <!-- Kartu Metrik Utama -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <RdCard padding>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Pemasukan Bulan Ini</span>
+        <div class="flex items-center gap-1.5">
           <RdInfoTooltip text="Total seluruh mutasi kas masuk bulan berjalan" size="sm" title="Pemasukan" />
+          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Pemasukan Bulan Ini</span>
         </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
           <RdMoney :amount-minor="summary.incomeMinor" :masked="isNominalHidden" />
@@ -136,9 +136,9 @@ const txColumns = [
       </RdCard>
 
       <RdCard padding>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Pengeluaran Bulan Ini</span>
+        <div class="flex items-center gap-1.5">
           <RdInfoTooltip text="Total mutasi belanja dan biaya bulan berjalan" size="sm" title="Pengeluaran" />
+          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Pengeluaran Bulan Ini</span>
         </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
           <RdMoney :amount-minor="summary.expenseMinor" :masked="isNominalHidden" />
@@ -146,9 +146,9 @@ const txColumns = [
       </RdCard>
 
       <RdCard padding>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Saldo Kas Bersih</span>
+        <div class="flex items-center gap-1.5">
           <RdInfoTooltip text="Surplus atau selisih antara pemasukan dan pengeluaran bulan berjalan" size="sm" title="Saldo Kas" />
+          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Saldo Kas Bersih</span>
         </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
           <RdMoney :amount-minor="summary.netMinor" :masked="isNominalHidden" />
@@ -156,9 +156,9 @@ const txColumns = [
       </RdCard>
 
       <RdCard padding>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Akumulasi Tabungan</span>
+        <div class="flex items-center gap-1.5">
           <RdInfoTooltip text="Total akumulasi saldo dari seluruh pos simpanan aktif" size="sm" title="Tabungan" />
+          <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Akumulasi Tabungan</span>
         </div>
         <div class="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
           <RdMoney :amount-minor="summary.savingsMinor" :masked="isNominalHidden" />
@@ -170,7 +170,7 @@ const txColumns = [
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
       <!-- Tabel Transaksi Terkini (2 Kolom) -->
       <div class="lg:col-span-2">
-        <RdCard title="Transaksi Terkini" description="5 transaksi terbaru yang dicatat dalam ruang kerja ini">
+        <RdCard title="Transaksi Terkini" description="5 transaksi terbaru yang dicatat dalam ruang ini">
           <template #actions>
             <a :href="`/t/${tenant?.slug || ''}/apps/pekan/transactions`" class="text-xs text-teal-700 dark:text-teal-400 font-semibold hover:underline">
               Lihat Semua

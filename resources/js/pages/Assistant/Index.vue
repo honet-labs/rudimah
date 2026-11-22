@@ -486,13 +486,13 @@ onUnmounted(() => {
           </button>
 
           <h1 class="text-xs sm:text-sm md:text-base font-bold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
-            <span class="sm:hidden">Asisten AI</span>
-            <span class="hidden sm:inline">Asisten Cerdas Ruang Kerja</span>
             <RdInfoTooltip
-              text="Konsultasi finansial interaktif, ringkasan arus kas, dan analisis keuangan cerdas terisolasi khusus ruang kerja ini"
+              text="Konsultasi finansial interaktif, ringkasan arus kas, dan analisis keuangan cerdas terisolasi khusus ruang ini"
               size="sm"
               title="Informasi Asisten AI"
             />
+            <span class="sm:hidden">Asisten AI</span>
+            <span class="hidden sm:inline">Asisten Cerdas Ruang</span>
           </h1>
 
           <!-- Badges tersembunyi di mobile agar tidak menumpuk baris tombol -->
@@ -605,7 +605,7 @@ onUnmounted(() => {
           </div>
 
           <div class="p-2.5 px-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 shrink-0">
-            Terisolasi ketat pada ruang kerja {{ tenant.name }}
+            Terisolasi ketat pada ruang {{ tenant.name }}
           </div>
         </aside>
 
@@ -615,7 +615,7 @@ onUnmounted(() => {
           <div class="py-2 px-3 sm:px-4 bg-slate-100/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between shrink-0">
             <div class="leading-normal">
               <span class="font-semibold text-slate-800 dark:text-slate-200">Proteksi Keamanan Aktif:</span>
-              Asisten dibatasi ketat pada konteks ruang kerja ini.
+              Asisten dibatasi ketat pada konteks ruang ini.
             </div>
             <span class="text-[10px] text-slate-400 shrink-0 hidden md:inline ml-2">Fail-Closed Context</span>
           </div>
@@ -631,7 +631,7 @@ onUnmounted(() => {
               class="max-w-2xl mx-auto py-4 md:py-6 text-center space-y-3"
             >
               <div class="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Selamat Datang di Asisten Finansial Ruang Kerja {{ tenant.name }}
+                Selamat Datang di Asisten Finansial Ruang {{ tenant.name }}
               </div>
               <p class="text-xs text-slate-500 max-w-md mx-auto">
                 Ajukan pertanyaan seputar pembukuan, transaksi, alokasi anggaran, target tabungan, atau jadwal tagihan jatuh tempo.
@@ -949,7 +949,7 @@ onUnmounted(() => {
                 Asisten RUDIMAH sedang berpikir...
               </div>
               <div class="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 italic">
-                Memproses konteks data ruang kerja dan menghasilkan respon terisolasi...
+                Memproses konteks data ruang dan menghasilkan respon terisolasi...
               </div>
             </div>
           </div>
@@ -964,7 +964,7 @@ onUnmounted(() => {
                 ref="chatInputRef"
                 v-model="inputMessage"
                 type="text"
-                placeholder="Tanyakan hal terkait keuangan ruang kerja Anda... (Tekan Enter untuk mengirim)"
+                placeholder="Tanyakan hal terkait keuangan ruang Anda... (Tekan Enter untuk mengirim)"
                 class="flex-1 px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-teal-600"
                 :disabled="isSending"
               />
@@ -1037,7 +1037,7 @@ onUnmounted(() => {
                   Kustomisasi Akun / Kunci API Sendiri (Opsional)
                 </label>
                 <span class="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
-                  Centang opsi ini hanya jika ruang kerja Anda ingin menggunakan akun/kunci API terpisah di luar Administrasi Sistem.
+                  Centang opsi ini hanya jika ruang Anda ingin menggunakan akun/kunci API terpisah di luar Administrasi Sistem.
                 </span>
               </div>
               <input
@@ -1094,12 +1094,12 @@ onUnmounted(() => {
 
               <div>
                 <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Kunci API Pribadi Ruang Kerja
+                  Kunci API Pribadi Ruang
                 </label>
                 <input
                   v-model="formSettings.api_key"
                   type="password"
-                  placeholder="Masukkan kunci API khusus ruang kerja Anda..."
+                  placeholder="Masukkan kunci API khusus ruang Anda..."
                   class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
                 />
               </div>
@@ -1109,12 +1109,12 @@ onUnmounted(() => {
           <!-- Persona Ruang Kerja (Selalu Tersedia) -->
           <div>
             <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Instruksi Sistem Khusus (Persona Ruang Kerja)
+              Instruksi Sistem Khusus (Persona Ruang)
             </label>
             <textarea
               v-model="formSettings.system_instructions"
               rows="3"
-              placeholder="Opsional: Tambahkan arahan khusus gaya bahasa atau fokus pembukuan keluarga/bisnis ruang kerja ini..."
+              placeholder="Opsional: Tambahkan arahan khusus gaya bahasa atau fokus pembukuan keluarga/bisnis ruang ini..."
               class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
             ></textarea>
           </div>
@@ -1127,7 +1127,7 @@ onUnmounted(() => {
               class="rounded border-slate-300 dark:border-slate-700"
             />
             <label for="ai_enabled" class="text-xs text-slate-700 dark:text-slate-300">
-              Aktifkan asisten AI untuk anggota ruang kerja ini
+              Aktifkan asisten AI untuk anggota ruang ini
             </label>
           </div>
         </div>

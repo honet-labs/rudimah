@@ -65,7 +65,7 @@ Tidak boleh upgrade library UI otomatis yang menghasilkan breaking visual tanpa 
 - Pesan berhasil: `Perubahan berhasil disimpan.`
 - Error jaringan: `Tidak dapat terhubung. Periksa koneksi lalu coba lagi.`
 - Status OCR: `Menunggu diproses`, `Sedang membaca struk`, `Perlu diperiksa`, `Selesai`, `Gagal`.
-- Istilah dipilih sekali dalam glossary; satu konsep satu istilah, jangan kadang `organisasi` kadang `tenant` di antarmuka publik tanpa alasan. UI gunakan `Ruang Kerja` atau `Organisasi` sebagai label, internal boleh `tenant`.
+- Istilah publik untuk workspace/tenant adalah **Ruang**, sesuai persetujuan pengguna. Nama class, tabel, route `/workspaces`, slug, dan identifier internal tetap kompatibel; nama ruang milik pengguna tidak diubah.
 - Label tidak menjanjikan kemampuan yang belum terimplementasi.
 
 ## 8. Checklist reviewer PR frontend
@@ -80,3 +80,9 @@ Tidak boleh upgrade library UI otomatis yang menghasilkan breaking visual tanpa 
 - [ ] Component docs dan snapshots diperbarui bila perlu.
 - [ ] Bebas dari dead code (tidak ada unused imports, unused variables, props atau payload yang tidak terpakai).
 - [ ] Skenario authorization UI tidak menggantikan backend security.
+
+## 9. Changelog RDS — 23 November 2026 (draft patch)
+- Persetujuan eksplisit pengguna: ikon informasi ditempatkan **sebelum judul**, pada header halaman, kartu, modal, pemilih ruang, asisten, dan kartu metrik. Ikon tetap monokrom, dapat difokuskan, dan tooltip tidak berubah fungsi.
+- Istilah UI `Ruang Kerja` menjadi `Ruang`; tidak ada perubahan identitas atau URL tenant.
+- Perbaikan receipt review: total tercetak dipertahankan, tanggal ambigu wajib diperiksa, tampilkan tanggal kalender berbahasa Indonesia di samping input native perangkat.
+- Bukti pengujian dan keterbatasan: `docs/FIX_MOBILE_RECEIPTS.md`, ADR-009. Tidak ada redesign shell/token maupun klaim visual parity legacy baru.

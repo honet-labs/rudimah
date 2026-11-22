@@ -163,9 +163,10 @@ Format JSON wajib:
   ]
 }';
 
+        $prompt .= \App\Modules\Pekan\Services\ReceiptDataNormalizer::instructions();
         $payload = [
             'model' => $model,
-            'max_tokens' => 1200,
+            'max_tokens' => 4096,
             'messages' => [
                 [
                     'role' => 'user',
@@ -192,7 +193,9 @@ Format JSON wajib:
                 'x-api-key' => $apiKey,
                 'anthropic-version' => '2023-06-01',
                 'content-type' => 'application/json',
-            ])->timeout(80)->post($url, $payload);
+            ])->timeout(80)->retry(2, 500, static fn ($error) =>
+                $error instanceof \Illuminate\Http\Client\ConnectionException ||
+                ($error instanceof \Illuminate\Http\Client\RequestException && in_array($error->response->status(), [429, 502, 503, 504])), throw: false)->post($url, $payload);
         } catch (\Throwable $e) {
             Log::error('Claude Vision exception', ['error' => $e->getMessage()]);
             if (str_contains(strtolower($e->getMessage()), 'timed out') || str_contains(strtolower($e->getMessage()), 'timeout') || str_contains(strtolower($e->getMessage()), '28')) {
@@ -216,7 +219,7 @@ Format JSON wajib:
             if (preg_match('/\{[\s\S]*\}/', $cleanJson, $matches)) {
                 $parsed = json_decode($matches[0], true);
                 if (is_array($parsed)) {
-                    return $this->normalizeReceiptData($parsed);
+                    return \App\Modules\Pekan\Services\ReceiptDataNormalizer::normalize($parsed);
                 }
             }
             throw new \RuntimeException('Respon Anthropic Claude tidak menghasilkan JSON kuitansi yang valid.');
@@ -238,51 +241,6 @@ Format JSON wajib:
         throw new \RuntimeException("Pemindaian OCR Anthropic Claude gagal (HTTP {$status}): {$errMsg}");
     }
 
-    protected function normalizeReceiptData(array $raw): array
-    {
-        $items = [];
-        if (!empty($raw['items']) && is_array($raw['items'])) {
-            foreach ($raw['items'] as $it) {
-                $rawQty = $it['quantity'] ?? 1;
-                $qty = is_numeric($rawQty) ? (float) $rawQty : 1;
-                if ($qty <= 0) {
-                    $qty = 1;
-                }
-                $price = (int) ($it['price_minor'] ?? ($it['price'] ?? 0));
-                $disc = (int) ($it['discount_minor'] ?? ($it['discount'] ?? 0));
-                $total = (int) ($it['total_minor'] ?? ($it['total'] ?? round(($qty * $price) - $disc)));
-                $items[] = [
-                    'item_name' => (string) ($it['item_name'] ?? $it['name'] ?? 'Item'),
-                    'quantity' => $qty,
-                    'price_minor' => $price,
-                    'discount_minor' => $disc,
-                    'total_minor' => $total,
-                ];
-            }
-        }
-
-        $subtotal = (int) ($raw['subtotal_minor'] ?? ($raw['subtotal'] ?? 0));
-        if ($subtotal === 0 && count($items) > 0) {
-            $subtotal = array_sum(array_column($items, 'total_minor'));
-        }
-        $tax = (int) ($raw['tax_minor'] ?? ($raw['tax'] ?? 0));
-        $service = (int) ($raw['service_charge_minor'] ?? ($raw['service_charge'] ?? 0));
-        $discount = (int) ($raw['discount_minor'] ?? ($raw['discount'] ?? 0));
-        $total = (int) ($raw['total_minor'] ?? ($raw['total'] ?? ($subtotal + $tax + $service - $discount)));
-
-        return [
-            'merchant_name' => (string) ($raw['merchant_name'] ?? $raw['store_name'] ?? 'Toko Belanja'),
-            'receipt_number' => (string) ($raw['receipt_number'] ?? $raw['invoice_number'] ?? 'STR-' . date('Ymd-His')),
-            'transaction_date' => (string) ($raw['transaction_date'] ?? $raw['date'] ?? date('Y-m-d')),
-            'currency' => 'Rp',
-            'subtotal_minor' => $subtotal,
-            'tax_minor' => $tax,
-            'service_charge_minor' => $service,
-            'discount_minor' => $discount,
-            'total_minor' => $total,
-            'items' => $items,
-        ];
-    }
 
     protected function buildMessagesUrl(string $endpoint): string
     {

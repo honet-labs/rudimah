@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onUnmounted } from 'vue';
 
 export interface ExistingImage {
   id: string;
@@ -68,7 +68,7 @@ function handleIncomingFiles(fileList: FileList | null) {
 
   const validNewFiles: File[] = [];
   const maxBytes = props.maxSizeMb * 1024 * 1024;
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
   for (let i = 0; i < fileList.length; i++) {
     if (validNewFiles.length >= remainingSlots) {
@@ -77,7 +77,9 @@ function handleIncomingFiles(fileList: FileList | null) {
     }
 
     const file = fileList[i];
-    if (!allowedTypes.includes(file.type)) {
+    const detectedType = file.type.toLowerCase();
+    const knownExtension = /\.(jpe?g|png|webp)$/i.test(file.name);
+    if (!allowedTypes.includes(detectedType) && detectedType !== 'image/jpg' && !(detectedType === '' && knownExtension)) {
       errorMessage.value = `Berkas "${file.name}" bukan format gambar yang didukung (JPG, PNG, WEBP).`;
       continue;
     }
@@ -93,7 +95,6 @@ function handleIncomingFiles(fileList: FileList | null) {
   if (validNewFiles.length > 0) {
     const updated = [...(props.modelValue || []), ...validNewFiles];
     emit('update:modelValue', updated);
-    syncLocalPreviews(updated);
   }
 
   if (fileInput.value) {
@@ -106,7 +107,6 @@ function removeNewFile(index: number) {
   if (updated[index]) {
     updated.splice(index, 1);
     emit('update:modelValue', updated);
-    syncLocalPreviews(updated);
   }
 }
 
@@ -141,6 +141,8 @@ function closePreview() {
 const totalCount = computed(() => {
   return (props.existingImages?.length || 0) + (props.modelValue?.length || 0);
 });
+watch(() => props.modelValue, files => syncLocalPreviews(files || []), { immediate: true, deep: true });
+onUnmounted(() => localPreviews.value.forEach(preview => URL.revokeObjectURL(preview.previewUrl)));
 
 function formatFileSize(bytes?: number): string {
   if (!bytes) return '';
@@ -174,9 +176,14 @@ function formatFileSize(bytes?: number): string {
       @dragleave.prevent="isDragging = false"
       @drop.prevent="onDrop"
       @click="fileInput?.click()"
+      role="button"
+      tabindex="0"
+      @keydown.enter.prevent="fileInput?.click()"
+      @keydown.space.prevent="fileInput?.click()"
     >
       <input
         ref="fileInput"
+        @click.stop
         type="file"
         accept="image/jpeg,image/png,image/webp"
         multiple

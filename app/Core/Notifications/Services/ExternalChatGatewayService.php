@@ -183,11 +183,11 @@ class ExternalChatGatewayService
 
             return "[RUDIMAH] Tautan Berhasil Terhubung!\n\n"
                 . "Halo, {$pairing->user->full_name}.\n"
-                . "Nomor {$channelLabel} ini telah berhasil dihubungkan ke Ruang Kerja: {$pairing->tenant->name}.\n\n"
+                . "Nomor {$channelLabel} ini telah berhasil dihubungkan ke Ruang: {$pairing->tenant->name}.\n\n"
                 . "Asisten Cerdas RUDIMAH siap membantu Anda:\n"
                 . "- Kirimkan catatan transaksi, kuitansi, atau pertanyaan keuangan harian.\n"
-                . "- Ketik /status untuk memeriksa ruang kerja yang aktif.\n"
-                . "- Ketik /tenant untuk melihat daftar atau berpindah ruang kerja.\n"
+                . "- Ketik /status untuk memeriksa ruang yang aktif.\n"
+                . "- Ketik /tenant untuk melihat daftar atau berpindah ruang.\n"
                 . "- Ketik /logout untuk memutuskan tautan chat ini kapan saja.";
         }
 
@@ -197,7 +197,7 @@ class ExternalChatGatewayService
             . "Cara Menghubungkan Akun:\n"
             . "1. Buka peramban dan login ke web RUDIMAH.\n"
             . "2. Buka menu Profil > Integrasi Chat (WhatsApp & Telegram).\n"
-            . "3. Pilih Ruang Kerja Anda, lalu klik 'Buat Kode Hubung'.\n"
+            . "3. Pilih Ruang Anda, lalu klik 'Buat Kode Hubung'.\n"
             . "4. Balas obrolan ini dengan kode yang muncul (contoh: RD-123456) dalam waktu 15 menit.";
     }
 
@@ -349,7 +349,7 @@ class ExternalChatGatewayService
             }
 
             $res = "[RUDIMAH - Hasil Pindai Struk]\n\n"
-                . "Foto struk berhasil dipindai dan dicatat ke pengeluaran ruang kerja {$session->tenant->name}:\n\n"
+                . "Foto struk berhasil dipindai dan dicatat ke pengeluaran ruang {$session->tenant->name}:\n\n"
                 . "Tempat: *{$merchantName}*\n"
                 . "Tanggal: {$date}\n"
                 . "Total Belanja: *{$totalFormatted}*\n";
@@ -478,7 +478,7 @@ class ExternalChatGatewayService
             ->values();
 
         if ($memberships->isEmpty()) {
-            return "[RUDIMAH] Anda belum terdaftar pada ruang kerja aktif manapun.";
+            return "[RUDIMAH] Anda belum terdaftar pada ruang aktif manapun.";
         }
 
         // Jika ada argumen (nomor urut atau slug tenant)
@@ -499,23 +499,23 @@ class ExternalChatGatewayService
                     'conversation_id' => null, // Reset percakapan agar terisolasi di tenant baru
                 ]);
 
-                return "[RUDIMAH] Ruang Kerja Dialihkan\n\n"
-                    . "Ruang kerja aktif Anda kini: {$targetTenant->name} ({$targetTenant->slug}).\n"
-                    . "Seluruh pencatatan dan perintah AI berikutnya akan diterapkan pada ruang kerja ini.";
+                return "[RUDIMAH] Ruang Dialihkan\n\n"
+                    . "Ruang aktif Anda kini: {$targetTenant->name} ({$targetTenant->slug}).\n"
+                    . "Seluruh pencatatan dan perintah AI berikutnya akan diterapkan pada ruang ini.";
             }
 
-            return "[RUDIMAH] Ruang kerja '{$argument}' tidak ditemukan dalam daftar ruang kerja Anda.\nKetik /tenant untuk melihat daftar pilihan.";
+            return "[RUDIMAH] Ruang '{$argument}' tidak ditemukan dalam daftar ruang Anda.\nKetik /tenant untuk melihat daftar pilihan.";
         }
 
         // Tampilkan daftar ruang kerja
-        $list = "[RUDIMAH] Daftar Ruang Kerja Anda:\n\n";
+        $list = "[RUDIMAH] Daftar Ruang Anda:\n\n";
         foreach ($memberships as $idx => $m) {
             $num = $idx + 1;
             $isCurrent = ($m->tenant_id === $session->tenant_id) ? " [Sedang Aktif]" : "";
             $list .= "{$num}. {$m->tenant->name} ({$m->tenant->slug}){$isCurrent}\n";
         }
 
-        $list .= "\nUntuk beralih ke ruang kerja lain, balas dengan:\n"
+        $list .= "\nUntuk beralih ke ruang lain, balas dengan:\n"
             . "/switch <nomor>\n"
             . "Contoh: /switch 2";
 
@@ -530,11 +530,11 @@ class ExternalChatGatewayService
         return "[RUDIMAH] Status Sesi Terhubung\n\n"
             . "Pengguna: {$session->user->full_name}\n"
             . "Email: {$session->user->email}\n"
-            . "Ruang Kerja Aktif: {$session->tenant->name} ({$session->tenant->slug})\n"
+            . "Ruang Aktif: {$session->tenant->name} ({$session->tenant->slug})\n"
             . "Kanal Integrasi: {$channelLabel}\n"
             . "Interaksi Terakhir: " . ($session->last_interaction_at ? $session->last_interaction_at->format('d M Y H:i') : 'Baru saja') . "\n\n"
             . "Perintah Navigasi:\n"
-            . "- /tenant : Lihat & ganti ruang kerja\n"
+            . "- /tenant : Lihat & ganti ruang\n"
             . "- /help : Bantuan perintah\n"
             . "- /logout : Putuskan koneksi chat ini";
     }
@@ -545,11 +545,11 @@ class ExternalChatGatewayService
     protected function buildHelpMessage(ExternalChatSession $session): string
     {
         return "[RUDIMAH] Panduan Asisten Chat (WhatsApp & Telegram)\n\n"
-            . "Ruang Kerja Saat Ini: {$session->tenant->name}\n\n"
+            . "Ruang Saat Ini: {$session->tenant->name}\n\n"
             . "Perintah Sistem:\n"
-            . "- /status : Cek info akun & ruang kerja yang sedang aktif\n"
-            . "- /tenant : Tampilkan daftar ruang kerja Anda\n"
-            . "- /switch <nomor> : Beralih ke ruang kerja lain\n"
+            . "- /status : Cek info akun & ruang yang sedang aktif\n"
+            . "- /tenant : Tampilkan daftar ruang Anda\n"
+            . "- /switch <nomor> : Beralih ke ruang lain\n"
             . "- /logout : Putuskan tautan chat ini dari akun Anda\n\n"
             . "Fungsi AI Assistant (Sama Persis dengan Web RUDIMAH):\n"
             . "1. Catat Transaksi: Kirim teks seperti 'Beli bensin pertamax 35rb di SPBU Pertamina' atau 'Makan siang soto 25rb'.\n"

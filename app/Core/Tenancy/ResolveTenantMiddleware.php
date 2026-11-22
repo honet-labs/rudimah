@@ -21,13 +21,13 @@ class ResolveTenantMiddleware
             })->where('status', 'active')->first();
 
             if (!$tenant) {
-                abort(404, 'Ruang kerja tidak ditemukan atau telah dinonaktifkan.');
+                abort(404, 'Ruang tidak ditemukan atau telah dinonaktifkan.');
             }
 
             // Verifikasi otentikasi dan keanggotaan pengguna pada ruang kerja (fail-closed)
             $user = $request->user();
             if (!$user) {
-                abort(401, 'Silakan masuk terlebih dahulu untuk mengakses ruang kerja ini.');
+                abort(401, 'Silakan masuk terlebih dahulu untuk mengakses ruang ini.');
             }
 
             if (!$user->is_active) {
@@ -40,7 +40,7 @@ class ResolveTenantMiddleware
                 ->first();
 
             if (!$membership && !$user->is_super_admin) {
-                abort(403, 'Akses ditolak. Anda bukan anggota aktif dari ruang kerja ini.');
+                abort(403, 'Akses ditolak. Anda bukan anggota aktif dari ruang ini.');
             }
 
             $tenant->role = $membership ? $membership->role : ($user->is_super_admin ? 'admin' : 'member');

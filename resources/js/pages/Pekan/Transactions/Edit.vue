@@ -9,6 +9,9 @@ import RdInput from '../../../design-system/RdInput.vue';
 import RdSelect from '../../../design-system/RdSelect.vue';
 import RdTextarea from '../../../design-system/RdTextarea.vue';
 import RdMoney from '../../../design-system/RdMoney.vue';
+import RdImageUploadMultiple from '../../../design-system/RdImageUploadMultiple.vue';
+import RdAlert from '../../../design-system/RdAlert.vue';
+import { calendarDate, localDate } from '../../../utils/date';
 import type { User, Tenant, AppManifest } from '../../../types/core';
 import type { FinanceCategory, Transaction, TransactionItem } from '../../../types/pekan';
 
@@ -29,13 +32,19 @@ const props = withDefaults(
 );
 
 const isSubmitting = ref(false);
+const images = ref<File[]>([]);
+const existingImages = ref(props.transaction.images || []);
+const errors = ref<Record<string, string>>({});
 
 const transactionType = ref<'income' | 'expense' | 'savings'>(
   props.transaction.type === 'income' ? 'income' : (props.transaction.type === 'savings' ? 'savings' : 'expense')
 );
 const categoryId = ref(props.transaction.category_id || (props.categories[0]?.id || ''));
 const accountId = ref(props.transaction.account_id || props.accounts?.[0]?.id || '');
-const transactionDate = ref(props.transaction.transaction_date ? props.transaction.transaction_date.substring(0, 10) : new Date().toISOString().substring(0, 10));
+const transactionDate = ref(calendarDate(props.transaction.transaction_date) || localDate());
+const taxMinor = ref(props.transaction.tax_minor ?? 0);
+const serviceMinor = ref(props.transaction.service_charge_minor ?? 0);
+const discountMinor = ref(props.transaction.receipt_discount_minor ?? 0);
 const description = ref(props.transaction.description || '');
 const merchantName = ref(props.transaction.merchant_name || '');
 const receiptNumber = ref(props.transaction.receipt_number || '');
@@ -106,15 +115,18 @@ function updateItemTotal(item: TransactionItem) {
   item.total_minor = Math.max(0, line);
 }
 
-const grandTotalMinor = computed(() => {
-  return items.value.reduce((acc, it) => acc + (it.total_minor || 0), 0);
-});
+// Preserve the verified receipt total when editing unrelated fields. Only apply item deltas.
+const initialItemsTotal = initialItems.reduce((sum, item) => sum + item.total_minor, 0);
+const subtotalMinor = computed(() => (props.transaction.subtotal_minor ?? props.transaction.amount_minor)
+  + items.value.reduce((sum, item) => sum + item.total_minor, 0) - initialItemsTotal);
+const grandTotalMinor = computed(() => subtotalMinor.value + taxMinor.value + serviceMinor.value - discountMinor.value);
 
 function handleSubmit() {
   if (isSubmitting.value) return;
   isSubmitting.value = true;
 
-  router.put(`/t/${props.tenant.slug}/apps/pekan/transactions/${props.transaction.id}`, {
+  router.post(`/t/${props.tenant.slug}/apps/pekan/transactions/${props.transaction.id}`, {
+    _method: 'put',
     account_id: accountId.value || null,
     type: transactionType.value,
     category_id: categoryId.value || null,
@@ -125,7 +137,15 @@ function handleSubmit() {
     receipt_number: receiptNumber.value,
     notes: notes.value,
     items: items.value,
+    subtotal_minor: subtotalMinor.value,
+    tax_minor: taxMinor.value,
+    service_charge_minor: serviceMinor.value,
+    receipt_discount_minor: discountMinor.value,
+    images: images.value,
+    existing_images: JSON.stringify(existingImages.value.map(image => image.id)),
   }, {
+    forceFormData: true,
+    onError: (validationErrors) => { errors.value = validationErrors; },
     onFinish: () => {
       isSubmitting.value = false;
     }
@@ -146,6 +166,9 @@ function handleSubmit() {
     />
 
     <form @submit.prevent="handleSubmit" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <RdAlert v-if="Object.keys(errors).length" variant="error" title="Perubahan belum tersimpan">
+        {{ Object.values(errors).join(' ') }}
+      </RdAlert>
       <!-- Kolom Kiri: Formulir Transaksi & Item Barang (2 Kolom) -->
       <div class="lg:col-span-2 space-y-6">
         <RdCard title="Informasi Transaksi">
@@ -313,6 +336,7 @@ function handleSubmit() {
         </RdCard>
 
         <RdCard title="Catatan Tambahan">
+          <RdImageUploadMultiple v-model="images" v-model:existing-images="existingImages" />
           <RdTextarea
             id="notes"
             v-model="notes"
@@ -327,6 +351,10 @@ function handleSubmit() {
       <div class="space-y-6">
         <RdCard title="Ringkasan Nominal">
           <div class="space-y-4">
+            <div>Subtotal: <RdMoney :amount-minor="subtotalMinor" /></div>
+            <RdInput v-model.number="taxMinor" type="number" label="Pajak (Rp)" min="0" />
+            <RdInput v-model.number="serviceMinor" type="number" label="Biaya layanan (Rp)" min="0" />
+            <RdInput v-model.number="discountMinor" type="number" label="Diskon struk (Rp)" min="0" />
             <div class="flex justify-between items-center text-sm border-b border-slate-100 dark:border-slate-800 pb-3">
               <span class="text-slate-500">Jumlah Baris:</span>
               <span class="font-bold">{{ items.length }} item</span>

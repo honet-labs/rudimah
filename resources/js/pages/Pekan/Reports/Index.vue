@@ -69,7 +69,7 @@ const columns = [
           </div>
 
           <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-md text-xs text-slate-600 dark:text-slate-300">
-            Kondisi arus kas ruang kerja ini berada dalam status sehat dengan tingkat rasio tabungan sebesar 46.7% dari total pendapatan bulan berjalan.
+            Kondisi arus kas ruang ini berada dalam status sehat dengan tingkat rasio tabungan sebesar 46.7% dari total pendapatan bulan berjalan.
           </div>
         </RdCard>
 

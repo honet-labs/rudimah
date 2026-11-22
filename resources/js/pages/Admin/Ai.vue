@@ -268,13 +268,13 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
   >
     <RdPageHeader
       title="Penyedia AI Platform Terpusat"
-      description="Atur kecerdasan buatan terpusat untuk Asisten Keuangan, Ekstraksi Struk OCR, dan Analisis Cerdas di seluruh ruang kerja RUDIMAH (Google Gemini, OpenAI, Anthropic Claude, 9Router Gateway)"
+      description="Atur kecerdasan buatan terpusat untuk Asisten Keuangan, Ekstraksi Struk OCR, dan Analisis Cerdas di seluruh ruang RUDIMAH (Google Gemini, OpenAI, Anthropic Claude, 9Router Gateway)"
       :breadcrumbs="[{ label: 'Administrasi', href: '/admin' }, { label: 'Penyedia AI Platform' }]"
     >
       <template #actions>
         <a href="/workspaces" class="w-full sm:w-auto">
           <RdButton variant="outline" size="sm" class="w-full sm:w-auto">
-            Kembali ke Pemilih Ruang Kerja
+            Kembali ke Pemilih Ruang
           </RdButton>
         </a>
       </template>
@@ -303,7 +303,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
 
     <RdCard
       title="Konfigurasi Model & Kunci API"
-      description="Konfigurasi di bawah ini berlaku untuk seluruh ruang kerja dan seluruh fitur kecerdasan buatan RUDIMAH."
+      description="Konfigurasi di bawah ini berlaku untuk seluruh ruang dan seluruh fitur kecerdasan buatan RUDIMAH."
       class="mb-6"
     >
       <!-- Ringkasan Status Penyedia AI -->
@@ -354,7 +354,7 @@ async function detectModels(provider: 'gemini' | 'openai' | 'claude' | '9router'
             <RdCheckbox
               v-model="aiForm.is_enabled"
               label="Aktifkan Layanan Kecerdasan Buatan (AI) Global"
-              description="Izinkan fitur asisten chat cerdas dan ekstraksi bukti transaksi otomatis di seluruh ruang kerja"
+              description="Izinkan fitur asisten chat cerdas dan ekstraksi bukti transaksi otomatis di seluruh ruang"
             />
             <RdButton
               type="button"

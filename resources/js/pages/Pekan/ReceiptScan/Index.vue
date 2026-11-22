@@ -10,6 +10,7 @@ import RdFileUpload from '../../../design-system/RdFileUpload.vue';
 import RdInput from '../../../design-system/RdInput.vue';
 import RdSelect from '../../../design-system/RdSelect.vue';
 import RdMoney from '../../../design-system/RdMoney.vue';
+import RdDateTime from '../../../design-system/RdDateTime.vue';
 import RdAlert from '../../../design-system/RdAlert.vue';
 import RdModal from '../../../design-system/RdModal.vue';
 import { secureFetch } from '../../../utils/csrf';
@@ -80,7 +81,7 @@ const extraction = ref<ReceiptExtraction>({
   description: '',
   merchant_name: '',
   receipt_number: '',
-  transaction_date: new Date().toISOString().substring(0, 10),
+  transaction_date: '',
   currency: 'Rp',
   subtotal_minor: 0,
   tax_minor: 0,
@@ -108,14 +109,9 @@ async function compressImageForUpload(file: File): Promise<File> {
       img.onload = () => {
         URL.revokeObjectURL(objectUrl);
 
-        const maxDim = 1280;
+        const maxDim = 2560;
         let width = img.width;
         let height = img.height;
-
-        if (width <= maxDim && height <= maxDim && file.size <= 400 * 1024) {
-          resolve(file);
-          return;
-        }
 
         if (width > height) {
           if (width > maxDim) {
@@ -158,7 +154,7 @@ async function compressImageForUpload(file: File): Promise<File> {
             resolve(compressed);
           },
           'image/jpeg',
-          0.78
+          0.92
         );
       };
 
@@ -175,9 +171,12 @@ async function compressImageForUpload(file: File): Promise<File> {
 }
 
 async function handleFileSelected(file: File) {
+  if (isProcessing.value || isSaving.value) return;
   isProcessing.value = true;
   errorMessage.value = null;
   hasResult.value = false;
+  scanId.value = null;
+  scannedImages.value = [];
 
   const fileToUpload = await compressImageForUpload(file);
 
@@ -185,7 +184,7 @@ async function handleFileSelected(file: File) {
   formData.append('receipt_file', fileToUpload);
 
   const abortCtrl = new AbortController();
-  const timeoutId = setTimeout(() => abortCtrl.abort(), 90000);
+  const timeoutId = setTimeout(() => abortCtrl.abort(), 175000);
 
   try {
     const res = await secureFetch(`/t/${props.tenant.slug}/apps/pekan/receipt-scan/upload`, {
@@ -213,7 +212,8 @@ async function handleFileSelected(file: File) {
         description: ext.description || ext.merchant_name || 'Belanja',
         merchant_name: ext.merchant_name || 'Toko Belanja',
         receipt_number: ext.receipt_number || '',
-        transaction_date: ext.transaction_date || new Date().toISOString().substring(0, 10),
+        transaction_date: ext.transaction_date || '',
+        transaction_date_raw: ext.transaction_date_raw || '',
         currency: 'Rp',
         subtotal_minor: Number(ext.subtotal_minor) || 0,
         tax_minor: Number(ext.tax_minor) || 0,
@@ -239,7 +239,7 @@ async function handleFileSelected(file: File) {
         });
       }
 
-      recalculateGrandTotal();
+      // Keep the printed total. Item totals can already include promotions or rounding.
       hasResult.value = true;
     } else {
       const explicitError =
@@ -263,7 +263,7 @@ async function handleFileSelected(file: File) {
     }
   } catch (err: any) {
     if (err?.name === 'AbortError') {
-      errorMessage.value = 'Waktu proses pemindaian struk melebihi batas (timeout 90 detik). Silakan coba unggah kembali dengan foto struk yang lebih fokus atau periksa koneksi dan model vision di Administrasi Sistem.';
+      errorMessage.value = 'Pemindaian belum selesai dalam batas waktu. Periksa koneksi atau coba foto yang lebih jelas. Tidak ada transaksi yang disimpan.';
     } else {
       errorMessage.value = 'Terjadi gangguan jaringan saat mengunggah struk: ' + (err.message || 'Koneksi gagal');
     }
@@ -284,6 +284,7 @@ function addItemRow() {
 }
 
 function removeItemRow(idx: number) {
+  extraction.value.subtotal_minor -= Number(extraction.value.items[idx]?.total_minor) || 0;
   extraction.value.items.splice(idx, 1);
   recalculateGrandTotal();
 }
@@ -294,20 +295,28 @@ function updateLineTotal(idx: number) {
   const qty = Number(item.quantity) || 1;
   const price = Number(item.price_minor) || 0;
   const discount = Number(item.discount_minor) || 0;
-  item.total_minor = Math.max(0, (qty * price) - discount);
+  const oldTotal = Number(item.total_minor) || 0;
+  item.total_minor = Math.max(0, Math.round(qty * price) - discount);
+  extraction.value.subtotal_minor += item.total_minor - oldTotal;
   recalculateGrandTotal();
 }
 
 function recalculateGrandTotal() {
-  const sumItems = extraction.value.items.reduce((acc, it) => acc + (Number(it.total_minor) || 0), 0);
-  extraction.value.subtotal_minor = sumItems;
   const tax = Number(extraction.value.tax_minor) || 0;
   const service = Number(extraction.value.service_charge_minor) || 0;
   const discount = Number(extraction.value.discount_minor) || 0;
-  extraction.value.total_minor = Math.max(0, sumItems + tax + service - discount);
+  extraction.value.total_minor = Math.max(0, Number(extraction.value.subtotal_minor) + tax + service - discount);
 }
 
+const totalsMatch = computed(() => Number(extraction.value.total_minor) === Number(extraction.value.subtotal_minor)
+  + Number(extraction.value.tax_minor) + Number(extraction.value.service_charge_minor) - Number(extraction.value.discount_minor));
+
 async function saveConfirmedTransaction() {
+  if (isSaving.value || isProcessing.value) return;
+  if (!scanId.value || !extraction.value.transaction_date || !totalsMatch.value || extraction.value.total_minor <= 0) {
+    errorMessage.value = 'Periksa tanggal dan cocokkan subtotal, diskon, pajak, serta total akhir dengan struk sebelum menyimpan.';
+    return;
+  }
   if (!extraction.value.merchant_name) {
     errorMessage.value = 'Nama merchant / toko wajib diisi.';
     return;
@@ -345,7 +354,7 @@ async function saveConfirmedTransaction() {
     if (res.ok && data.success) {
       router.visit(data.redirect_url || `/t/${props.tenant.slug}/apps/pekan/transactions`);
     } else {
-      errorMessage.value = data.message || 'Gagal menyimpan transaksi dari struk.';
+      errorMessage.value = data.errors ? Object.values(data.errors).flat().join(' ') : (data.message || 'Gagal menyimpan transaksi dari struk.');
     }
   } catch (err: any) {
     errorMessage.value = 'Terjadi kesalahan sistem saat menyimpan transaksi: ' + (err.message || 'Koneksi gagal');
@@ -400,7 +409,7 @@ const categoryOptions = computed(() => {
 
       <!-- Area Unggah Berkas Struk Asli -->
       <RdCard title="Unggah Foto atau Berkas Kuitansi">
-        <RdFileUpload @file-selected="handleFileSelected" />
+        <RdFileUpload :disabled="isProcessing || isSaving" @file-selected="handleFileSelected" />
         <div v-if="isProcessing" class="mt-4 p-4 text-center text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 rounded-md">
           <div class="flex items-center justify-center gap-2">
             <svg class="animate-spin h-4 w-4 text-teal-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -455,6 +464,10 @@ const categoryOptions = computed(() => {
         </RdCard>
 
         <RdCard title="Hasil Ekstraksi Kuitansi">
+          <RdAlert v-if="!extraction.transaction_date" variant="warning" title="Tanggal perlu diperiksa">
+            Tanggal struk tidak terbaca dengan pasti. Isi tanggal sesuai struk; sistem tidak menggantinya dengan tanggal hari ini.
+          </RdAlert>
+          <p v-if="extraction.transaction_date_raw" class="text-xs mb-4">Teks tanggal pada struk: {{ extraction.transaction_date_raw }}</p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <RdInput
               id="ocr_description"
@@ -501,6 +514,11 @@ const categoryOptions = computed(() => {
             </div>
           </div>
 
+          <p v-if="extraction.transaction_date" class="text-xs mb-4">
+            Tanggal transaksi yang akan disimpan: <strong><RdDateTime :value="extraction.transaction_date" /></strong>.
+            Cocokkan dengan tanggal pada foto struk, bukan urutan bulan/hari pada pengaturan perangkat.
+          </p>
+
           <!-- Rincian Item Hasil Ekstraksi -->
           <div class="mt-4">
             <div class="flex items-center justify-between mb-2">
@@ -533,7 +551,7 @@ const categoryOptions = computed(() => {
                     type="number"
                     label="Jumlah"
                     required
-                    @input="updateLineTotal(idx)"
+                    @update:model-value="updateLineTotal(idx)"
                   />
                 </div>
                 <div class="sm:col-span-2">
@@ -543,7 +561,7 @@ const categoryOptions = computed(() => {
                     type="number"
                     label="Harga Satuan (Rp)"
                     required
-                    @input="updateLineTotal(idx)"
+                    @update:model-value="updateLineTotal(idx)"
                   />
                 </div>
                 <div class="sm:col-span-2 text-right">
@@ -570,7 +588,7 @@ const categoryOptions = computed(() => {
           <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-2 text-xs">
             <div class="flex justify-between items-center">
               <span class="text-slate-500">Subtotal Barang:</span>
-              <span class="font-mono font-semibold"><RdMoney :amount-minor="extraction.subtotal_minor" /></span>
+              <div class="w-36"><RdInput v-model.number="extraction.subtotal_minor" type="number" label="Subtotal (Rp)" min="0" @update:model-value="recalculateGrandTotal" /></div>
             </div>
             <div class="flex justify-between items-center">
               <span class="text-slate-500">Pajak (PPN):</span>
@@ -579,7 +597,8 @@ const categoryOptions = computed(() => {
                   id="ocr_tax"
                   v-model.number="extraction.tax_minor"
                   type="number"
-                  @input="recalculateGrandTotal"
+                  label="Pajak (Rp)"
+                  @update:model-value="recalculateGrandTotal"
                 />
               </div>
             </div>
@@ -590,7 +609,8 @@ const categoryOptions = computed(() => {
                   id="ocr_service"
                   v-model.number="extraction.service_charge_minor"
                   type="number"
-                  @input="recalculateGrandTotal"
+                  label="Biaya layanan (Rp)"
+                  @update:model-value="recalculateGrandTotal"
                 />
               </div>
             </div>
@@ -601,16 +621,18 @@ const categoryOptions = computed(() => {
                   id="ocr_discount"
                   v-model.number="extraction.discount_minor"
                   type="number"
-                  @input="recalculateGrandTotal"
+                  label="Diskon (Rp)"
+                  @update:model-value="recalculateGrandTotal"
                 />
               </div>
             </div>
             <div class="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-800 text-sm font-bold">
               <span>Total Akhir Kuitansi:</span>
-              <span class="text-teal-800 dark:text-teal-300 font-mono text-base">
-                <RdMoney :amount-minor="extraction.total_minor" />
-              </span>
+              <div class="w-36"><RdInput v-model.number="extraction.total_minor" type="number" label="Total tercetak (Rp)" min="1" /></div>
             </div>
+            <RdAlert v-if="!totalsMatch" variant="warning" title="Angka struk belum cocok">
+              Total tercetak berbeda dari subtotal + pajak + biaya layanan − diskon. Periksa angka di atas; total tidak diubah otomatis saat hasil scan dimuat.
+            </RdAlert>
           </div>
         </RdCard>
 
@@ -623,7 +645,7 @@ const categoryOptions = computed(() => {
             type="button"
             variant="primary"
             :loading="isSaving"
-            :disabled="isSaving"
+            :disabled="isSaving || !totalsMatch || !extraction.transaction_date"
             @click="saveConfirmedTransaction"
           >
             Simpan Sebagai Transaksi Final

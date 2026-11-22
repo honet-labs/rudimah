@@ -55,7 +55,7 @@ function selectTenant(tenant: Tenant) {
     >
       <div class="flex items-center gap-2 min-w-0">
         <span class="w-2 h-2 rounded-full bg-teal-600 shrink-0" aria-hidden="true"></span>
-        <span :class="['truncate', fullWidth ? 'max-w-[190px]' : 'max-w-24 sm:max-w-36']">{{ currentTenant.name || 'Ruang Kerja' }}</span>
+        <span :class="['truncate', fullWidth ? 'max-w-[190px]' : 'max-w-24 sm:max-w-36']">{{ currentTenant.name || 'Ruang' }}</span>
       </div>
       <svg class="h-3 w-3 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="dropup ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'" />
@@ -72,7 +72,7 @@ function selectTenant(tenant: Tenant) {
       role="menu"
     >
       <div class="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-        Pilih Ruang Kerja
+        Pilih Ruang
       </div>
       <div class="max-h-52 overflow-y-auto">
         <button
@@ -96,7 +96,7 @@ function selectTenant(tenant: Tenant) {
           href="/workspaces"
           class="block px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
         >
-          Kelola Semua Ruang Kerja
+          Kelola Semua Ruang
         </a>
       </div>
     </div>

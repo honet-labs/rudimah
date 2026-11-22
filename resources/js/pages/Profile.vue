@@ -243,7 +243,7 @@ function disconnectSession(sessionId: string) {
                     </span>
                   </div>
                   <div class="text-xs text-slate-500 dark:text-slate-400">
-                    Terhubung ke Ruang Kerja: <strong class="text-slate-700 dark:text-slate-200">{{ s.tenant_name }}</strong>
+                    Terhubung ke Ruang: <strong class="text-slate-700 dark:text-slate-200">{{ s.tenant_name }}</strong>
                     <span v-if="s.last_interaction_at" class="ml-2">
                       (Terakhir aktif {{ s.last_interaction_at }})
                     </span>
@@ -287,7 +287,7 @@ function disconnectSession(sessionId: string) {
                 {{ activePairing.code }}
               </div>
               <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Ruang Kerja Target: <strong class="text-slate-700 dark:text-slate-200">{{ activePairing.tenant_name }}</strong>
+                Ruang Target: <strong class="text-slate-700 dark:text-slate-200">{{ activePairing.tenant_name }}</strong>
               </p>
             </div>
 
@@ -315,9 +315,9 @@ function disconnectSession(sessionId: string) {
                 <RdSelect
                   id="tenant_id"
                   v-model="pairingForm.tenant_id"
-                  label="Pilih Ruang Kerja Awal"
+                  label="Pilih Ruang Awal"
                   :options="tenantSelectOptions"
-                  hint="Pilih ruang kerja yang ingin Anda kelola melalui chat. Anda dapat berpindah ruang kerja kapan saja di dalam chat dengan perintah /tenant."
+                  hint="Pilih ruang yang ingin Anda kelola melalui chat. Anda dapat berpindah ruang kapan saja di dalam chat dengan perintah /tenant."
                   required
                 />
               </div>

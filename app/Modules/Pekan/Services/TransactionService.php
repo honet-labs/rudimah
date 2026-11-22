@@ -22,7 +22,7 @@ class TransactionService
 
         $tenantId = TenantContext::id();
         if (!$tenantId) {
-            throw new \RuntimeException('Konteks ruang kerja belum aktif.');
+            throw new \RuntimeException('Konteks ruang belum aktif.');
         }
 
         return DB::connection('pekan')->transaction(function () use ($data, $items, $images, $tenantId) {
@@ -162,6 +162,10 @@ class TransactionService
                 'receipt_number' => $data['receipt_number'] ?? $transaction->receipt_number,
                 'payment_method' => $data['payment_method'] ?? $transaction->payment_method,
                 'notes' => $data['notes'] ?? $transaction->notes,
+                'subtotal_minor' => (int) ($data['subtotal_minor'] ?? $transaction->subtotal_minor),
+                'tax_minor' => (int) ($data['tax_minor'] ?? $transaction->tax_minor),
+                'service_charge_minor' => (int) ($data['service_charge_minor'] ?? $transaction->service_charge_minor),
+                'receipt_discount_minor' => (int) ($data['receipt_discount_minor'] ?? $transaction->receipt_discount_minor),
                 'updated_by' => auth()->id() ?: null,
             ];
 
@@ -306,4 +310,3 @@ class TransactionService
         }
     }
 }
-

@@ -36,15 +36,16 @@ withDefaults(
           </span>
         </template>
       </nav>
-      <div class="flex items-center gap-2 flex-wrap">
-        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-          {{ title }}
-        </h1>
+      <div class="flex items-center gap-2">
         <RdInfoTooltip
           v-if="description"
           :text="description"
           title="Informasi Menu"
+          class="shrink-0"
         />
+        <h1 class="min-w-0 text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+          {{ title }}
+        </h1>
       </div>
     </div>
     <div v-if="$slots.actions" class="flex items-center gap-2 self-start md:self-auto">

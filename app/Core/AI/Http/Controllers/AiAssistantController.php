@@ -32,7 +32,7 @@ class AiAssistantController
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
-            abort(403, 'Konteks ruang kerja belum aktif.');
+            abort(403, 'Konteks ruang belum aktif.');
         }
 
         PlatformAiService::applyRuntimeConfig();
@@ -168,7 +168,7 @@ class AiAssistantController
             ->first();
 
         if (!$conversation) {
-            return response()->json(['message' => 'Percakapan tidak ditemukan pada ruang kerja ini.'], 404);
+            return response()->json(['message' => 'Percakapan tidak ditemukan pada ruang ini.'], 404);
         }
 
         // Keamanan: larang user lain mengakses percakapan privat
@@ -332,8 +332,8 @@ class AiAssistantController
         return response()->json([
             'success' => true,
             'message' => $reset
-                ? 'Ruang kerja kini otomatis menggunakan konfigurasi AI dari Administrasi Sistem.'
-                : 'Pengaturan kustom AI ruang kerja berhasil disimpan.',
+                ? 'Ruang kini otomatis menggunakan konfigurasi AI dari Administrasi Sistem.'
+                : 'Pengaturan kustom AI ruang berhasil disimpan.',
         ]);
     }
 }

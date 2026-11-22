@@ -8,7 +8,9 @@ import RdButton from '../../../design-system/RdButton.vue';
 import RdInput from '../../../design-system/RdInput.vue';
 import RdSelect from '../../../design-system/RdSelect.vue';
 import RdTextarea from '../../../design-system/RdTextarea.vue';
-import RdFileUpload from '../../../design-system/RdFileUpload.vue';
+import RdImageUploadMultiple from '../../../design-system/RdImageUploadMultiple.vue';
+import RdAlert from '../../../design-system/RdAlert.vue';
+import { localDate } from '../../../utils/date';
 import RdMoney from '../../../design-system/RdMoney.vue';
 import type { User, Tenant, AppManifest } from '../../../types/core';
 import type { FinanceCategory, TransactionItem } from '../../../types/pekan';
@@ -32,7 +34,9 @@ const isSubmitting = ref(false);
 const transactionType = ref<'income' | 'expense' | 'savings'>('expense');
 const categoryId = ref(props.categories.find(c => c.category_type === 'expense')?.id || props.categories[0]?.id || '');
 const accountId = ref(props.accounts?.[0]?.id || '');
-const transactionDate = ref(new Date().toISOString().substring(0, 10));
+const transactionDate = ref(localDate());
+const images = ref<File[]>([]);
+const errors = ref<Record<string, string>>({});
 const description = ref('');
 const merchantName = ref('');
 const receiptNumber = ref('');
@@ -96,14 +100,17 @@ function handleSubmit() {
     account_id: accountId.value || null,
     type: transactionType.value,
     category_id: categoryId.value || null,
-    amount_minor: grandTotalMinor.value > 0 ? grandTotalMinor.value : 50000,
+    amount_minor: grandTotalMinor.value,
     transaction_date: transactionDate.value,
     description: description.value || 'Pencatatan transaksi',
     merchant_name: merchantName.value,
     receipt_number: receiptNumber.value,
     notes: notes.value,
     items: items.value,
+    images: images.value,
   }, {
+    forceFormData: true,
+    onError: (validationErrors) => { errors.value = validationErrors; },
     onFinish: () => {
       isSubmitting.value = false;
     }
@@ -131,6 +138,9 @@ function handleSubmit() {
     />
 
     <form @submit.prevent="handleSubmit" class="space-y-6 max-w-4xl">
+      <RdAlert v-if="Object.keys(errors).length" variant="error" title="Transaksi belum tersimpan">
+        {{ Object.values(errors).join(' ') }}
+      </RdAlert>
       <!-- Data Transaksi Utama -->
       <RdCard title="Informasi Transaksi" description="Informasi inti mutasi keuangan, merchant, dan kategori transaksi">
         <div class="mb-4">
@@ -273,7 +283,7 @@ function handleSubmit() {
       <!-- Lampiran Berkas dan Catatan -->
       <RdCard title="Lampiran Bukti dan Catatan">
         <div class="space-y-4">
-          <RdFileUpload />
+          <RdImageUploadMultiple v-model="images" />
           <RdTextarea
             id="notes"
             v-model="notes"

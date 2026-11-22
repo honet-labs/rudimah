@@ -28,7 +28,8 @@ class AttachmentUploadService
                 continue;
             }
 
-            $ext = strtolower($file->getClientOriginalExtension());
+            // Kamera mobile kadang mengirim nama tanpa ekstensi. Gunakan MIME terdeteksi.
+            $ext = $file->guessExtension() ?: strtolower($file->getClientOriginalExtension());
             if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf'])) {
                 continue;
             }
@@ -37,7 +38,10 @@ class AttachmentUploadService
             $filename = "{$uuid}.{$ext}";
 
             try {
-                $file->move($targetDir, $filename);
+                // Jangan memindahkan temp file: OCR dan request masih membutuhkannya.
+                if (!copy($file->getRealPath(), "{$targetDir}/{$filename}")) {
+                    throw new \RuntimeException('Gagal menyalin lampiran.');
+                }
                 $filePath = "{$targetDir}/{$filename}";
                 $fileSize = file_exists($filePath) ? filesize($filePath) : 0;
 
@@ -50,6 +54,7 @@ class AttachmentUploadService
                 ];
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("[AttachmentUploadService] Gagal menyimpan salinan fisik berkas {$filename}: " . $e->getMessage());
+                throw new \RuntimeException('Lampiran belum tersimpan. Silakan coba unggah kembali.', 0, $e);
             }
         }
 

@@ -16,6 +16,8 @@ use App\Shared\Helpers\MoneyHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -121,18 +123,18 @@ class ReceiptScanController
     public function confirm(Request $request, ?string $tenantSlug = null): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
-            'scan_id' => 'nullable|string',
+            'scan_id' => 'required|uuid',
             'description' => 'nullable|string|max:255',
             'merchant_name' => 'required|string|max:200',
             'receipt_number' => 'nullable|string|max:100',
-            'transaction_date' => 'required|date',
+            'transaction_date' => 'required|date_format:Y-m-d',
             'category_id' => 'nullable|string',
             'account_id' => 'nullable|string',
-            'subtotal_minor' => 'nullable|integer|min:0',
+            'subtotal_minor' => 'required|integer|min:0',
             'tax_minor' => 'nullable|integer|min:0',
             'service_charge_minor' => 'nullable|integer|min:0',
             'discount_minor' => 'nullable|integer|min:0',
-            'total_minor' => 'required|integer|min:0',
+            'total_minor' => 'required|integer|min:1',
             'notes' => 'nullable|string|max:500',
             'items' => 'nullable|array',
             'items.*.item_name' => 'required|string|max:255',
@@ -143,6 +145,17 @@ class ReceiptScanController
             'images' => 'nullable|array',
         ]);
 
+        return DB::connection('pekan')->transaction(function () use ($request, $validated, $tenantSlug) {
+            return $this->persistConfirmation($request, $validated, $tenantSlug);
+        });
+    }
+
+    private function persistConfirmation(Request $request, array $validated, ?string $tenantSlug): JsonResponse|RedirectResponse
+    {
+        $scan = FinanceReceiptScan::whereKey($validated['scan_id'])->lockForUpdate()->firstOrFail();
+        if ($scan->status !== 'pending_review') {
+            throw ValidationException::withMessages(['scan_id' => 'Struk sudah disimpan atau tidak siap diverifikasi.']);
+        }
         $tenant = TenantContext::get();
         $slug = $tenant?->slug ?: $tenantSlug;
 
@@ -167,6 +180,9 @@ class ReceiptScanController
         $taxMinor = (int) ($validated['tax_minor'] ?? 0);
         $discountMinor = (int) ($validated['discount_minor'] ?? 0);
         $serviceChargeMinor = (int) ($validated['service_charge_minor'] ?? 0);
+        if ($totalMinor !== $subtotalMinor + $taxMinor + $serviceChargeMinor - $discountMinor) {
+            throw ValidationException::withMessages(['total_minor' => 'Total tidak cocok dengan subtotal, pajak, biaya layanan, dan diskon. Periksa kembali angka pada struk.']);
+        }
 
         $description = !empty($validated['description'])
             ? trim($validated['description'])
@@ -177,7 +193,7 @@ class ReceiptScanController
             'category_id' => $categoryId,
             'type' => 'expense',
             'amount_minor' => $totalMinor,
-            'currency' => 'Rp',
+            'currency' => 'IDR',
             'transaction_date' => $validated['transaction_date'],
             'description' => $description,
             'merchant_name' => $validated['merchant_name'],
@@ -191,23 +207,13 @@ class ReceiptScanController
 
         $items = $validated['items'] ?? [];
 
-        // Ambil lampiran berkas foto struk asli dari payload atau riwayat scan OCR
-        $receiptImages = $validated['images'] ?? [];
-        if (empty($receiptImages) && !empty($validated['scan_id'])) {
-            $scanRecord = FinanceReceiptScan::find($validated['scan_id']);
-            if ($scanRecord) {
-                $receiptImages = $scanRecord->images ?: ($scanRecord->extracted_json['_receipt_images'] ?? []);
-            }
-        }
+        // Lampiran hanya dari scan server yang telah dibatasi tenant aktif.
+        $receiptImages = $scan->images ?: ($scan->extracted_json['_receipt_images'] ?? []);
 
         $transaction = $this->transactionService->createTransaction($txData, $items, $receiptImages);
 
         // 3. Tandai status scan OCR sebagai confirmed
-        if (!empty($validated['scan_id'])) {
-            FinanceReceiptScan::where('id', $validated['scan_id'])->update([
-                'status' => 'confirmed',
-            ]);
-        }
+        $scan->update(['status' => 'confirmed']);
 
         AuditLogger::log('ocr_receipt_confirmed', 'finance_transactions', $transaction->id, null, [
             'scan_id' => $validated['scan_id'] ?? null,
@@ -231,4 +237,3 @@ class ReceiptScanController
             ->with('status', $successMsg);
     }
 }
-

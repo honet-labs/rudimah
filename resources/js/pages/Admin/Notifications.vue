@@ -134,13 +134,13 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
   >
     <RdPageHeader
       title="Kanal Notifikasi & OTP"
-      description="Konfigurasikan saluran pengiriman Email SMTP, WhatsApp (WAHA), dan Telegram untuk seluruh ruang kerja. Mendukung pengiriman ke nomor pribadi maupun Push Grup WhatsApp & Grup/Channel Telegram"
+      description="Konfigurasikan saluran pengiriman Email SMTP, WhatsApp (WAHA), dan Telegram untuk seluruh ruang. Mendukung pengiriman ke nomor pribadi maupun Push Grup WhatsApp & Grup/Channel Telegram"
       :breadcrumbs="[{ label: 'Administrasi', href: '/admin' }, { label: 'Kanal Notifikasi & OTP' }]"
     >
       <template #actions>
         <a href="/workspaces" class="w-full sm:w-auto">
           <RdButton variant="outline" size="sm" class="w-full sm:w-auto">
-            Kembali ke Pemilih Ruang Kerja
+            Kembali ke Pemilih Ruang
           </RdButton>
         </a>
       </template>
@@ -205,7 +205,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
     <!-- Panel Pengaturan -->
     <RdCard
       title="Pengaturan Kredensial Saluran Notifikasi"
-      description="Konfigurasi di bawah ini berlaku untuk seluruh ruang kerja dan notifikasi transaksi, OTP, serta alert tagihan."
+      description="Konfigurasi di bawah ini berlaku untuk seluruh ruang dan notifikasi transaksi, OTP, serta alert tagihan."
       class="mb-8"
     >
       <!-- Navigasi Tab Saluran -->
@@ -465,7 +465,7 @@ function runTest(channel: 'mail' | 'whatsapp' | 'telegram', target?: string) {
         <!-- Aksi Simpan Global -->
         <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
           <p class="text-xs text-slate-500 text-center sm:text-left">
-            Pengaturan ini berlaku instan ke seluruh ruang kerja tanpa perlu merestart server.
+            Pengaturan ini berlaku instan ke seluruh ruang tanpa perlu merestart server.
           </p>
           <RdButton
             type="submit"

@@ -78,7 +78,7 @@ function logout() {
           <span class="w-6 h-6 rounded bg-teal-800 text-white flex items-center justify-center text-xs font-black">R</span>
           <span class="text-sm font-extrabold tracking-wide uppercase">RUDIMAH</span>
         </a>
-        <span class="text-xs text-slate-400 dark:text-slate-500 hidden sm:inline-block">/ Ruang Kerja</span>
+        <span class="text-xs text-slate-400 dark:text-slate-500 hidden sm:inline-block">/ Ruang</span>
       </div>
 
       <div class="flex items-center gap-2 sm:gap-3">
@@ -155,25 +155,25 @@ function logout() {
           R
         </div>
         <div class="flex items-center justify-center gap-2">
-          <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
-            Pilih Ruang Kerja RUDIMAH
-          </h1>
           <RdInfoTooltip
-            text="Pilih ruang kerja yang ingin Anda buka atau buat ruang kerja baru untuk keluarga atau tim Anda"
-            title="Informasi Ruang Kerja"
+            text="Pilih ruang yang ingin Anda buka atau buat ruang baru untuk keluarga atau tim Anda"
+            title="Informasi Ruang"
           />
+          <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
+            Pilih Ruang RUDIMAH
+          </h1>
         </div>
       </div>
 
       <RdCard padding class="mb-6">
         <template #header>
           <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">
-            Daftar Ruang Kerja Tersedia
+            Daftar Ruang Tersedia
           </span>
         </template>
         <template #actions>
           <RdButton size="sm" variant="outline" @click="isCreateModalOpen = true">
-            Buat Ruang Kerja Baru
+            Buat Ruang Baru
           </RdButton>
         </template>
 
@@ -201,7 +201,7 @@ function logout() {
       <!-- Modal Buat Ruang Kerja -->
       <RdModal
         v-model="isCreateModalOpen"
-        title="Buat Ruang Kerja Baru"
+        title="Buat Ruang Baru"
         description="Ruang kerja memisahkan data transaksi dan anggota secara aman"
       >
         <form id="create-workspace-form" @submit.prevent="submitWorkspace" class="space-y-4">
@@ -209,7 +209,7 @@ function logout() {
             id="workspace_name"
             name="name"
             v-model="form.name"
-            label="Nama Ruang Kerja"
+            label="Nama Ruang"
             placeholder="Contoh: Keluarga Pratama, Toko Berkah"
             :error="form.errors.name"
             required
@@ -221,7 +221,7 @@ function logout() {
             Batal
           </RdButton>
           <RdButton form="create-workspace-form" type="submit" variant="primary" size="sm" :loading="form.processing">
-            Simpan Ruang Kerja
+            Simpan Ruang
           </RdButton>
         </template>
       </RdModal>
@@ -229,8 +229,8 @@ function logout() {
       <!-- Modal Pilih Aplikasi Ruang Kerja -->
       <RdModal
         v-model="isAppModalOpen"
-        :title="`Pilih Aplikasi: ${selectedTenant?.name || 'Ruang Kerja'}`"
-        description="Pilih modul aplikasi yang ingin Anda buka di ruang kerja ini"
+        :title="`Pilih Aplikasi: ${selectedTenant?.name || 'Ruang'}`"
+        description="Pilih modul aplikasi yang ingin Anda buka di ruang ini"
         max-width="lg"
       >
         <div class="space-y-3 py-2">

@@ -7,6 +7,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Pekan\Models\FinanceAccount;
 use App\Modules\Pekan\Models\FinanceCategory;
 use App\Modules\Pekan\Models\FinanceTransaction;
+use App\Modules\Pekan\Services\AttachmentUploadService;
 use App\Modules\Pekan\Services\TransactionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -108,7 +109,8 @@ class TransactionController
             'receipt_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
             'items' => 'nullable|array',
-            'images' => 'nullable|array',
+            'images' => 'nullable|array|max:8',
+            'images.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:10240',
         ]);
 
         if (empty($validated['account_id'])) {
@@ -117,7 +119,9 @@ class TransactionController
         }
 
         $items = $request->input('items', []);
-        $images = $request->input('images');
+        $images = $request->hasFile('images')
+            ? app(AttachmentUploadService::class)->uploadMultiple($request->file('images'), 'transactions')
+            : null;
 
         $this->transactionService->createTransaction($validated, $items, $images);
 
@@ -192,10 +196,26 @@ class TransactionController
             'receipt_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
             'items' => 'nullable|array',
+            'subtotal_minor' => 'nullable|integer|min:0',
+            'tax_minor' => 'nullable|integer|min:0',
+            'service_charge_minor' => 'nullable|integer|min:0',
+            'receipt_discount_minor' => 'nullable|integer|min:0',
+            'images' => 'nullable|array|max:8',
+            'images.*' => 'file|mimes:jpg,jpeg,png,webp|max:5120',
+            'existing_images' => 'nullable|json',
         ]);
 
         $items = $request->input('items', []);
-        $this->transactionService->updateTransaction($transaction, $validated, $items);
+        $images = $transaction->images ?? [];
+        if ($request->filled('existing_images')) {
+            $retainedIds = json_decode($validated['existing_images'], true);
+            if (!is_array($retainedIds)) abort(422, 'Daftar lampiran tidak valid.');
+            $images = array_values(array_filter($images, fn ($image) => in_array($image['id'], $retainedIds, true)));
+        }
+        if ($request->hasFile('images')) {
+            $images = array_merge($images, app(AttachmentUploadService::class)->uploadMultiple($request->file('images'), 'transactions'));
+        }
+        $this->transactionService->updateTransaction($transaction, $validated, $items, $images);
 
         $tenant = TenantContext::get();
         $slug = $tenant?->slug ?: $tenantSlug ?: session('current_tenant_slug');
@@ -218,4 +238,3 @@ class TransactionController
             ->with('status', 'Transaksi berhasil dihapus.');
     }
 }
-

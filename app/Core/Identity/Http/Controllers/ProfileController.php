@@ -39,7 +39,7 @@ class ProfileController
                 'channel' => $s->channel,
                 'channel_user_id' => $s->channel_user_id,
                 'tenant_id' => $s->tenant_id,
-                'tenant_name' => $s->tenant?->name ?? 'Ruang Kerja',
+                'tenant_name' => $s->tenant?->name ?? 'Ruang',
                 'last_interaction_at' => $s->last_interaction_at?->diffForHumans(),
                 'created_at' => $s->created_at?->format('d M Y H:i'),
             ]);
@@ -128,7 +128,7 @@ class ProfileController
             ->first();
 
         if (!$membership || !$membership->tenant) {
-            return back()->with('error', 'Ruang kerja yang dipilih tidak valid atau Anda bukan anggota aktif.');
+            return back()->with('error', 'Ruang yang dipilih tidak valid atau Anda bukan anggota aktif.');
         }
 
         $pairing = $gateway->generatePairingCode($user, $membership->tenant, $validated['channel'] ?? 'any');
@@ -152,4 +152,3 @@ class ProfileController
         return back()->with('error', 'Sesi obrolan tidak ditemukan.');
     }
 }
-

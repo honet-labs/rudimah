@@ -20,3 +20,9 @@ Dokumen ini mencatat ringkasan pengujian unit, fitur, isolasi keamanan tenant, d
 * UI/UX Design System: Seluruh antarmuka mengonsumsi token semantik di `tokens.css` dan komponen pustaka `Rd*`.
 * Standar Aksesibilitas: Seluruh form dan kontrol memenuhi target WCAG 2.2 AA.
 * Non-Destructive DevOps: Seluruh skrip siklus hidup deployment teruji mempertahankan data persisten.
+
+## 3. Verifikasi aktual perbaikan mobile — 23 November 2026
+Catatan di atas adalah laporan historis, bukan hasil pengujian ulang pada sesi ini. Rujukan aktual: `docs/FIX_MOBILE_RECEIPTS.md`.
+- Suite regresi baru receipt/mobile/context: **13 tes / 67 assertions lulus**, menggunakan SQLite in-memory dan HTTP fake, bukan database atau AI produksi.
+- Build frontend serta integrasi browser fixture untuk upload, total, tanggal, ikon, dan responsivitas lulus.
+- Suite lama **belum seluruhnya lulus**: 4 errors dan 4 failures juga muncul pada baseline `d27f520` di environment pengujian ini. Klaim seluruh release gates selesai tidak dapat disimpulkan dari laporan historis.

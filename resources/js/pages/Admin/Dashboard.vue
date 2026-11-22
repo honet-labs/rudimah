@@ -86,7 +86,7 @@ const props = defineProps<{
 }>();
 
 const tenantColumns = [
-  { key: 'name', label: 'Nama Ruang Kerja' },
+  { key: 'name', label: 'Nama Ruang' },
   { key: 'slug', label: 'Slug URL' },
   { key: 'members_count', label: 'Anggota', width: '90px', align: 'center' as const },
   { key: 'created_at', label: 'Terdaftar', width: '120px' },
@@ -99,7 +99,7 @@ const userColumns = [
   { key: 'email', label: 'Alamat Email' },
   { key: 'has_mfa', label: 'Keamanan MFA', width: '130px', align: 'center' as const },
   { key: 'is_super_admin', label: 'Hak Akses', width: '130px', align: 'center' as const },
-  { key: 'workspaces_count', label: 'Ruang Kerja', width: '110px', align: 'center' as const },
+  { key: 'workspaces_count', label: 'Ruang', width: '110px', align: 'center' as const },
 ];
 
 const activeAiDetail = computed(() => {
@@ -125,7 +125,7 @@ const activeAiDetail = computed(() => {
       <template #actions>
         <a href="/workspaces" class="w-full sm:w-auto">
           <RdButton variant="outline" size="sm" class="w-full sm:w-auto">
-            Kembali ke Pemilih Ruang Kerja
+            Kembali ke Pemilih Ruang
           </RdButton>
         </a>
       </template>
@@ -146,7 +146,7 @@ const activeAiDetail = computed(() => {
     <!-- Kartu Metrik Sistem & Kesehatan Platform -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
       <RdCard padding>
-        <span class="text-[11px] sm:text-xs text-slate-500 font-medium truncate block">Total Ruang Kerja</span>
+        <span class="text-[11px] sm:text-xs text-slate-500 font-medium truncate block">Total Ruang</span>
         <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5 sm:mt-1">
           {{ systemStats?.totalTenants ?? 1 }}
         </div>
@@ -194,7 +194,7 @@ const activeAiDetail = computed(() => {
             Penyedia AI: {{ activeAiDetail?.name || aiSettings?.active_provider?.toUpperCase() || 'Belum Diatur' }}
           </h4>
           <p class="text-xs text-slate-500 leading-relaxed">
-            Model aktif: <code class="font-mono text-teal-600 dark:text-teal-400 font-medium">{{ activeAiDetail?.model || '-' }}</code>. Digunakan serentak untuk Chat Asisten Keuangan dan Pindai Struk OCR di seluruh ruang kerja.
+            Model aktif: <code class="font-mono text-teal-600 dark:text-teal-400 font-medium">{{ activeAiDetail?.model || '-' }}</code>. Digunakan serentak untuk Chat Asisten Keuangan dan Pindai Struk OCR di seluruh ruang.
           </p>
         </div>
         <div class="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
@@ -243,20 +243,20 @@ const activeAiDetail = computed(() => {
           <div class="flex items-center justify-between">
             <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Multi-Tenancy</span>
             <RdBadge variant="info">
-              {{ systemStats?.totalTenants ?? 1 }} Ruang Kerja
+              {{ systemStats?.totalTenants ?? 1 }} Ruang
             </RdBadge>
           </div>
           <h4 class="text-base font-bold text-slate-900 dark:text-white">
-            Direktori Seluruh Ruang Kerja
+            Direktori Seluruh Ruang
           </h4>
           <p class="text-xs text-slate-500 leading-relaxed">
-            Kelola seluruh tenant keluarga dan usaha, pantau anggota, dan akses instan ke seluruh ruang kerja terdaftar.
+            Kelola seluruh tenant keluarga dan usaha, pantau anggota, dan akses instan ke seluruh ruang terdaftar.
           </p>
         </div>
         <div class="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
           <a href="/admin/workspaces">
             <RdButton variant="outline" size="sm">
-              Buka Semua Ruang Kerja
+              Buka Semua Ruang
             </RdButton>
           </a>
         </div>
@@ -291,13 +291,13 @@ const activeAiDetail = computed(() => {
     <!-- Seksi 1: Pratinjau Ruang Kerja Terbaru -->
     <div class="mb-6">
       <RdCard
-        title="Ruang Kerja Terkini"
+        title="Ruang Terkini"
         description="Pratinjau tenant terdaftar terbaru di platform RUDIMAH"
       >
         <template #actions>
           <a href="/admin/workspaces">
             <RdButton variant="outline" size="sm">
-              Lihat Semua Ruang Kerja
+              Lihat Semua Ruang
             </RdButton>
           </a>
         </template>
@@ -324,7 +324,7 @@ const activeAiDetail = computed(() => {
           <template #actions="{ item }">
             <a :href="`/t/${item.slug}/apps/pekan/dashboard`" class="inline-block whitespace-nowrap">
               <RdButton variant="outline" size="sm">
-                Buka Ruang Kerja
+                Buka Ruang
               </RdButton>
             </a>
           </template>
@@ -363,7 +363,7 @@ const activeAiDetail = computed(() => {
             </RdBadge>
           </template>
           <template #workspaces_count="{ value }">
-            <span class="text-xs font-medium whitespace-nowrap">{{ value }} Ruang Kerja</span>
+            <span class="text-xs font-medium whitespace-nowrap">{{ value }} Ruang</span>
           </template>
         </RdTable>
       </RdCard>

@@ -24,11 +24,13 @@ const isoDatetime = computed(() => {
 
 const formatted = computed(() => {
   if (!props.value) return '-';
-  const d = new Date(props.value);
+  const calendar = typeof props.value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(props.value);
+  const d = new Date(calendar ? `${props.value}T00:00:00+07:00` : props.value);
   if (isNaN(d.getTime())) return String(props.value);
 
   if (props.format === 'time') {
     return new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
@@ -37,6 +39,7 @@ const formatted = computed(() => {
 
   if (props.format === 'datetime') {
     return new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -47,6 +50,7 @@ const formatted = computed(() => {
   }
 
   return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
     day: 'numeric',
     month: 'short',
     year: 'numeric',

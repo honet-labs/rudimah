@@ -44,7 +44,7 @@ class TenantAssistantService
         $userId = auth()->id();
 
         if (!$tenantId || !$userId) {
-            throw new \RuntimeException('Konteks ruang kerja dan pengguna wajib aktif.');
+            throw new \RuntimeException('Konteks ruang dan pengguna wajib aktif.');
         }
 
         PlatformAiService::applyRuntimeConfig();
@@ -99,7 +99,7 @@ class TenantAssistantService
 
         // Verifikasi isolasi keamanan: percakapan wajib milik tenant dan user yang sedang aktif
         if ($conversation->tenant_id !== $tenantId) {
-            throw new \Illuminate\Auth\Access\AuthorizationException('Percakapan ini berada di luar ruang kerja Anda.');
+            throw new \Illuminate\Auth\Access\AuthorizationException('Percakapan ini berada di luar ruang Anda.');
         }
 
         if ($conversation->user_id !== $userId && !auth()->user()?->is_super_admin) {
@@ -127,7 +127,7 @@ class TenantAssistantService
 
         // 2. Evaluasi Perlindungan Keamanan & Anti-Injeksi Prompt Cepat
         if ($this->isExplicitOutOfScopeOrInjection($userMessageText)) {
-            $refusalText = "Maaf, sebagai Asisten Cerdas RUDIMAH, peran saya dikhususkan untuk membantu manajemen keuangan harian (PEKAN), pencatatan transaksi, pos anggaran, target tabungan, pengingat tagihan, dan visualisasi grafik keuangan pada ruang kerja ini. Saya tidak dapat melayani permintaan penulisan kode program/skrip atau topik di luar manajemen keuangan platform RUDIMAH.";
+            $refusalText = "Maaf, sebagai Asisten Cerdas RUDIMAH, peran saya dikhususkan untuk membantu manajemen keuangan harian (PEKAN), pencatatan transaksi, pos anggaran, target tabungan, pengingat tagihan, dan visualisasi grafik keuangan pada ruang ini. Saya tidak dapat melayani permintaan penulisan kode program/skrip atau topik di luar manajemen keuangan platform RUDIMAH.";
 
             return AiMessage::create([
                 'id' => (string) Str::uuid(),
@@ -150,7 +150,7 @@ class TenantAssistantService
                 'conversation_id' => $conversation->id,
                 'tenant_id' => $tenantId,
                 'role' => 'assistant',
-                'content' => 'Layanan Asisten AI saat ini sedang dinonaktifkan oleh administrator ruang kerja Anda.',
+                'content' => 'Layanan Asisten AI saat ini sedang dinonaktifkan oleh administrator ruang Anda.',
                 'metadata' => ['disabled' => true],
             ]);
         }
@@ -184,7 +184,7 @@ class TenantAssistantService
         }
 
         // 3. Bangun prompt sistem dengan batasan ketat tenant dan konteks data riil
-        $systemPrompt = $this->contextBuilder->buildSystemPrompt($setting?->system_instructions);
+        $systemPrompt = $this->contextBuilder->buildSystemPrompt($setting?->system_instructions, $userMessageText);
 
         // 4. Siapkan riwayat percakapan (maksimal 10 pesan terakhir)
         $pastMessages = AiMessage::where('conversation_id', $conversation->id)
@@ -1684,7 +1684,7 @@ class TenantAssistantService
             // Jika balasan AI keliru menolak ("Maaf, sebagai Asisten Cerdas RUDIMAH..."), ganti dengan teks pengantar yang ramah
             if (preg_match('/Maaf,\s*sebagai\s*Asisten\s*Cerdas\s*RUDIMAH/i', $replyContent) ||
                 preg_match('/tidak\s*dapat\s*melayani\s*permintaan\s*penulisan\s*kode/i', $replyContent)) {
-                $replyContent = "Berikut grafik visualisasi data transaksi keuangan untuk ruang kerja Anda:";
+                $replyContent = "Berikut grafik visualisasi data transaksi keuangan untuk ruang Anda:";
             }
 
             return $this->buildFallbackChartOption($userMessageText, $tenantId);
@@ -2003,7 +2003,7 @@ class TenantAssistantService
      * kandidat tanggal dari ekstraksi, dan waktu saat ini (now).
      * Pesan pengguna adalah Single Source of Truth untuk waktu/tanggal relatif dan eksplisit.
      */
-    public function resolveTransactionDate(string $userText, ?string $candidateDate = null, ?string $referenceDate = null): string
+    public function resolveTransactionDate(string $userText, ?string $candidateDate = null, string|\DateTimeInterface|null $referenceDate = null): string
     {
         $today = now()->toDateString();
         $userTextTrimmed = trim($userText);
@@ -2063,10 +2063,9 @@ class TenantAssistantService
             }
         }
 
-        // 9. Jika ada candidate date yang valid
-        if (!empty($candidateDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $candidateDate)) {
-            return $candidateDate;
-        }
+        // A correction without a new date must retain the existing calendar date.
+        if ($referenceDate instanceof \DateTimeInterface) return $referenceDate->format('Y-m-d');
+        if ($referenceDate) return substr($referenceDate, 0, 10);
 
         // 10. Default Aman: Selalu gunakan tanggal HARI INI
         return $today;
@@ -2531,5 +2530,3 @@ class TenantAssistantService
         ];
     }
 }
-
-

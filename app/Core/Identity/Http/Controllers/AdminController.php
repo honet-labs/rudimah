@@ -219,7 +219,7 @@ class AdminController
 
         PlatformNotificationService::saveSettings($validated);
 
-        return back()->with('status', 'Konfigurasi notifikasi platform berhasil disimpan dan diterapkan untuk semua ruang kerja.');
+        return back()->with('status', 'Konfigurasi notifikasi platform berhasil disimpan dan diterapkan untuk semua ruang.');
     }
 
     /**
@@ -292,7 +292,7 @@ class AdminController
 
         PlatformAiService::saveSettings($validated);
 
-        return back()->with('status', 'Konfigurasi Penyedia AI Platform berhasil disimpan dan diterapkan untuk seluruh ruang kerja.');
+        return back()->with('status', 'Konfigurasi Penyedia AI Platform berhasil disimpan dan diterapkan untuk seluruh ruang.');
     }
 
     /**

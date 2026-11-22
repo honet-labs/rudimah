@@ -28,7 +28,7 @@ class ReceiptOcrService
 
         $tenantId = TenantContext::id();
         if (!$tenantId) {
-            throw new \RuntimeException('Konteks ruang kerja belum aktif.');
+            throw new \RuntimeException('Konteks ruang belum aktif.');
         }
 
         // Validasi batasan berkas
@@ -46,7 +46,7 @@ class ReceiptOcrService
         // Ambil konfigurasi AI ruang kerja atau platform global (100% sinkron dan sama persis dengan Chat AI)
         $tenantSetting = TenantAiSetting::where('tenant_id', $tenantId)->first();
         if ($tenantSetting && !$tenantSetting->is_enabled) {
-            throw new \RuntimeException('Layanan AI dinonaktifkan untuk ruang kerja ini.');
+            throw new \RuntimeException('Layanan AI dinonaktifkan untuk ruang ini.');
         }
 
         $platformSettings = PlatformAiService::getSettings();
@@ -146,7 +146,7 @@ class ReceiptOcrService
 
     /**
      * Mengoptimasi ukuran gambar struk belanja sebelum dikirim ke gateway Vision AI.
-     * Mengubah resolusi gambar ultra-besar menjadi maksimal 1600px dan mengompres ke JPEG
+     * Mengubah resolusi gambar ultra-besar menjadi maksimal 2560px dan mengompres ke JPEG
      * agar payload cepat terunggah dan model vision memprosesnya tanpa timeout.
      */
     protected function prepareImageForOcr(UploadedFile $file, string $mimeType): array
@@ -180,7 +180,8 @@ class ReceiptOcrService
             $width = imagesx($img);
             $height = imagesy($img);
 
-            $maxDim = 1280;
+            // Preserve small print on long receipts; avoid a second aggressive mobile resize.
+            $maxDim = 2560;
             if ($width > $maxDim || $height > $maxDim) {
                 if ($width >= $height) {
                     $newWidth = $maxDim;
@@ -191,15 +192,14 @@ class ReceiptOcrService
                 }
 
                 $resized = imagecreatetruecolor($newWidth, $newHeight);
-                imagealphablending($resized, false);
-                imagesavealpha($resized, true);
+                imagefill($resized, 0, 0, imagecolorallocate($resized, 255, 255, 255));
                 imagecopyresampled($resized, $img, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
                 imagedestroy($img);
                 $img = $resized;
             }
 
             ob_start();
-            imagejpeg($img, null, 75);
+            imagejpeg($img, null, 92);
             $compressedData = ob_get_clean();
             imagedestroy($img);
 

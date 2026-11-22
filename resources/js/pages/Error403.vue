@@ -15,7 +15,7 @@ defineProps<{
       Akses Tidak Diizinkan
     </h1>
     <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 max-w-md mt-2 mb-6">
-      {{ message || 'Anda tidak memiliki hak akses atau izin yang cukup untuk membuka sumber daya ini pada ruang kerja aktif.' }}
+      {{ message || 'Anda tidak memiliki hak akses atau izin yang cukup untuk membuka sumber daya ini pada ruang aktif.' }}
     </p>
     <a href="/">
       <RdButton variant="primary">

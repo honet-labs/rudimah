@@ -593,7 +593,7 @@ function deleteAccount() {
     <RdModal
       v-model="showCategoryModal"
       :title="isEditing ? 'Ubah Kategori Transaksi' : 'Tambah Kategori Transaksi'"
-      :description="isEditing ? 'Perbarui informasi pos kategori keuangan' : 'Buat pos kategori baru untuk pengeluaran, pemasukan, atau tabungan ruang kerja'"
+      :description="isEditing ? 'Perbarui informasi pos kategori keuangan' : 'Buat pos kategori baru untuk pengeluaran, pemasukan, atau tabungan ruang'"
       max-width="md"
     >
       <form @submit.prevent="submitCategory" class="space-y-4 py-2">

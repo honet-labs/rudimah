@@ -20,16 +20,17 @@ withDefaults(
       class="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
     >
       <div>
-        <div class="flex items-center gap-1.5 flex-wrap">
-          <h3 v-if="title" class="text-sm font-semibold text-slate-800 dark:text-slate-100">
-            {{ title }}
-          </h3>
+        <div class="flex items-center gap-1.5">
           <RdInfoTooltip
             v-if="description"
             :text="description"
             size="sm"
             title="Informasi Bagian"
+            class="shrink-0"
           />
+          <h3 v-if="title" class="min-w-0 text-sm font-semibold text-slate-800 dark:text-slate-100">
+            {{ title }}
+          </h3>
         </div>
         <slot name="header" />
       </div>

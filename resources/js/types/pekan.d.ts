@@ -114,6 +114,7 @@ export interface ReceiptExtraction {
   merchant_name: string;
   receipt_number?: string;
   transaction_date?: string;
+  transaction_date_raw?: string;
   currency?: string;
   subtotal_minor: number;
   tax_minor: number;

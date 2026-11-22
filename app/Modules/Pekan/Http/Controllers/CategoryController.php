@@ -18,7 +18,7 @@ class CategoryController
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
-            abort(403, 'Konteks ruang kerja tidak valid.');
+            abort(403, 'Konteks ruang tidak valid.');
         }
 
         $validated = $request->validate([
@@ -51,7 +51,7 @@ class CategoryController
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
-            abort(403, 'Konteks ruang kerja tidak valid.');
+            abort(403, 'Konteks ruang tidak valid.');
         }
 
         $categoryId = $request->route('id') ?: $id;
@@ -89,7 +89,7 @@ class CategoryController
     {
         $tenant = TenantContext::get();
         if (!$tenant) {
-            abort(403, 'Konteks ruang kerja tidak valid.');
+            abort(403, 'Konteks ruang tidak valid.');
         }
 
         $categoryId = $request->route('id') ?: $id;

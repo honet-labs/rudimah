@@ -48,8 +48,8 @@ class FinanceTransaction extends Model
         'tax_minor' => 'integer',
         'service_charge_minor' => 'integer',
         'receipt_discount_minor' => 'integer',
-        'transaction_date' => 'date',
-        'input_date' => 'date',
+        'transaction_date' => 'date:Y-m-d',
+        'input_date' => 'date:Y-m-d',
         'images' => 'array',
     ];
 
